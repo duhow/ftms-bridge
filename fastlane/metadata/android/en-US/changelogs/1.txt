@@ -19,12 +19,12 @@ Initial release.
 - Delete past workouts via long-press
 - BH Fitness iConcept 3.0 treadmill now supported — connect and start using it
 - Session recording starts and stops automatically when the machine starts or stops
-- Fixed: GATT operation queue serialised — all CCCD subscriptions and characteristic reads now complete reliably (fixes no data on BH Fitness and similar devices)
-- Audio Bluetooth devices (earbuds, headphones) are now hidden from the scan list
+- Fixed: GATT operation queue serialized — all CCCD subscriptions and characteristic reads now complete reliably (fixes no data on BH Fitness and similar devices)
+- Audio devices (earbuds, headphones) are now hidden from the scan list
 - Previously connected devices remain visible in the list after disconnect, with a Reconnect button — no need to re-scan
 - Fixed: dashboard metrics are cleared when device disconnects
 - Show notification when device unexpectedly disconnects
 - Fixed: BH Fitness treadmill incline was displayed 6× too high — now correctly divided
 - Fixed: BH Fitness indoor bike shows strides/min (from proprietary energy field) with correct label
 - Fixed: session time now uses wall-clock when device does not provide elapsed time (BH Fitness treadmill/bike)
-- Fixed: calories tile always shows the received value (0 kcal) rather than hiding it
+- Fixed: energy/calories tile always displays a value; for BH Fitness indoor bikes it shows strides/min instead of a misleading kcal reading

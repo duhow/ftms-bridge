@@ -221,9 +221,10 @@ class MainActivity : AppCompatActivity() {
                 val isFtms = serviceUuids.contains(FtmsConstants.FTMS_SERVICE_UUID)
                 val isHr = serviceUuids.contains(FtmsConstants.HR_SERVICE_UUID)
 
-                // Skip devices that advertise services but none of them are fitness-related
+                // Skip devices that advertise service UUIDs but none of them are fitness-related
                 // (e.g. audio headphones, earbuds). Devices with no service UUIDs in their
                 // advertisement are kept as "unknown" since some fitness equipment omits them.
+                // This prevents audio Bluetooth devices from cluttering the scan list.
                 if (serviceUuids.isNotEmpty() && !isFtms && !isHr) return
 
                 val existing = scanResultsMap[device.address]
@@ -538,6 +539,8 @@ class MainActivity : AppCompatActivity() {
 
     /**
      * Show only the metric tiles that are relevant to [machineType].
+     * The Energy tile always shows; its label/unit switches between kcal and strides/min
+     * depending on the data received (see [updateDashboard]).
      *
      * Treadmill  → Speed, HR, Distance, Energy, Time, Inclination
      * Indoor Bike → Speed, HR, Cadence, Power, Distance, Energy, Time, Resistance

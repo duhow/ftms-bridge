@@ -300,8 +300,8 @@ class BleConnectionManager(
             listener?.onServicesReady(ftmsChars, hasHeartRate)
 
             // --- Step 3: read informational characteristics AFTER all CCCD writes ---
-            // Keeping reads at the end avoids the race condition where readCharacteristic()
-            // returns false because writeDescriptor() is in-flight (or vice-versa).
+            // The unified GattOp queue guarantees all descriptor writes (and Request Control)
+            // complete before any read begins, eliminating the bus-busy race condition.
             if (ActivityCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED) {
                 ftmsService?.getCharacteristic(FtmsConstants.FITNESS_MACHINE_FEATURE_UUID)
                     ?.let { scheduleCharRead(it) }
