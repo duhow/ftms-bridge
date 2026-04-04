@@ -10,6 +10,8 @@ object FtmsConstants {
     val FITNESS_MACHINE_FEATURE_UUID: UUID = uuidFrom16Bit(0x2ACC)
     val TREADMILL_DATA_UUID: UUID = uuidFrom16Bit(0x2ACD)
     val CROSS_TRAINER_DATA_UUID: UUID = uuidFrom16Bit(0x2ACE)
+    val STEP_CLIMBER_DATA_UUID: UUID = uuidFrom16Bit(0x2AD0)
+    val STAIR_CLIMBER_DATA_UUID: UUID = uuidFrom16Bit(0x2AD1)
     val INDOOR_BIKE_DATA_UUID: UUID = uuidFrom16Bit(0x2AD2)
     val TRAINING_STATUS_UUID: UUID = uuidFrom16Bit(0x2AD3)
     val SUPPORTED_SPEED_RANGE_UUID: UUID = uuidFrom16Bit(0x2AD4)
@@ -55,6 +57,7 @@ object FtmsConstants {
         TREADMILL,
         INDOOR_BIKE,
         CROSS_TRAINER,
+        STAIR_CLIMBER,
         UNKNOWN
     }
 
