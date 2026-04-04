@@ -89,10 +89,14 @@ class BleScanner(private val context: Context) {
     fun isBluetoothEnabled(): Boolean = bluetoothAdapter?.isEnabled == true
 
     /**
-     * Returns all BLE (LE or dual-mode) devices that are already bonded to this phone.
-     * These can be connected via GATT without a prior scan — useful for devices like
-     * Gadgetbridge-managed wearables (e.g. Mi Band 7) that are paired but not currently
-     * advertising a discoverable service UUID.
+     * Returns all bonded devices that could be BLE-capable.
+     *
+     * Android caches a bonded device's transport type only after an active connection has
+     * been established.  Idle paired devices (e.g. a Mi Band managed by Gadgetbridge that
+     * isn't currently advertising) often report [BluetoothDevice.DEVICE_TYPE_UNKNOWN], so
+     * filtering strictly on [BluetoothDevice.DEVICE_TYPE_LE] / [BluetoothDevice.DEVICE_TYPE_DUAL]
+     * would exclude them.  We therefore include UNKNOWN-type devices as well and rely on the
+     * caller to apply class-based or name-based filtering to exclude non-fitness peripherals.
      */
     fun getBondedBleDevices(): List<BluetoothDevice> {
         if (ActivityCompat.checkSelfPermission(
@@ -102,7 +106,8 @@ class BleScanner(private val context: Context) {
         return bluetoothAdapter?.bondedDevices
             ?.filter {
                 it.type == BluetoothDevice.DEVICE_TYPE_LE ||
-                it.type == BluetoothDevice.DEVICE_TYPE_DUAL
+                it.type == BluetoothDevice.DEVICE_TYPE_DUAL ||
+                it.type == BluetoothDevice.DEVICE_TYPE_UNKNOWN
             }
             ?: emptyList()
     }

@@ -2,6 +2,7 @@ package net.duhowpi.ftmsbridge
 
 import android.Manifest
 import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothClass
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.le.ScanResult
 import android.content.Intent
@@ -819,6 +820,11 @@ class MainActivity : AppCompatActivity() {
             val name = device.name ?: return@forEach
             if (name.isBlank()) return@forEach
             if (scanResultsMap.containsKey(device.address)) return@forEach
+            // Exclude audio/video peripherals (headsets, speakers, earbuds) by Bluetooth class.
+            // Classic BT audio devices report DEVICE_TYPE_CLASSIC or DEVICE_TYPE_UNKNOWN and
+            // always have the AUDIO_VIDEO major device class.
+            val majorClass = device.bluetoothClass?.majorDeviceClass
+            if (majorClass == BluetoothClass.Device.Major.AUDIO_VIDEO) return@forEach
             if (isIgnoredDevice(name)) return@forEach
             scanResultsMap[device.address] = ScannedDeviceInfo(
                 name = name,
