@@ -1,3 +1,40 @@
 <resources>
-    <string name="app_name">My App</string>
+    <string name="app_name">FTMS Bridge</string>
+
+    <!-- Connection -->
+    <string name="scan">Scan</string>
+    <string name="stop_scan">Stop</string>
+    <string name="connected">Connected</string>
+    <string name="not_connected">Not connected</string>
+    <string name="devices_found">%d device(s) found</string>
+    <string name="no_devices_found">No devices found</string>
+    <string name="select_fitness_machine">Select fitness machine</string>
+    <string name="select_hr_sensor">Select heart rate sensor</string>
+    <string name="scan_failed">Scan failed (error %d)</string>
+    <string name="permissions_required">Bluetooth permissions are required</string>
+
+    <!-- Session -->
+    <string name="start_session">Start</string>
+    <string name="stop_session">Stop</string>
+    <string name="recording">● REC</string>
+
+    <!-- Metrics -->
+    <string name="metric_speed">Speed</string>
+    <string name="metric_cadence">Cadence</string>
+    <string name="metric_power">Power</string>
+    <string name="metric_heart_rate">Heart Rate</string>
+    <string name="metric_distance">Distance</string>
+    <string name="metric_energy">Energy</string>
+    <string name="metric_elapsed_time">Time</string>
+    <string name="metric_inclination">Inclination</string>
+    <string name="metric_resistance">Resistance</string>
+
+    <!-- Units -->
+    <string name="unit_kmh">km/h</string>
+    <string name="unit_rpm">rpm</string>
+    <string name="unit_watts">W</string>
+    <string name="unit_bpm">bpm</string>
+    <string name="unit_km">km</string>
+    <string name="unit_kcal">kcal</string>
+    <string name="unit_percent">%</string>
 </resources>

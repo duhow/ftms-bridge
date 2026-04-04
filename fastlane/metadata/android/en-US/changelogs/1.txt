@@ -1,3 +1,9 @@
 Initial release.
 
-- Write your changes here.
+- Connect to FTMS-compatible treadmills and indoor bikes
+- Heart rate sensor support via BLE (Gadgetbridge compatible)
+- Real-time dashboard with speed, cadence, power, distance, HR, energy
+- Session recording to local database
+- Debug Bluetooth communication logging
+- BH Fitness device support
+- Portrait and landscape layouts

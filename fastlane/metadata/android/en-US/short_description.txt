@@ -1,1 +1,1 @@
-Short description of app.
+Connect to Bluetooth FTMS fitness machines, record workouts and monitor metrics.

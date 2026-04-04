@@ -1,1 +1,9 @@
-Full description of app.
+FTMS Bridge connects to Bluetooth FTMS-compatible treadmills and indoor bikes to capture real-time workout data. Supports BH Fitness machines and any FTMS-compatible equipment.
+
+Features:
+- Real-time dashboard with speed, cadence, power, distance, heart rate, energy, and more
+- Heart rate sensor support (Xiaomi Smart Band via Gadgetbridge, chest straps)
+- Session recording to local database
+- Debug Bluetooth logging for protocol analysis
+- BH Fitness treadmill and indoor bike support
+- Generic FTMS support for other brands

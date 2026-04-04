@@ -1,3 +1,40 @@
 <resources>
-    <string name="app_name">My App</string>
+    <string name="app_name">FTMS Bridge</string>
+
+    <!-- Connection -->
+    <string name="scan">Escanejar</string>
+    <string name="stop_scan">Aturar</string>
+    <string name="connected">Connectat</string>
+    <string name="not_connected">No connectat</string>
+    <string name="devices_found">%d dispositiu(s) trobat(s)</string>
+    <string name="no_devices_found">No s\'han trobat dispositius</string>
+    <string name="select_fitness_machine">Selecciona la màquina fitness</string>
+    <string name="select_hr_sensor">Selecciona el sensor de freqüència cardíaca</string>
+    <string name="scan_failed">Error d\'escaneig (error %d)</string>
+    <string name="permissions_required">Calen permisos de Bluetooth</string>
+
+    <!-- Session -->
+    <string name="start_session">Iniciar</string>
+    <string name="stop_session">Aturar</string>
+    <string name="recording">● REC</string>
+
+    <!-- Metrics -->
+    <string name="metric_speed">Velocitat</string>
+    <string name="metric_cadence">Cadència</string>
+    <string name="metric_power">Potència</string>
+    <string name="metric_heart_rate">Freqüència cardíaca</string>
+    <string name="metric_distance">Distància</string>
+    <string name="metric_energy">Energia</string>
+    <string name="metric_elapsed_time">Temps</string>
+    <string name="metric_inclination">Inclinació</string>
+    <string name="metric_resistance">Resistència</string>
+
+    <!-- Units -->
+    <string name="unit_kmh">km/h</string>
+    <string name="unit_rpm">rpm</string>
+    <string name="unit_watts">W</string>
+    <string name="unit_bpm">bpm</string>
+    <string name="unit_km">km</string>
+    <string name="unit_kcal">kcal</string>
+    <string name="unit_percent">%</string>
 </resources>
