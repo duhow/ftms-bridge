@@ -529,8 +529,7 @@ class MainActivity : AppCompatActivity() {
             binding.valueEnergy.text = "${sample.totalEnergyKcal}"
         }
 
-        binding.valueInclination.text = if (sample.inclinationPercent != 0.0)
-            String.format("%.1f", sample.inclinationPercent) else "--"
+        binding.valueInclination.text = String.format("%.1f", sample.inclinationPercent)
         binding.valueResistance.text = if (sample.resistanceLevel > 0) "${sample.resistanceLevel}" else "--"
         val minutes = elapsedSec / 60
         val seconds = elapsedSec % 60
