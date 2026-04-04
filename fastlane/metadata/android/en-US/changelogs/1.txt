@@ -27,4 +27,15 @@ Initial release.
 - Fixed: BH Fitness treadmill incline was displayed 6× too high — now correctly divided
 - Fixed: BH Fitness indoor bike shows strides/min (from proprietary energy field) with correct label
 - Fixed: session time now uses wall-clock when device does not provide elapsed time (BH Fitness treadmill/bike)
-- Fixed: energy/calories tile always displays a value; for BH Fitness indoor bikes it shows strides/min instead of a misleading kcal reading
+- Fixed: energy/calories tile always displays a value; for BH Fitness indoor bikes it shows strides/min instead of a misleading kcal reading- Fixed History button — now opens the Workout History screen
+- Workout History lists all recorded sessions with machine type, date, duration, distance and avg HR
+- Tap a session to export as FIT or CSV file
+- Scan list is hidden during an active workout to reduce clutter
+- Added Cross Trainer (elliptical, 0x2ACE) machine type recognition
+- Added Stair Climber / Step Climber (0x2AD1/0x2AD0) machine type recognition ("vertical bike")
+- FIT export correctly sets sport/sub-sport for Cross Trainer and Stair Climber sessions
+- BLE scan ignores common non-fitness devices by name (smart locks, TVs, speakers, earbuds, etc.)
+- Added About menu entry showing the current app version
+- Main screen buttons (Scan, History, Debug) are now fixed above the device scan list
+- Workout statistics are hidden until a workout begins, for a cleaner UI
+- Second device (HR sensor) connection status is hidden until a second device is connected
