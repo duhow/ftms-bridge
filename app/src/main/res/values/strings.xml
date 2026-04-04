@@ -48,6 +48,7 @@
     <string name="metric_heart_rate">Heart Rate</string>
     <string name="metric_distance">Distance</string>
     <string name="metric_energy">Energy</string>
+    <string name="metric_strides">Strides</string>
     <string name="metric_elapsed_time">Time</string>
     <string name="metric_inclination">Inclination</string>
     <string name="metric_resistance">Resistance</string>
@@ -55,6 +56,7 @@
     <!-- Units -->
     <string name="unit_kmh">km/h</string>
     <string name="unit_rpm">rpm</string>
+    <string name="unit_per_min">/min</string>
     <string name="unit_watts">W</string>
     <string name="unit_bpm">bpm</string>
     <string name="unit_km">km</string>
@@ -65,7 +67,9 @@
     <string name="connect">Connect</string>
     <string name="connected_label">Connected</string>
     <string name="disconnect">Disconnect</string>
+    <string name="reconnect">Reconnect</string>
     <string name="scanning_active">Scanning…</string>
+    <string name="device_disconnected">Device disconnected</string>
 
     <!-- Debug -->
     <string name="debug_info">Debug Info</string>

@@ -12,6 +12,9 @@ interface FitnessDevice {
     fun onFeaturesReceived(data: ByteArray)
     fun onDataReceived(data: ByteArray): FitnessSample?
 
+    /** Called when a BH Fitness iConcept proprietary notification arrives. */
+    fun onIConceptData(data: ByteArray) {}
+
     companion object {
         fun isBhFitness(name: String): Boolean {
             val lower = name.lowercase()

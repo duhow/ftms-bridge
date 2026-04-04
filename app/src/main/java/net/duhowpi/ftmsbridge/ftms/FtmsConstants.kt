@@ -31,6 +31,25 @@ object FtmsConstants {
     // CCCD for enabling notifications
     val CCCD_UUID: UUID = uuidFrom16Bit(0x2902)
 
+    // iConcept 3.0 / BH Fitness proprietary service (vendor extension to FTMS)
+    val ICONCEPT_SERVICE_UUID: UUID = UUID.fromString("0000c100-0000-1000-8000-00805f9b34fb")
+    val ICONCEPT_NOTIFY_1_UUID: UUID = UUID.fromString("0000c111-0000-1000-8000-00805f9b34fb")
+    val ICONCEPT_NOTIFY_2_UUID: UUID = UUID.fromString("0000c112-0000-1000-8000-00805f9b34fb")
+
+    // Fitness Machine Status op-codes (0x2AD7 characteristic)
+    const val MACHINE_STATUS_RESET = 0x00
+    const val MACHINE_STATUS_STOPPED_OR_PAUSED = 0x01   // param: 0x01=stop, 0x02=pause
+    const val MACHINE_STATUS_STOPPED_BY_SAFETY_KEY = 0x02
+    const val MACHINE_STATUS_STARTED_OR_RESUMED = 0x03
+    const val MACHINE_STATUS_CONTROL_PERMISSION_LOST = 0xFF
+
+    // Fitness Machine Control Point op-codes (0x2AD9 characteristic)
+    const val CONTROL_REQUEST_CONTROL: Byte = 0x00
+    const val CONTROL_RESET: Byte = 0x01
+    const val CONTROL_START_OR_RESUME: Byte = 0x07
+    const val CONTROL_STOP_OR_PAUSE: Byte = 0x08
+    const val CONTROL_RESPONSE_CODE = 0x80
+
     // Machine types detected from available characteristics
     enum class MachineType {
         TREADMILL,

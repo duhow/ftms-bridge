@@ -212,6 +212,43 @@ object FtmsDataParser {
         )
     }
 
+    /**
+     * Parses the Fitness Machine Status characteristic (0x2AD7).
+     * Returns the op-code byte (see FtmsConstants.MACHINE_STATUS_*).
+     */
+    fun parseMachineStatusOpCode(data: ByteArray): Int {
+        if (data.isEmpty()) return -1
+        return data[0].toInt() and 0xFF
+    }
+
+    /**
+     * Parses the BH Fitness iConcept proprietary 0xC112 notification packet.
+     *
+     * The packet header is [F1 0D] for a workout-counter message.
+     * Layout (all little-endian):
+     *   [0]    F1  – header
+     *   [1]    0D  – sub-type (workout data)
+     *   [2-3]  UINT16  elapsed time (seconds)
+     *   [4-6]  UINT24  total distance (metres)
+     *   [7-8]  UINT16  total energy (kcal); 0xFFFF = not available
+     *
+     * Returns null if the data does not match the expected header or is too short.
+     */
+    fun parseIConceptWorkoutData(data: ByteArray): FitnessSample? {
+        if (data.size < 9) return null
+        if ((data[0].toInt() and 0xFF) != 0xF1 || (data[1].toInt() and 0xFF) != 0x0D) return null
+        val buf = ByteBuffer.wrap(data).order(ByteOrder.LITTLE_ENDIAN)
+        buf.position(2)
+        val elapsedTimeSec = buf.short.toInt() and 0xFFFF
+        val b0 = buf.get().toInt() and 0xFF
+        val b1 = buf.get().toInt() and 0xFF
+        val b2 = buf.get().toInt() and 0xFF
+        val distanceM = b0 or (b1 shl 8) or (b2 shl 16)
+        val rawCalories = buf.short.toInt() and 0xFFFF
+        val calories = if (rawCalories == FtmsConstants.INVALID_UINT16) 0 else rawCalories
+        return FitnessSample(elapsedTimeSec = elapsedTimeSec, totalDistanceM = distanceM, totalEnergyKcal = calories)
+    }
+
     fun parseHeartRate(data: ByteArray): Int {
         if (data.isEmpty()) return 0
         val flags = data[0].toInt() and 0xFF

@@ -60,9 +60,14 @@ class MainActivity : AppCompatActivity() {
     private var currentSessionId: Long? = null
     private var sessionStartTime: Long = 0
     private var isRecording = false
+    private var isMachineRunning = false
 
     // Raw scan results map, updated on every BLE event
     private val scanResultsMap = mutableMapOf<String, ScannedDeviceInfo>()
+
+    // Devices that were previously connected; survives scan cycles so the user can
+    // reconnect without re-scanning.
+    private val knownDevicesMap = mutableMapOf<String, ScannedDeviceInfo>()
 
     // Last known HR for merging into FTMS samples
     private var lastHeartRateBpm = 0
@@ -216,6 +221,12 @@ class MainActivity : AppCompatActivity() {
                 val isFtms = serviceUuids.contains(FtmsConstants.FTMS_SERVICE_UUID)
                 val isHr = serviceUuids.contains(FtmsConstants.HR_SERVICE_UUID)
 
+                // Skip devices that advertise service UUIDs but none of them are fitness-related
+                // (e.g. audio headphones, earbuds). Devices with no service UUIDs in their
+                // advertisement are kept as "unknown" since some fitness equipment omits them.
+                // This prevents audio Bluetooth devices from cluttering the scan list.
+                if (serviceUuids.isNotEmpty() && !isFtms && !isHr) return
+
                 val existing = scanResultsMap[device.address]
                 if (existing != null) {
                     existing.rssi = result.rssi
@@ -262,12 +273,22 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updateScanListUI() {
-        val list = scanResultsMap.values.toList()
+        // Merge current scan results with known devices (previously connected) that
+        // are not present in the current scan — so the user can always reconnect.
+        val combined = scanResultsMap.toMutableMap()
+        knownDevicesMap.forEach { (addr, info) ->
+            if (!combined.containsKey(addr)) combined[addr] = info
+        }
+        val list = combined.values.toList()
         runOnUiThread {
             binding.txtScanStatus.text = if (bleScanner.isScanning)
-                "${getString(R.string.scanning_active)} ${list.size}"
+                "${getString(R.string.scanning_active)} ${scanResultsMap.size}"
             else
-                getString(R.string.devices_found, list.size)
+                getString(R.string.devices_found, scanResultsMap.size)
+            if (list.isNotEmpty()) {
+                binding.rvScanResults.visibility = View.VISIBLE
+                binding.txtScanStatus.visibility = View.VISIBLE
+            }
             scanAdapter.updateAll(list)
             // Mark already-connected devices
             ftmsConnectionManager?.connectedDeviceAddress?.let { scanAdapter.markConnected(it) }
@@ -278,6 +299,8 @@ class MainActivity : AppCompatActivity() {
     // ---- Device connection from scan list -----------------------------------
 
     private fun onDeviceConnectTapped(info: ScannedDeviceInfo) {
+        // Save device info so it remains accessible for reconnect after scanning stops
+        knownDevicesMap[info.address] = info
         when {
             info.isFtms -> connectFtmsDevice(info.device)
             info.isHr -> connectHrDevice(info.device)
@@ -308,10 +331,14 @@ class MainActivity : AppCompatActivity() {
 
             override fun onDisconnected() {
                 fitnessDevice = null
+                isMachineRunning = false
                 runOnUiThread {
                     updateConnectionStatus()
                     scanAdapter.markDisconnected(device.address)
+                    resetMetrics()
                     if (isRecording) stopRecording()
+                    Toast.makeText(this@MainActivity, getString(R.string.device_disconnected), Toast.LENGTH_SHORT).show()
+                    updateScanListUI()
                 }
             }
 
@@ -323,6 +350,7 @@ class MainActivity : AppCompatActivity() {
                     updateConnectionStatus()
                     binding.txtMachineType.text = fitnessDevice?.machineType?.name ?: "?"
                     binding.txtMachineType.visibility = View.VISIBLE
+                    updateMetricVisibility(fitnessDevice?.machineType ?: FtmsConstants.MachineType.UNKNOWN)
                 }
             }
 
@@ -330,6 +358,13 @@ class MainActivity : AppCompatActivity() {
                 val sample = fitnessDevice?.onDataReceived(data) ?: return
                 val mergedSample = if (sample.heartRateBpm == 0 && lastHeartRateBpm > 0)
                     sample.copy(heartRateBpm = lastHeartRateBpm) else sample
+                // Detect machine running state from speed as a fallback for devices that
+                // do not expose a machine-status characteristic (speed > 0 → machine running).
+                val nowRunning = mergedSample.speedKmh > 0.1
+                if (nowRunning != isMachineRunning) {
+                    isMachineRunning = nowRunning
+                    runOnUiThread { updateMachineRunningState() }
+                }
                 runOnUiThread { updateDashboard(mergedSample) }
                 if (isRecording && currentSessionId != null) saveSample(mergedSample)
             }
@@ -349,6 +384,23 @@ class MainActivity : AppCompatActivity() {
 
             override fun onDeviceInfoRead() {
                 runOnUiThread { updateFtmsDeviceInfoUI() }
+            }
+
+            override fun onMachineStatusChanged(opCode: Int, params: ByteArray) {
+                val nowRunning = when (opCode) {
+                    FtmsConstants.MACHINE_STATUS_STARTED_OR_RESUMED -> true
+                    FtmsConstants.MACHINE_STATUS_STOPPED_OR_PAUSED,
+                    FtmsConstants.MACHINE_STATUS_STOPPED_BY_SAFETY_KEY,
+                    FtmsConstants.MACHINE_STATUS_RESET -> false
+                    else -> return
+                }
+                if (nowRunning == isMachineRunning) return
+                isMachineRunning = nowRunning
+                runOnUiThread { updateMachineRunningState() }
+            }
+
+            override fun onIConceptData(data: ByteArray) {
+                fitnessDevice?.onIConceptData(data)
             }
         })
     }
@@ -373,6 +425,7 @@ class MainActivity : AppCompatActivity() {
                 runOnUiThread {
                     updateConnectionStatus()
                     scanAdapter.markDisconnected(device.address)
+                    updateScanListUI()
                 }
             }
 
@@ -393,6 +446,10 @@ class MainActivity : AppCompatActivity() {
             override fun onFeaturesRead(data: ByteArray) {}
 
             override fun onDeviceInfoRead() {}
+
+            override fun onMachineStatusChanged(opCode: Int, params: ByteArray) {}
+
+            override fun onIConceptData(data: ByteArray) {}
         })
     }
 
@@ -426,6 +483,15 @@ class MainActivity : AppCompatActivity() {
         binding.btnWorkoutStart.isEnabled = ftmsConnected
     }
 
+    /** Called whenever the machine transitions between running and stopped state. */
+    private fun updateMachineRunningState() {
+        if (isMachineRunning && !isRecording) {
+            startRecording()
+        } else if (!isMachineRunning && isRecording) {
+            stopRecording()
+        }
+    }
+
     private fun updateFtmsDeviceInfoUI() {
         val cm = ftmsConnectionManager ?: return
         val parts = buildList {
@@ -443,18 +509,54 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updateDashboard(sample: FitnessSample) {
+        // Prefer device-reported elapsed time; fall back to wall-clock when recording.
+        // BH Fitness devices either omit the elapsed-time field entirely or always send 0.
+        val elapsedSec = if (sample.elapsedTimeSec > 0) {
+            sample.elapsedTimeSec
+        } else if (isRecording && sessionStartTime > 0) {
+            ((System.currentTimeMillis() - sessionStartTime) / 1000).toInt()
+        } else 0
+
         binding.valueSpeed.text = String.format("%.1f", sample.speedKmh)
         binding.valueCadence.text = if (sample.cadenceRpm > 0) String.format("%.0f", sample.cadenceRpm) else "--"
         binding.valuePower.text = if (sample.instantaneousPowerW > 0) "${sample.instantaneousPowerW}" else "--"
         binding.valueDistance.text = String.format("%.2f", sample.totalDistanceM / 1000.0)
         if (sample.heartRateBpm > 0) binding.valueHeartRate.text = "${sample.heartRateBpm}"
-        binding.valueEnergy.text = if (sample.totalEnergyKcal > 0) "${sample.totalEnergyKcal}" else "--"
-        binding.valueInclination.text = if (sample.inclinationPercent != 0.0)
-            String.format("%.1f", sample.inclinationPercent) else "--"
+
+        // Energy tile: show strides/min (BH Fitness indoor bike) when available,
+        // otherwise show calories. Always show a numeric value once data is received.
+        if (sample.stridesPerMin > 0) {
+            binding.labelEnergy.setText(R.string.metric_strides)
+            binding.unitEnergy.setText(R.string.unit_per_min)
+            binding.valueEnergy.text = String.format("%.1f", sample.stridesPerMin)
+        } else {
+            binding.labelEnergy.setText(R.string.metric_energy)
+            binding.unitEnergy.setText(R.string.unit_kcal)
+            binding.valueEnergy.text = "${sample.totalEnergyKcal}"
+        }
+
+        binding.valueInclination.text = String.format("%.1f", sample.inclinationPercent)
         binding.valueResistance.text = if (sample.resistanceLevel > 0) "${sample.resistanceLevel}" else "--"
-        val minutes = sample.elapsedTimeSec / 60
-        val seconds = sample.elapsedTimeSec % 60
+        val minutes = elapsedSec / 60
+        val seconds = elapsedSec % 60
         binding.valueElapsedTime.text = String.format("%d:%02d", minutes, seconds)
+    }
+
+    /**
+     * Show only the metric tiles that are relevant to [machineType].
+     * The Energy tile always shows; its label/unit switches between kcal and strides/min
+     * depending on the data received (see [updateDashboard]).
+     *
+     * Treadmill  → Speed, HR, Distance, Energy, Time, Inclination
+     * Indoor Bike → Speed, HR, Cadence, Power, Distance, Energy, Time, Resistance
+     * Unknown / disconnected → only the universal tiles (no device-specific tiles)
+     */
+    private fun updateMetricVisibility(machineType: FtmsConstants.MachineType) {
+        val isTreadmill = machineType == FtmsConstants.MachineType.TREADMILL
+        val isBike = machineType == FtmsConstants.MachineType.INDOOR_BIKE
+        binding.rowCadencePower.visibility = if (isBike) View.VISIBLE else View.GONE
+        binding.cardInclination.visibility = if (isTreadmill) View.VISIBLE else View.GONE
+        binding.cardResistance.visibility = if (isBike) View.VISIBLE else View.GONE
     }
 
     private fun resetMetrics() {
@@ -464,11 +566,14 @@ class MainActivity : AppCompatActivity() {
         binding.valueDistance.text = "--"
         binding.valueHeartRate.text = "--"
         binding.valueEnergy.text = "--"
+        binding.labelEnergy.setText(R.string.metric_energy)
+        binding.unitEnergy.setText(R.string.unit_kcal)
         binding.valueElapsedTime.text = "0:00"
         binding.valueInclination.text = "--"
         binding.valueResistance.text = "--"
         binding.txtMachineType.visibility = View.GONE
         binding.txtFtmsDeviceInfo.visibility = View.GONE
+        updateMetricVisibility(FtmsConstants.MachineType.UNKNOWN)
     }
 
     // ---- Session recording --------------------------------------------------
@@ -505,12 +610,15 @@ class MainActivity : AppCompatActivity() {
 
     private fun saveSample(sample: FitnessSample) {
         val sessionId = currentSessionId ?: return
+        // Use wall-clock elapsed time when device sends 0 (BH Fitness quirk).
+        val elapsedSec = if (sample.elapsedTimeSec > 0) sample.elapsedTimeSec
+        else ((System.currentTimeMillis() - sessionStartTime) / 1000).toInt()
         lifecycleScope.launch(Dispatchers.IO) {
             db.sampleDao().insert(
                 WorkoutSample(
                     sessionId = sessionId,
                     timestampMs = System.currentTimeMillis(),
-                    elapsedTimeSec = sample.elapsedTimeSec,
+                    elapsedTimeSec = elapsedSec,
                     speedKmh = sample.speedKmh,
                     cadenceRpm = sample.cadenceRpm,
                     instantaneousPowerW = sample.instantaneousPowerW,
