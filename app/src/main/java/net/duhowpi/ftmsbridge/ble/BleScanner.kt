@@ -2,6 +2,7 @@ package net.duhowpi.ftmsbridge.ble
 
 import android.Manifest
 import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothManager
 import android.bluetooth.le.BluetoothLeScanner
 import android.bluetooth.le.ScanCallback
@@ -86,4 +87,28 @@ class BleScanner(private val context: Context) {
     }
 
     fun isBluetoothEnabled(): Boolean = bluetoothAdapter?.isEnabled == true
+
+    /**
+     * Returns all bonded devices that could be BLE-capable.
+     *
+     * Android caches a bonded device's transport type only after an active connection has
+     * been established.  Idle paired devices (e.g. a Mi Band managed by Gadgetbridge that
+     * isn't currently advertising) often report [BluetoothDevice.DEVICE_TYPE_UNKNOWN], so
+     * filtering strictly on [BluetoothDevice.DEVICE_TYPE_LE] / [BluetoothDevice.DEVICE_TYPE_DUAL]
+     * would exclude them.  We therefore include UNKNOWN-type devices as well and rely on the
+     * caller to apply class-based or name-based filtering to exclude non-fitness peripherals.
+     */
+    fun getBondedBleDevices(): List<BluetoothDevice> {
+        if (ActivityCompat.checkSelfPermission(
+                context, Manifest.permission.BLUETOOTH_CONNECT
+            ) != PackageManager.PERMISSION_GRANTED
+        ) return emptyList()
+        return bluetoothAdapter?.bondedDevices
+            ?.filter {
+                it.type == BluetoothDevice.DEVICE_TYPE_LE ||
+                it.type == BluetoothDevice.DEVICE_TYPE_DUAL ||
+                it.type == BluetoothDevice.DEVICE_TYPE_UNKNOWN
+            }
+            ?: emptyList()
+    }
 }

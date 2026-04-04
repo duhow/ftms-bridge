@@ -48,6 +48,7 @@ class ScanResultAdapter(
         items.addAll(newItems.sortedWith(
             compareByDescending<ScannedDeviceInfo> { connectedAddresses.contains(it.address) }
                 .thenByDescending { it.isFtms || it.isHr }
+                .thenBy { it.isBonded }
                 .thenByDescending { it.rssi }
         ))
         notifyDataSetChanged()

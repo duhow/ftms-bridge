@@ -2,6 +2,7 @@ package net.duhowpi.ftmsbridge
 
 import android.Manifest
 import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothClass
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.le.ScanResult
 import android.content.Intent
@@ -302,6 +303,7 @@ class MainActivity : AppCompatActivity() {
     private fun stopScan() {
         bleScanner.stopScan()
         updateHandler.removeCallbacks(scanListUpdateRunnable)
+        addBondedDevicesToList()
         updateScanListUI() // final refresh
         binding.btnScan.text = getString(R.string.scan)
         binding.txtScanStatus.text = getString(R.string.devices_found, scanResultsMap.size)
@@ -799,6 +801,43 @@ class MainActivity : AppCompatActivity() {
     }
 
     // ---- Device filtering ---------------------------------------------------
+
+    /**
+     * Adds BLE devices that are already bonded to this phone (via the OS bonded-devices
+     * list) but were not found during the active BLE scan.  This makes paired wearables
+     * visible even when they are not currently advertising — for example a Xiaomi / Mi Band
+     * device managed by Gadgetbridge that uses proprietary service UUIDs and is therefore
+     * filtered out during the active scan.
+     *
+     * To expose real-time HR from a Gadgetbridge-managed device:
+     *   1. Open Gadgetbridge → device settings → enable "3rd party realtime HR access".
+     *   2. Enable "Visible while connected" in the same device settings.
+     *   3. Select the device (shown here as "Paired") and choose "HR Sensor".
+     */
+    private fun addBondedDevicesToList() {
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) return
+        bleScanner.getBondedBleDevices().forEach { device ->
+            val name = device.name ?: return@forEach
+            if (name.isBlank()) return@forEach
+            if (scanResultsMap.containsKey(device.address)) return@forEach
+            // Exclude audio/video peripherals (headsets, speakers, earbuds) by Bluetooth class.
+            // Classic BT audio devices report DEVICE_TYPE_CLASSIC or DEVICE_TYPE_UNKNOWN and
+            // always have the AUDIO_VIDEO major device class.
+            val majorClass = device.bluetoothClass?.majorDeviceClass
+            if (majorClass == BluetoothClass.Device.Major.AUDIO_VIDEO) return@forEach
+            if (isIgnoredDevice(name)) return@forEach
+            scanResultsMap[device.address] = ScannedDeviceInfo(
+                name = name,
+                address = device.address,
+                rssi = Int.MIN_VALUE,
+                isFtms = false,
+                isHr = false,
+                device = device,
+                isBonded = true
+            )
+            debugLogger.logMessage("Bonded BLE device added to list: $name (${device.address})")
+        }
+    }
 
     /**
      * Returns true if [name] matches a known non-fitness BLE device that should be
