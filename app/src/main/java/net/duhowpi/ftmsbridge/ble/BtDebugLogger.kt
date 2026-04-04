@@ -22,6 +22,9 @@ class BtDebugLogger(val enabled: Boolean, private val context: Context) {
     private var sessionFile: File? = null
     private var sessionWriter: PrintWriter? = null
 
+    // Deduplication: last payload logged per UUID — suppress repeated identical NOTIFY packets
+    private val lastNotifyData = HashMap<String, ByteArray>()
+
     init {
         if (enabled) {
             val dir = File(context.getExternalFilesDir(null), "debug")
@@ -68,6 +71,11 @@ class BtDebugLogger(val enabled: Boolean, private val context: Context) {
 
     fun logEvent(direction: String, uuid: String, data: ByteArray) {
         if (!enabled) return
+        if (direction == "NOTIFY") {
+            val last = lastNotifyData[uuid]
+            if (last != null && last.contentEquals(data)) return
+            lastNotifyData[uuid] = data.copyOf()
+        }
         val timestamp = timestampFormat.format(Date())
         val hex = data.joinToString(" ") { String.format("%02X", it) }
         val line = "$timestamp [$direction] $uuid (${data.size} bytes): $hex"
@@ -94,6 +102,7 @@ class BtDebugLogger(val enabled: Boolean, private val context: Context) {
         appWriter?.println("$ts [INFO] Session ended: ${sessionFile?.name}")
         Log.i(tag, "Session log closed: ${sessionFile?.absolutePath}")
         sessionFile = null
+        lastNotifyData.clear()
     }
 
     fun close() {
