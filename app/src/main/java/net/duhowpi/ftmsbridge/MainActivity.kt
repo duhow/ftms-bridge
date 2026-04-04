@@ -349,6 +349,7 @@ class MainActivity : AppCompatActivity() {
                     updateConnectionStatus()
                     binding.txtMachineType.text = fitnessDevice?.machineType?.name ?: "?"
                     binding.txtMachineType.visibility = View.VISIBLE
+                    updateMetricVisibility(fitnessDevice?.machineType ?: FtmsConstants.MachineType.UNKNOWN)
                 }
             }
 
@@ -535,6 +536,21 @@ class MainActivity : AppCompatActivity() {
         binding.valueElapsedTime.text = String.format("%d:%02d", minutes, seconds)
     }
 
+    /**
+     * Show only the metric tiles that are relevant to [machineType].
+     *
+     * Treadmill  → Speed, HR, Distance, Energy, Time, Inclination
+     * Indoor Bike → Speed, HR, Cadence, Power, Distance, Energy, Time, Resistance
+     * Unknown / disconnected → only the universal tiles (no device-specific tiles)
+     */
+    private fun updateMetricVisibility(machineType: FtmsConstants.MachineType) {
+        val isTreadmill = machineType == FtmsConstants.MachineType.TREADMILL
+        val isBike = machineType == FtmsConstants.MachineType.INDOOR_BIKE
+        binding.rowCadencePower.visibility = if (isBike) View.VISIBLE else View.GONE
+        binding.cardInclination.visibility = if (isTreadmill) View.VISIBLE else View.GONE
+        binding.cardResistance.visibility = if (isBike) View.VISIBLE else View.GONE
+    }
+
     private fun resetMetrics() {
         binding.valueSpeed.text = "--"
         binding.valueCadence.text = "--"
@@ -542,11 +558,14 @@ class MainActivity : AppCompatActivity() {
         binding.valueDistance.text = "--"
         binding.valueHeartRate.text = "--"
         binding.valueEnergy.text = "--"
+        binding.labelEnergy.setText(R.string.metric_energy)
+        binding.unitEnergy.setText(R.string.unit_kcal)
         binding.valueElapsedTime.text = "0:00"
         binding.valueInclination.text = "--"
         binding.valueResistance.text = "--"
         binding.txtMachineType.visibility = View.GONE
         binding.txtFtmsDeviceInfo.visibility = View.GONE
+        updateMetricVisibility(FtmsConstants.MachineType.UNKNOWN)
     }
 
     // ---- Session recording --------------------------------------------------
