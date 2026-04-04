@@ -178,9 +178,11 @@ class WorkoutHistoryActivity : AppCompatActivity() {
 
             fun bind(session: WorkoutSession) {
                 val typeName = when (session.machineType) {
-                    "TREADMILL" -> "🏃 ${session.deviceName.ifEmpty { session.machineType }}"
-                    "INDOOR_BIKE" -> "🚴 ${session.deviceName.ifEmpty { session.machineType }}"
-                    "HR_ONLY" -> "❤️ ${session.deviceName.ifEmpty { "HR Sensor" }}"
+                    "TREADMILL"     -> "🏃 ${session.deviceName.ifEmpty { session.machineType }}"
+                    "INDOOR_BIKE"   -> "🚴 ${session.deviceName.ifEmpty { session.machineType }}"
+                    "CROSS_TRAINER" -> "🏋️ ${session.deviceName.ifEmpty { session.machineType }}"
+                    "STAIR_CLIMBER" -> "🪜 ${session.deviceName.ifEmpty { session.machineType }}"
+                    "HR_ONLY"       -> "❤️ ${session.deviceName.ifEmpty { "HR Sensor" }}"
                     else -> session.deviceName.ifEmpty { session.machineType }
                 }
                 txtType.text = typeName

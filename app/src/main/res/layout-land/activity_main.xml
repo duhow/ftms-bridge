@@ -1,5 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="?android:colorBackground">
+
+    <androidx.appcompat.widget.Toolbar
+        android:id="@+id/toolbar"
+        android:layout_width="match_parent"
+        android:layout_height="?attr/actionBarSize"
+        android:background="?attr/colorSurface"
+        android:elevation="4dp" />
+
+    <ScrollView
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="?android:colorBackground">
@@ -17,14 +30,6 @@
             android:orientation="horizontal"
             android:gravity="center_vertical"
             android:paddingBottom="8dp">
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/app_name"
-                android:textSize="20sp"
-                android:textStyle="bold"
-                android:paddingEnd="16dp" />
 
             <View
                 android:id="@+id/indicatorFtms"
@@ -49,20 +54,30 @@
                 android:paddingEnd="12dp"
                 android:visibility="gone" />
 
-            <View
-                android:id="@+id/indicatorHr"
-                android:layout_width="10dp"
-                android:layout_height="10dp"
-                android:background="@color/status_disconnected" />
-
-            <TextView
-                android:id="@+id/txtHrDevice"
-                android:layout_width="0dp"
+            <LinearLayout
+                android:id="@+id/hrStatusRow"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="@string/not_connected"
-                android:paddingStart="4dp"
-                android:textSize="12sp" />
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:visibility="gone">
+
+                <View
+                    android:id="@+id/indicatorHr"
+                    android:layout_width="10dp"
+                    android:layout_height="10dp"
+                    android:background="@color/status_disconnected" />
+
+                <TextView
+                    android:id="@+id/txtHrDevice"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/not_connected"
+                    android:paddingStart="4dp"
+                    android:paddingEnd="12dp"
+                    android:textSize="12sp" />
+
+            </LinearLayout>
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnScan"
@@ -175,9 +190,11 @@
 
         <!-- Metrics: 2 cards per row. Device-specific rows/tiles are shown/hidden at runtime. -->
         <LinearLayout
+            android:id="@+id/metricsSection"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical">
+            android:orientation="vertical"
+            android:visibility="gone">
 
             <!-- Speed | Heart Rate (always shown) -->
             <LinearLayout
@@ -407,4 +424,6 @@
         </LinearLayout>
 
     </LinearLayout>
-</ScrollView>
+
+    </ScrollView>
+</LinearLayout>

@@ -11,6 +11,8 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import android.view.Menu
+import android.view.MenuItem
 import android.view.View
 import android.widget.ScrollView
 import android.widget.TextView
@@ -115,6 +117,9 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
+        binding.toolbar.title = getString(R.string.app_name)
+        setSupportActionBar(binding.toolbar)
+
         db = AppDatabase.getInstance(this)
         debugLogger = BtDebugLogger(BuildConfig.BT_DEBUG_LOG, this)
         hrDebugLogger = BtDebugLogger(BuildConfig.BT_DEBUG_LOG, this)
@@ -125,6 +130,26 @@ class MainActivity : AppCompatActivity() {
 
         // Request permissions immediately on app start (without auto-scanning)
         requestPermissionsIfNeeded()
+    }
+
+    override fun onCreateOptionsMenu(menu: Menu): Boolean {
+        menuInflater.inflate(R.menu.menu_main, menu)
+        return true
+    }
+
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        return when (item.itemId) {
+            R.id.action_about -> { showAboutDialog(); true }
+            else -> super.onOptionsItemSelected(item)
+        }
+    }
+
+    private fun showAboutDialog() {
+        AlertDialog.Builder(this)
+            .setTitle(getString(R.string.about_title))
+            .setMessage(getString(R.string.about_version, BuildConfig.VERSION_NAME))
+            .setPositiveButton(android.R.string.ok, null)
+            .show()
     }
 
     private fun setupScanList() {
@@ -145,6 +170,10 @@ class MainActivity : AppCompatActivity() {
                 pendingScanAfterPermission = true
                 checkPermissionsAndMaybeScan()
             }
+        }
+
+        binding.btnHistory.setOnClickListener {
+            startActivity(Intent(this, WorkoutHistoryActivity::class.java))
         }
 
         binding.btnWorkoutStart.setOnClickListener {
@@ -226,6 +255,12 @@ class MainActivity : AppCompatActivity() {
                 // advertisement are kept as "unknown" since some fitness equipment omits them.
                 // This prevents audio Bluetooth devices from cluttering the scan list.
                 if (serviceUuids.isNotEmpty() && !isFtms && !isHr) return
+
+                // Skip devices that are known non-fitness peripherals by name pattern.
+                if (isIgnoredDevice(name)) {
+                    debugLogger.logMessage("Ignored device: $name (${device.address})")
+                    return
+                }
 
                 val existing = scanResultsMap[device.address]
                 if (existing != null) {
@@ -458,6 +493,7 @@ class MainActivity : AppCompatActivity() {
     private fun updateConnectionStatus() {
         val ftmsConnected = ftmsConnectionManager?.isConnected == true
         val hrConnected = hrConnectionManager?.isConnected == true
+        val hasHrDevice = hrConnectionManager != null
 
         binding.indicatorFtms.setBackgroundResource(
             if (ftmsConnected) R.color.status_connected else R.color.status_disconnected
@@ -472,6 +508,9 @@ class MainActivity : AppCompatActivity() {
         binding.txtHrDevice.text = if (hrConnected)
             hrConnectionManager?.connectedDeviceName ?: getString(R.string.connected)
         else getString(R.string.not_connected)
+
+        // Show the HR status row only once a second device has been connected/attempted
+        binding.hrStatusRow.visibility = if (hasHrDevice) View.VISIBLE else View.GONE
 
         if (!ftmsConnected) {
             binding.txtFtmsDeviceInfo.visibility = View.GONE
@@ -547,13 +586,16 @@ class MainActivity : AppCompatActivity() {
      * The Energy tile always shows; its label/unit switches between kcal and strides/min
      * depending on the data received (see [updateDashboard]).
      *
-     * Treadmill  → Speed, HR, Distance, Energy, Time, Inclination
-     * Indoor Bike → Speed, HR, Cadence, Power, Distance, Energy, Time, Resistance
+     * Treadmill      → Speed, HR, Distance, Energy, Time, Inclination
+     * Indoor Bike    → Speed, HR, Cadence, Power, Distance, Energy, Time, Resistance
+     * Cross Trainer  → Speed, HR, Cadence, Power, Distance, Energy, Time, Resistance
+     * Stair Climber  → HR, Cadence, Distance, Energy, Time
      * Unknown / disconnected → only the universal tiles (no device-specific tiles)
      */
     private fun updateMetricVisibility(machineType: FtmsConstants.MachineType) {
         val isTreadmill = machineType == FtmsConstants.MachineType.TREADMILL
-        val isBike = machineType == FtmsConstants.MachineType.INDOOR_BIKE
+        val isBike = machineType == FtmsConstants.MachineType.INDOOR_BIKE ||
+                machineType == FtmsConstants.MachineType.CROSS_TRAINER
         binding.rowCadencePower.visibility = if (isBike) View.VISIBLE else View.GONE
         binding.cardInclination.visibility = if (isTreadmill) View.VISIBLE else View.GONE
         binding.cardResistance.visibility = if (isBike) View.VISIBLE else View.GONE
@@ -573,6 +615,7 @@ class MainActivity : AppCompatActivity() {
         binding.valueResistance.text = "--"
         binding.txtMachineType.visibility = View.GONE
         binding.txtFtmsDeviceInfo.visibility = View.GONE
+        binding.metricsSection.visibility = View.GONE
         updateMetricVisibility(FtmsConstants.MachineType.UNKNOWN)
     }
 
@@ -584,6 +627,10 @@ class MainActivity : AppCompatActivity() {
         sessionStartTime = System.currentTimeMillis()
         binding.btnWorkoutStart.text = getString(R.string.stop_session)
         binding.recordingIndicator.visibility = View.VISIBLE
+        binding.metricsSection.visibility = View.VISIBLE
+        // Hide scan results list during workout to reduce clutter
+        binding.rvScanResults.visibility = View.GONE
+        binding.txtScanStatus.visibility = View.GONE
         lifecycleScope.launch(Dispatchers.IO) {
             val session = WorkoutSession(
                 startTimeMs = sessionStartTime,
@@ -749,6 +796,58 @@ class MainActivity : AppCompatActivity() {
         hrConnectionManager?.disconnect()
         debugLogger.close()
         hrDebugLogger.close()
+    }
+
+    // ---- Device filtering ---------------------------------------------------
+
+    /**
+     * Returns true if [name] matches a known non-fitness BLE device that should be
+     * excluded from the scan list. Checked after the service-UUID filter so this
+     * mainly catches devices that do not advertise service UUIDs.
+     */
+    private fun isIgnoredDevice(name: String): Boolean {
+        for (prefix in IGNORED_DEVICE_PREFIXES) {
+            if (name.startsWith(prefix, ignoreCase = true)) return true
+        }
+        for (fragment in IGNORED_DEVICE_CONTAINS) {
+            if (name.contains(fragment, ignoreCase = true)) return true
+        }
+        return false
+    }
+
+    companion object {
+        /** Device name prefixes that identify non-fitness BLE peripherals. */
+        private val IGNORED_DEVICE_PREFIXES = listOf(
+            "Nuki_",        // Nuki smart locks
+            "[TV]",         // Samsung / LG smart TVs
+            "[AV]",
+            "Flip_",        // JBL Flip speakers
+            "Charge_",      // JBL Charge speakers
+            "WH-",          // Sony over-ear headphones
+            "WF-",          // Sony true-wireless earbuds
+            "MDR-",         // Sony MDR headphones / earphones
+            "SRS-",         // Sony SRS Bluetooth speakers
+            "Mi TV",        // Xiaomi smart TV
+            "PHILIPS HUE",  // Philips Hue lighting bridge
+            "Hue-",         // Philips Hue accessories
+            "SmartThings",  // Samsung SmartThings hubs
+            "Ring-",        // Ring smart home devices
+        )
+
+        /** Case-insensitive substrings that identify non-fitness BLE peripherals. */
+        private val IGNORED_DEVICE_CONTAINS = listOf(
+            "soundcore",    // Anker SoundCore speakers / earbuds
+            "airpods",      // Apple AirPods
+            " buds",        // Generic "Buds" earbuds (e.g. Galaxy Buds)
+            "headphone",    // Generic headphone devices
+            "headset",      // Generic headset devices
+            "keyboard",     // Bluetooth keyboards
+            "mouse",        // Bluetooth mice
+            "trackpad",     // Bluetooth trackpads
+            "smart plug",   // Smart plugs
+            "smart bulb",   // Smart bulbs
+            "smart lamp",   // Smart lamps
+        )
     }
 }
 

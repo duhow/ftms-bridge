@@ -22,6 +22,8 @@ open class FtmsDevice(
         return when (machineType) {
             FtmsConstants.MachineType.TREADMILL -> FtmsDataParser.parseTreadmillData(data)
             FtmsConstants.MachineType.INDOOR_BIKE -> FtmsDataParser.parseIndoorBikeData(data)
+            FtmsConstants.MachineType.CROSS_TRAINER -> FtmsDataParser.parseCrossTrainerData(data)
+            FtmsConstants.MachineType.STAIR_CLIMBER -> FtmsDataParser.parseStairClimberData(data)
             else -> null
         }
     }
@@ -36,6 +38,11 @@ open class FtmsDevice(
                     FtmsConstants.MachineType.TREADMILL
                 characteristics.contains(FtmsConstants.INDOOR_BIKE_DATA_UUID) ->
                     FtmsConstants.MachineType.INDOOR_BIKE
+                characteristics.contains(FtmsConstants.CROSS_TRAINER_DATA_UUID) ->
+                    FtmsConstants.MachineType.CROSS_TRAINER
+                characteristics.contains(FtmsConstants.STAIR_CLIMBER_DATA_UUID) ||
+                characteristics.contains(FtmsConstants.STEP_CLIMBER_DATA_UUID) ->
+                    FtmsConstants.MachineType.STAIR_CLIMBER
                 else -> FtmsConstants.MachineType.UNKNOWN
             }
 

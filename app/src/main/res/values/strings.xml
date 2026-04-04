@@ -79,4 +79,9 @@
     <string name="capabilities">Capabilities</string>
     <string name="recent_bt_events">Recent BT Events</string>
     <string name="log_files">Log Files</string>
+
+    <!-- About -->
+    <string name="about">About</string>
+    <string name="about_title">About FTMS Bridge</string>
+    <string name="about_version">Version: %s</string>
 </resources>

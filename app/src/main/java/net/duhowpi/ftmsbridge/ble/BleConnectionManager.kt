@@ -263,6 +263,24 @@ class BleConnectionManager(
                     enableNotification(bikeChar)
                 }
 
+                val crossTrainerChar = ftmsService.getCharacteristic(FtmsConstants.CROSS_TRAINER_DATA_UUID)
+                if (crossTrainerChar != null) {
+                    ftmsChars.add(FtmsConstants.CROSS_TRAINER_DATA_UUID)
+                    enableNotification(crossTrainerChar)
+                }
+
+                val stairClimberChar = ftmsService.getCharacteristic(FtmsConstants.STAIR_CLIMBER_DATA_UUID)
+                if (stairClimberChar != null) {
+                    ftmsChars.add(FtmsConstants.STAIR_CLIMBER_DATA_UUID)
+                    enableNotification(stairClimberChar)
+                }
+
+                val stepClimberChar = ftmsService.getCharacteristic(FtmsConstants.STEP_CLIMBER_DATA_UUID)
+                if (stepClimberChar != null) {
+                    ftmsChars.add(FtmsConstants.STEP_CLIMBER_DATA_UUID)
+                    enableNotification(stepClimberChar)
+                }
+
                 val statusChar = ftmsService.getCharacteristic(FtmsConstants.FITNESS_MACHINE_STATUS_UUID)
                 if (statusChar != null) enableNotification(statusChar)
 
@@ -364,7 +382,10 @@ class BleConnectionManager(
 
             when (characteristic.uuid) {
                 FtmsConstants.TREADMILL_DATA_UUID,
-                FtmsConstants.INDOOR_BIKE_DATA_UUID -> {
+                FtmsConstants.INDOOR_BIKE_DATA_UUID,
+                FtmsConstants.CROSS_TRAINER_DATA_UUID,
+                FtmsConstants.STAIR_CLIMBER_DATA_UUID,
+                FtmsConstants.STEP_CLIMBER_DATA_UUID -> {
                     listener?.onFtmsData(characteristic.uuid, data)
                 }
                 FtmsConstants.HR_MEASUREMENT_UUID -> {
