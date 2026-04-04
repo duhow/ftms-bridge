@@ -40,3 +40,5 @@ Initial release.
 - Main screen buttons (Scan, History, Debug) are now fixed above the device scan list
 - Workout statistics are hidden until a workout begins, for a cleaner UI
 - Second device (HR sensor) connection status is hidden until a second device is connected
+- Added support for BH Fitness vertical bike (C01_XXXXX devices) — uses Cross Trainer FTMS data with iConcept supplementary workout counters
+- Fixed: BH Fitness devices using iConcept naming convention (B01_, C01_, etc.) are now correctly detected and receive device-specific quirk handling

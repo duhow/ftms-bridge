@@ -50,6 +50,7 @@ open class FtmsDevice(
                 when (type) {
                     FtmsConstants.MachineType.TREADMILL -> BhFitnessTreadmill(deviceName)
                     FtmsConstants.MachineType.INDOOR_BIKE -> BhFitnessIndoorBike(deviceName)
+                    FtmsConstants.MachineType.CROSS_TRAINER -> BhFitnessVerticalBike(deviceName)
                     else -> FtmsDevice(deviceName, type)
                 }
             } else {
