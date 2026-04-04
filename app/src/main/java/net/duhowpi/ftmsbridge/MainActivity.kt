@@ -142,7 +142,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        binding.btnSession.setOnClickListener {
+        binding.btnWorkoutStart.setOnClickListener {
             if (isRecording) stopRecording() else startRecording()
         }
 
@@ -422,7 +422,8 @@ class MainActivity : AppCompatActivity() {
             updateFtmsDeviceInfoUI()
         }
 
-        binding.btnSession.isEnabled = ftmsConnected
+        binding.workoutButtonRow.visibility = if (ftmsConnected) View.VISIBLE else View.GONE
+        binding.btnWorkoutStart.isEnabled = ftmsConnected
     }
 
     private fun updateFtmsDeviceInfoUI() {
@@ -476,7 +477,7 @@ class MainActivity : AppCompatActivity() {
         val device = fitnessDevice ?: return
         isRecording = true
         sessionStartTime = System.currentTimeMillis()
-        binding.btnSession.text = getString(R.string.stop_session)
+        binding.btnWorkoutStart.text = getString(R.string.stop_session)
         binding.recordingIndicator.visibility = View.VISIBLE
         lifecycleScope.launch(Dispatchers.IO) {
             val session = WorkoutSession(
@@ -491,7 +492,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun stopRecording() {
         isRecording = false
-        binding.btnSession.text = getString(R.string.start_session)
+        binding.btnWorkoutStart.text = getString(R.string.start_session)
         binding.recordingIndicator.visibility = View.GONE
         val sessionId = currentSessionId ?: return
         lifecycleScope.launch(Dispatchers.IO) {
