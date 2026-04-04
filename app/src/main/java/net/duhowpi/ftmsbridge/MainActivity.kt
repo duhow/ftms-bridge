@@ -820,6 +820,7 @@ class MainActivity : AppCompatActivity() {
         private val IGNORED_DEVICE_PREFIXES = listOf(
             "Nuki_",        // Nuki smart locks
             "[TV]",         // Samsung / LG smart TVs
+            "[AV]",
             "Flip_",        // JBL Flip speakers
             "Charge_",      // JBL Charge speakers
             "WH-",          // Sony over-ear headphones
