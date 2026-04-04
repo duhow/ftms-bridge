@@ -65,6 +65,10 @@ class MainActivity : AppCompatActivity() {
     // Raw scan results map, updated on every BLE event
     private val scanResultsMap = mutableMapOf<String, ScannedDeviceInfo>()
 
+    // Devices that were previously connected; survives scan cycles so the user can
+    // reconnect without re-scanning.
+    private val knownDevicesMap = mutableMapOf<String, ScannedDeviceInfo>()
+
     // Last known HR for merging into FTMS samples
     private var lastHeartRateBpm = 0
 
@@ -217,6 +221,11 @@ class MainActivity : AppCompatActivity() {
                 val isFtms = serviceUuids.contains(FtmsConstants.FTMS_SERVICE_UUID)
                 val isHr = serviceUuids.contains(FtmsConstants.HR_SERVICE_UUID)
 
+                // Skip devices that advertise services but none of them are fitness-related
+                // (e.g. audio headphones, earbuds). Devices with no service UUIDs in their
+                // advertisement are kept as "unknown" since some fitness equipment omits them.
+                if (serviceUuids.isNotEmpty() && !isFtms && !isHr) return
+
                 val existing = scanResultsMap[device.address]
                 if (existing != null) {
                     existing.rssi = result.rssi
@@ -263,12 +272,22 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updateScanListUI() {
-        val list = scanResultsMap.values.toList()
+        // Merge current scan results with known devices (previously connected) that
+        // are not present in the current scan — so the user can always reconnect.
+        val combined = scanResultsMap.toMutableMap()
+        knownDevicesMap.forEach { (addr, info) ->
+            if (!combined.containsKey(addr)) combined[addr] = info
+        }
+        val list = combined.values.toList()
         runOnUiThread {
             binding.txtScanStatus.text = if (bleScanner.isScanning)
-                "${getString(R.string.scanning_active)} ${list.size}"
+                "${getString(R.string.scanning_active)} ${scanResultsMap.size}"
             else
-                getString(R.string.devices_found, list.size)
+                getString(R.string.devices_found, scanResultsMap.size)
+            if (list.isNotEmpty()) {
+                binding.rvScanResults.visibility = View.VISIBLE
+                binding.txtScanStatus.visibility = View.VISIBLE
+            }
             scanAdapter.updateAll(list)
             // Mark already-connected devices
             ftmsConnectionManager?.connectedDeviceAddress?.let { scanAdapter.markConnected(it) }
@@ -279,6 +298,8 @@ class MainActivity : AppCompatActivity() {
     // ---- Device connection from scan list -----------------------------------
 
     private fun onDeviceConnectTapped(info: ScannedDeviceInfo) {
+        // Save device info so it remains accessible for reconnect after scanning stops
+        knownDevicesMap[info.address] = info
         when {
             info.isFtms -> connectFtmsDevice(info.device)
             info.isHr -> connectHrDevice(info.device)
@@ -316,6 +337,7 @@ class MainActivity : AppCompatActivity() {
                     resetMetrics()
                     if (isRecording) stopRecording()
                     Toast.makeText(this@MainActivity, getString(R.string.device_disconnected), Toast.LENGTH_SHORT).show()
+                    updateScanListUI()
                 }
             }
 
@@ -397,6 +419,7 @@ class MainActivity : AppCompatActivity() {
                 runOnUiThread {
                     updateConnectionStatus()
                     scanAdapter.markDisconnected(device.address)
+                    updateScanListUI()
                 }
             }
 

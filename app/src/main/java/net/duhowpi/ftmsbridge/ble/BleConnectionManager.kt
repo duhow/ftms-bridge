@@ -9,6 +9,8 @@ import android.bluetooth.BluetoothGattDescriptor
 import android.bluetooth.BluetoothProfile
 import android.content.Context
 import android.content.pm.PackageManager
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import androidx.core.app.ActivityCompat
 import net.duhowpi.ftmsbridge.ftms.FtmsConstants
@@ -22,11 +24,20 @@ class BleConnectionManager(
     private val tag = "BleConnectionManager"
     private var gatt: BluetoothGatt? = null
     private var listener: ConnectionListener? = null
-    private val pendingDescriptorWrites = LinkedList<BluetoothGattDescriptor>()
-    private var writingDescriptor = false
-    private val pendingCharReads = LinkedList<BluetoothGattCharacteristic>()
-    private var readingChar = false
-    private var requestControlPending = false
+
+    // Single serialised GATT operation queue.  Android's GATT layer only handles
+    // one operation at a time; mixing reads and descriptor writes without serialisation
+    // causes writeDescriptor() to return false silently, leaving writingDescriptor
+    // stuck at true and no CCCD ever written.
+    private sealed class GattOp {
+        class ReadChar(val char: BluetoothGattCharacteristic) : GattOp()
+        class WriteDescriptor(val descriptor: BluetoothGattDescriptor) : GattOp()
+        class WriteChar(val char: BluetoothGattCharacteristic, val data: ByteArray) : GattOp()
+    }
+    private val gattQueue = LinkedList<GattOp>()
+    private var gattBusy = false
+    private val retryHandler = Handler(Looper.getMainLooper())
+
     private var controlPointChar: BluetoothGattCharacteristic? = null
 
     var isConnected = false
@@ -73,8 +84,9 @@ class BleConnectionManager(
         connectedDeviceHwRevision = null
         connectedDeviceFwRevision = null
         recentEvents.clear()
-        pendingCharReads.clear()
-        readingChar = false
+        gattQueue.clear()
+        gattBusy = false
+        controlPointChar = null
         debugLogger.startSession(name, device.address)
         debugLogger.logMessage("Connecting to $name (${device.address})")
         gatt = device.connectGatt(context, false, gattCallback, BluetoothDevice.TRANSPORT_LE)
@@ -82,6 +94,7 @@ class BleConnectionManager(
 
     fun disconnect() {
         if (ActivityCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) return
+        retryHandler.removeCallbacksAndMessages(null)
         gatt?.disconnect()
         gatt?.close()
         gatt = null
@@ -92,11 +105,8 @@ class BleConnectionManager(
         connectedDeviceHwRevision = null
         connectedDeviceFwRevision = null
         recentEvents.clear()
-        pendingCharReads.clear()
-        pendingDescriptorWrites.clear()
-        readingChar = false
-        writingDescriptor = false
-        requestControlPending = false
+        gattQueue.clear()
+        gattBusy = false
         controlPointChar = null
         debugLogger.stopSession()
         listener?.onDisconnected()
@@ -109,9 +119,72 @@ class BleConnectionManager(
         val descriptor = characteristic.getDescriptor(FtmsConstants.CCCD_UUID)
         if (descriptor != null) {
             descriptor.value = BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
-            pendingDescriptorWrites.add(descriptor)
-            writeNextDescriptor()
+            enqueueOp(GattOp.WriteDescriptor(descriptor))
         }
+    }
+
+    private fun scheduleCharRead(characteristic: BluetoothGattCharacteristic) {
+        enqueueOp(GattOp.ReadChar(characteristic))
+    }
+
+    private fun writeControlPoint(data: ByteArray) {
+        val char = controlPointChar ?: return
+        enqueueOp(GattOp.WriteChar(char, data))
+    }
+
+    private fun enqueueOp(op: GattOp) {
+        gattQueue.add(op)
+        advanceQueue()
+    }
+
+    /** Execute the next queued GATT operation, if the bus is free. */
+    private fun advanceQueue() {
+        if (gattBusy) return
+        val g = gatt ?: return
+        val op = gattQueue.poll() ?: return
+        gattBusy = true
+
+        val started = when (op) {
+            is GattOp.WriteDescriptor -> {
+                if (ActivityCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) false
+                else {
+                    debugLogger.logMessage("CCCD write ${op.descriptor.characteristic.uuid.toString().takeLast(4)}")
+                    @Suppress("DEPRECATION")
+                    g.writeDescriptor(op.descriptor) == true
+                }
+            }
+            is GattOp.ReadChar -> {
+                if (ActivityCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) false
+                else {
+                    @Suppress("DEPRECATION")
+                    g.readCharacteristic(op.char) == true
+                }
+            }
+            is GattOp.WriteChar -> {
+                if (ActivityCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) false
+                else {
+                    debugLogger.logMessage("Char write ${op.char.uuid.toString().takeLast(4)}: ${op.data.joinToString(" ") { String.format("%02X", it) }}")
+                    @Suppress("DEPRECATION")
+                    op.char.value = op.data
+                    @Suppress("DEPRECATION")
+                    g.writeCharacteristic(op.char) == true
+                }
+            }
+        }
+
+        if (!started) {
+            // GATT busy or transient error — put the operation back and retry shortly.
+            gattBusy = false
+            gattQueue.addFirst(op)
+            debugLogger.logMessage("GATT op failed, retrying in 200 ms")
+            retryHandler.postDelayed({ advanceQueue() }, 200)
+        }
+    }
+
+    /** Called by every GATT completion callback to free the bus and run the next op. */
+    private fun onOperationComplete() {
+        gattBusy = false
+        advanceQueue()
     }
 
     private fun addRecentEvent(direction: String, uuid: String, data: ByteArray) {
@@ -121,47 +194,6 @@ class BleConnectionManager(
         synchronized(recentEvents) {
             if (recentEvents.size >= 30) recentEvents.removeFirst()
             recentEvents.addLast(entry)
-        }
-    }
-
-    private fun writeNextDescriptor() {
-        if (writingDescriptor) return
-        val descriptor = pendingDescriptorWrites.poll() ?: return
-        writingDescriptor = true
-        if (ActivityCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) return
-        @Suppress("DEPRECATION")
-        gatt?.writeDescriptor(descriptor)
-    }
-
-    private fun scheduleCharRead(characteristic: BluetoothGattCharacteristic) {
-        pendingCharReads.add(characteristic)
-        readNextChar()
-    }
-
-    private fun writeControlPoint(data: ByteArray) {
-        val g = gatt ?: return
-        val char = controlPointChar ?: return
-        if (ActivityCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) return
-        @Suppress("DEPRECATION")
-        char.value = data
-        @Suppress("DEPRECATION")
-        val ok = g.writeCharacteristic(char)
-        debugLogger.logMessage("Control point write ${data.joinToString(" ") { String.format("%02X", it) }}: ok=$ok")
-    }
-
-    private fun readNextChar() {
-        if (readingChar) return
-        val char = pendingCharReads.poll() ?: return
-        readingChar = true
-        if (ActivityCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
-            readingChar = false
-            readNextChar()
-            return
-        }
-        @Suppress("DEPRECATION")
-        if (gatt?.readCharacteristic(char) != true) {
-            readingChar = false
-            readNextChar()
         }
     }
 
@@ -185,11 +217,9 @@ class BleConnectionManager(
                     connectedDeviceSerial = null
                     connectedDeviceHwRevision = null
                     connectedDeviceFwRevision = null
-                    pendingCharReads.clear()
-                    pendingDescriptorWrites.clear()
-                    readingChar = false
-                    writingDescriptor = false
-                    requestControlPending = false
+                    retryHandler.removeCallbacksAndMessages(null)
+                    gattQueue.clear()
+                    gattBusy = false
                     controlPointChar = null
                     debugLogger.stopSession()
                     listener?.onDisconnected()
@@ -219,15 +249,7 @@ class BleConnectionManager(
             val ftmsChars = mutableListOf<UUID>()
 
             if (ftmsService != null) {
-                // Read machine features
-                val featureChar = ftmsService.getCharacteristic(FtmsConstants.FITNESS_MACHINE_FEATURE_UUID)
-                if (featureChar != null) {
-                    if (ActivityCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED) {
-                        scheduleCharRead(featureChar)
-                    }
-                }
-
-                // Subscribe to data characteristics
+                // --- Step 1: subscribe to all data / status notification characteristics ---
                 val treadmillChar = ftmsService.getCharacteristic(FtmsConstants.TREADMILL_DATA_UUID)
                 if (treadmillChar != null) {
                     ftmsChars.add(FtmsConstants.TREADMILL_DATA_UUID)
@@ -240,27 +262,20 @@ class BleConnectionManager(
                     enableNotification(bikeChar)
                 }
 
-                // Machine status notifications
                 val statusChar = ftmsService.getCharacteristic(FtmsConstants.FITNESS_MACHINE_STATUS_UUID)
-                if (statusChar != null) {
-                    enableNotification(statusChar)
-                }
+                if (statusChar != null) enableNotification(statusChar)
 
-                // Training status notifications
                 val trainingChar = ftmsService.getCharacteristic(FtmsConstants.TRAINING_STATUS_UUID)
-                if (trainingChar != null) {
-                    enableNotification(trainingChar)
-                }
+                if (trainingChar != null) enableNotification(trainingChar)
 
-                // FTMS Control Point: subscribe to notifications/indications.
-                // BH Fitness iConcept 3.0 uses NOTIFY (props=24) instead of the standard
-                // INDICATE (props=40). Subscribing here enables the machine to send start/stop
-                // events back, and also allows us to send "Request Control" to trigger data streaming.
+                // --- Step 2: subscribe to control point, then queue "Request Control" ---
+                // BH Fitness iConcept 3.0 uses NOTIFY (props=24) for the control point.
+                // Sending Request Control (0x00) after subscribing triggers data streaming.
                 val cpChar = ftmsService.getCharacteristic(FtmsConstants.FITNESS_MACHINE_CONTROL_POINT_UUID)
                 if (cpChar != null) {
                     controlPointChar = cpChar
                     enableNotification(cpChar)
-                    requestControlPending = true
+                    writeControlPoint(byteArrayOf(FtmsConstants.CONTROL_REQUEST_CONTROL))
                 }
             }
 
@@ -284,8 +299,13 @@ class BleConnectionManager(
 
             listener?.onServicesReady(ftmsChars, hasHeartRate)
 
-            // Schedule reads for Device Information Service characteristics
+            // --- Step 3: read informational characteristics AFTER all CCCD writes ---
+            // Keeping reads at the end avoids the race condition where readCharacteristic()
+            // returns false because writeDescriptor() is in-flight (or vice-versa).
             if (ActivityCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED) {
+                ftmsService?.getCharacteristic(FtmsConstants.FITNESS_MACHINE_FEATURE_UUID)
+                    ?.let { scheduleCharRead(it) }
+
                 val devInfoService = gatt.getService(FtmsConstants.DEVICE_INFO_SERVICE_UUID)
                 if (devInfoService != null) {
                     debugLogger.logMessage("Device Information Service found")
@@ -306,13 +326,10 @@ class BleConnectionManager(
             characteristic: BluetoothGattCharacteristic,
             status: Int
         ) {
-            readingChar = false
-            if (status != BluetoothGatt.GATT_SUCCESS) {
-                readNextChar()
-                return
-            }
+            onOperationComplete()
+            if (status != BluetoothGatt.GATT_SUCCESS) return
             @Suppress("DEPRECATION")
-            val data = characteristic.value ?: run { readNextChar(); return }
+            val data = characteristic.value ?: return
             debugLogger.logEvent("READ", characteristic.uuid.toString(), data)
             addRecentEvent("READ", characteristic.uuid.toString(), data)
 
@@ -331,7 +348,6 @@ class BleConnectionManager(
                     listener?.onDeviceInfoRead()
                 }
             }
-            readNextChar()
         }
 
         @Deprecated("Deprecated in API 33")
@@ -339,6 +355,7 @@ class BleConnectionManager(
             gatt: BluetoothGatt,
             characteristic: BluetoothGattCharacteristic
         ) {
+            // Spontaneous notification — does NOT advance the operation queue.
             @Suppress("DEPRECATION")
             val data = characteristic.value ?: return
             debugLogger.logEvent("NOTIFY", characteristic.uuid.toString(), data)
@@ -359,11 +376,8 @@ class BleConnectionManager(
                     listener?.onMachineStatusChanged(opCode, params)
                 }
                 FtmsConstants.FITNESS_MACHINE_CONTROL_POINT_UUID -> {
-                    // Asynchronous control-point notification (e.g. response to Request Control,
-                    // or unsolicited machine-state event on BH Fitness iConcept 3.0 devices).
                     debugLogger.logMessage("Control point notification: ${data.joinToString(" ") { String.format("%02X", it) }}")
                     if (data.isNotEmpty() && (data[0].toInt() and 0xFF) != FtmsConstants.CONTROL_RESPONSE_CODE) {
-                        // Treat non-response notifications as machine status events
                         val opCode = data[0].toInt() and 0xFF
                         val params = if (data.size > 1) data.copyOfRange(1, data.size) else byteArrayOf()
                         listener?.onMachineStatusChanged(opCode, params)
@@ -385,15 +399,16 @@ class BleConnectionManager(
             status: Int
         ) {
             debugLogger.logMessage("Descriptor write for ${descriptor.characteristic.uuid}: status=$status")
-            writingDescriptor = false
-            writeNextDescriptor()
-            // Once all CCCD subscriptions are complete, send "Request Control" to the
-            // FTMS control point. BH Fitness iConcept 3.0 devices require this before
-            // they start streaming treadmill data and sending start/stop events.
-            if (pendingDescriptorWrites.isEmpty() && !writingDescriptor && requestControlPending) {
-                requestControlPending = false
-                writeControlPoint(byteArrayOf(FtmsConstants.CONTROL_REQUEST_CONTROL))
-            }
+            onOperationComplete()
+        }
+
+        override fun onCharacteristicWrite(
+            gatt: BluetoothGatt,
+            characteristic: BluetoothGattCharacteristic,
+            status: Int
+        ) {
+            debugLogger.logMessage("Characteristic write for ${characteristic.uuid}: status=$status")
+            onOperationComplete()
         }
     }
 }

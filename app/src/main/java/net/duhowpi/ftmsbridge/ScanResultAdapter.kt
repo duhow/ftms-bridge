@@ -12,6 +12,7 @@ class ScanResultAdapter(
 
     private val items = mutableListOf<ScannedDeviceInfo>()
     private val connectedAddresses = mutableSetOf<String>()
+    private val disconnectedAddresses = mutableSetOf<String>()
 
     class ViewHolder(val binding: ItemScanResultBinding) : RecyclerView.ViewHolder(binding.root)
 
@@ -23,14 +24,18 @@ class ScanResultAdapter(
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
         val item = items[position]
         val isConnected = connectedAddresses.contains(item.address)
+        val isDisconnected = !isConnected && disconnectedAddresses.contains(item.address)
         holder.binding.apply {
             txtDeviceType.text = item.typeLabel
             txtDeviceName.text = item.name
             txtDeviceAddress.text = item.address
-            txtSignalBars.text = item.signalBars
-            txtRssi.text = item.rssiLabel
-            btnConnect.text = if (isConnected)
-                root.context.getString(R.string.connected_label) else root.context.getString(R.string.connect)
+            txtSignalBars.text = if (item.rssi != Int.MIN_VALUE) item.signalBars else "○○○○"
+            txtRssi.text = if (item.rssi != Int.MIN_VALUE) item.rssiLabel else ""
+            btnConnect.text = when {
+                isConnected -> root.context.getString(R.string.connected_label)
+                isDisconnected -> root.context.getString(R.string.reconnect)
+                else -> root.context.getString(R.string.connect)
+            }
             btnConnect.isEnabled = !isConnected
             btnConnect.setOnClickListener { if (!isConnected) onConnect(item) }
         }
@@ -40,13 +45,16 @@ class ScanResultAdapter(
 
     fun updateAll(newItems: List<ScannedDeviceInfo>) {
         items.clear()
-        items.addAll(newItems.sortedWith(compareByDescending<ScannedDeviceInfo> {
-            it.isFtms || it.isHr
-        }.thenByDescending { it.rssi }))
+        items.addAll(newItems.sortedWith(
+            compareByDescending<ScannedDeviceInfo> { connectedAddresses.contains(it.address) }
+                .thenByDescending { it.isFtms || it.isHr }
+                .thenByDescending { it.rssi }
+        ))
         notifyDataSetChanged()
     }
 
     fun markConnected(address: String) {
+        disconnectedAddresses.remove(address)
         connectedAddresses.add(address)
         val idx = items.indexOfFirst { it.address == address }
         if (idx >= 0) notifyItemChanged(idx)
@@ -54,6 +62,7 @@ class ScanResultAdapter(
 
     fun markDisconnected(address: String) {
         connectedAddresses.remove(address)
+        disconnectedAddresses.add(address)
         val idx = items.indexOfFirst { it.address == address }
         if (idx >= 0) notifyItemChanged(idx)
     }

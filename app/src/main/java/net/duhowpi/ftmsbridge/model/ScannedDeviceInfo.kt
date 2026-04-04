@@ -17,12 +17,13 @@ data class ScannedDeviceInfo(
         else -> "BLE"
     }
 
-    val rssiLabel: String get() = "$rssi dBm"
+    val rssiLabel: String get() = if (rssi != Int.MIN_VALUE) "$rssi dBm" else ""
 
     val signalBars: String get() = when {
         rssi >= -60 -> "●●●●"
         rssi >= -70 -> "●●●○"
         rssi >= -80 -> "●●○○"
-        else -> "●○○○"
+        rssi > Int.MIN_VALUE -> "●○○○"
+        else -> "○○○○"
     }
 }

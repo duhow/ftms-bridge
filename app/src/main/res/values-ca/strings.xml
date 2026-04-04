@@ -65,6 +65,7 @@
     <string name="connect">Connectar</string>
     <string name="connected_label">Connectat</string>
     <string name="disconnect">Desconnectar</string>
+    <string name="reconnect">Reconnectar</string>
     <string name="scanning_active">Escanejant…</string>
     <string name="device_disconnected">Dispositiu desconnectat</string>
 
