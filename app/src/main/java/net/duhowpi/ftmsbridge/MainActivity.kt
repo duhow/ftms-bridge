@@ -334,8 +334,8 @@ class MainActivity : AppCompatActivity() {
                 val sample = fitnessDevice?.onDataReceived(data) ?: return
                 val mergedSample = if (sample.heartRateBpm == 0 && lastHeartRateBpm > 0)
                     sample.copy(heartRateBpm = lastHeartRateBpm) else sample
-                // Detect machine running state from speed as a fallback when no
-                // machine-status characteristic is present (e.g. BH Fitness iConcept 3.0).
+                // Detect machine running state from speed as a fallback for devices that
+                // do not expose a machine-status characteristic (speed > 0 → machine running).
                 val nowRunning = mergedSample.speedKmh > 0.0
                 if (nowRunning != isMachineRunning) {
                     isMachineRunning = nowRunning
