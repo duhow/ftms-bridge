@@ -29,8 +29,8 @@ class ScanResultAdapter(
             txtDeviceType.text = item.typeLabel
             txtDeviceName.text = item.name
             txtDeviceAddress.text = item.address
-            txtSignalBars.text = if (item.rssi != Int.MIN_VALUE) item.signalBars else "○○○○"
-            txtRssi.text = if (item.rssi != Int.MIN_VALUE) item.rssiLabel else ""
+            txtSignalBars.text = item.signalBars
+            txtRssi.text = item.rssiLabel
             btnConnect.text = when {
                 isConnected -> root.context.getString(R.string.connected_label)
                 isDisconnected -> root.context.getString(R.string.reconnect)

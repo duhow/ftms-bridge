@@ -358,7 +358,7 @@ class MainActivity : AppCompatActivity() {
                     sample.copy(heartRateBpm = lastHeartRateBpm) else sample
                 // Detect machine running state from speed as a fallback for devices that
                 // do not expose a machine-status characteristic (speed > 0 → machine running).
-                val nowRunning = mergedSample.speedKmh > 0.0
+                val nowRunning = mergedSample.speedKmh > 0.1
                 if (nowRunning != isMachineRunning) {
                     isMachineRunning = nowRunning
                     runOnUiThread { updateMachineRunningState() }
