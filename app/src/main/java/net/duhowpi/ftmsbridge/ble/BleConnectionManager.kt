@@ -26,6 +26,8 @@ class BleConnectionManager(
     private var writingDescriptor = false
     private val pendingCharReads = LinkedList<BluetoothGattCharacteristic>()
     private var readingChar = false
+    private var requestControlPending = false
+    private var controlPointChar: BluetoothGattCharacteristic? = null
 
     var isConnected = false
         private set
@@ -55,6 +57,7 @@ class BleConnectionManager(
         fun onHeartRateData(data: ByteArray)
         fun onFeaturesRead(data: ByteArray)
         fun onDeviceInfoRead()
+        fun onMachineStatusChanged(opCode: Int, params: ByteArray)
     }
 
     fun connect(device: BluetoothDevice, connectionListener: ConnectionListener) {
@@ -90,7 +93,11 @@ class BleConnectionManager(
         connectedDeviceFwRevision = null
         recentEvents.clear()
         pendingCharReads.clear()
+        pendingDescriptorWrites.clear()
         readingChar = false
+        writingDescriptor = false
+        requestControlPending = false
+        controlPointChar = null
         debugLogger.stopSession()
         listener?.onDisconnected()
     }
@@ -131,6 +138,17 @@ class BleConnectionManager(
         readNextChar()
     }
 
+    private fun writeControlPoint(data: ByteArray) {
+        val g = gatt ?: return
+        val char = controlPointChar ?: return
+        if (ActivityCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) return
+        @Suppress("DEPRECATION")
+        char.value = data
+        @Suppress("DEPRECATION")
+        val ok = g.writeCharacteristic(char)
+        debugLogger.logMessage("Control point write ${data.joinToString(" ") { String.format("%02X", it) }}: ok=$ok")
+    }
+
     private fun readNextChar() {
         if (readingChar) return
         val char = pendingCharReads.poll() ?: return
@@ -168,7 +186,11 @@ class BleConnectionManager(
                     connectedDeviceHwRevision = null
                     connectedDeviceFwRevision = null
                     pendingCharReads.clear()
+                    pendingDescriptorWrites.clear()
                     readingChar = false
+                    writingDescriptor = false
+                    requestControlPending = false
+                    controlPointChar = null
                     debugLogger.stopSession()
                     listener?.onDisconnected()
                 }
@@ -229,6 +251,17 @@ class BleConnectionManager(
                 if (trainingChar != null) {
                     enableNotification(trainingChar)
                 }
+
+                // FTMS Control Point: subscribe to notifications/indications.
+                // BH Fitness iConcept 3.0 uses NOTIFY (props=24) instead of the standard
+                // INDICATE (props=40). Subscribing here enables the machine to send start/stop
+                // events back, and also allows us to send "Request Control" to trigger data streaming.
+                val cpChar = ftmsService.getCharacteristic(FtmsConstants.FITNESS_MACHINE_CONTROL_POINT_UUID)
+                if (cpChar != null) {
+                    controlPointChar = cpChar
+                    enableNotification(cpChar)
+                    requestControlPending = true
+                }
             }
 
             var hasHeartRate = false
@@ -237,6 +270,15 @@ class BleConnectionManager(
                 if (hrChar != null) {
                     hasHeartRate = true
                     enableNotification(hrChar)
+                }
+            }
+
+            // iConcept 3.0 / BH Fitness proprietary service — subscribe to notify chars
+            val iConceptService = gatt.getService(FtmsConstants.ICONCEPT_SERVICE_UUID)
+            if (iConceptService != null) {
+                debugLogger.logMessage("iConcept proprietary service found")
+                listOf(FtmsConstants.ICONCEPT_NOTIFY_1_UUID, FtmsConstants.ICONCEPT_NOTIFY_2_UUID).forEach { uuid ->
+                    iConceptService.getCharacteristic(uuid)?.let { enableNotification(it) }
                 }
             }
 
@@ -311,10 +353,28 @@ class BleConnectionManager(
                     listener?.onHeartRateData(data)
                 }
                 FtmsConstants.FITNESS_MACHINE_STATUS_UUID -> {
+                    val opCode = data[0].toInt() and 0xFF
+                    val params = if (data.size > 1) data.copyOfRange(1, data.size) else byteArrayOf()
                     debugLogger.logMessage("Machine status update: ${data.joinToString(" ") { String.format("%02X", it) }}")
+                    listener?.onMachineStatusChanged(opCode, params)
+                }
+                FtmsConstants.FITNESS_MACHINE_CONTROL_POINT_UUID -> {
+                    // Asynchronous control-point notification (e.g. response to Request Control,
+                    // or unsolicited machine-state event on BH Fitness iConcept 3.0 devices).
+                    debugLogger.logMessage("Control point notification: ${data.joinToString(" ") { String.format("%02X", it) }}")
+                    if (data.isNotEmpty() && (data[0].toInt() and 0xFF) != FtmsConstants.CONTROL_RESPONSE_CODE) {
+                        // Treat non-response notifications as machine status events
+                        val opCode = data[0].toInt() and 0xFF
+                        val params = if (data.size > 1) data.copyOfRange(1, data.size) else byteArrayOf()
+                        listener?.onMachineStatusChanged(opCode, params)
+                    }
                 }
                 FtmsConstants.TRAINING_STATUS_UUID -> {
                     debugLogger.logMessage("Training status update: ${data.joinToString(" ") { String.format("%02X", it) }}")
+                }
+                FtmsConstants.ICONCEPT_NOTIFY_1_UUID,
+                FtmsConstants.ICONCEPT_NOTIFY_2_UUID -> {
+                    debugLogger.logMessage("iConcept notify ${characteristic.uuid.toString().takeLast(4)}: ${data.joinToString(" ") { String.format("%02X", it) }}")
                 }
             }
         }
@@ -327,6 +387,13 @@ class BleConnectionManager(
             debugLogger.logMessage("Descriptor write for ${descriptor.characteristic.uuid}: status=$status")
             writingDescriptor = false
             writeNextDescriptor()
+            // Once all CCCD subscriptions are complete, send "Request Control" to the
+            // FTMS control point. BH Fitness iConcept 3.0 devices require this before
+            // they start streaming treadmill data and sending start/stop events.
+            if (pendingDescriptorWrites.isEmpty() && !writingDescriptor && requestControlPending) {
+                requestControlPending = false
+                writeControlPoint(byteArrayOf(FtmsConstants.CONTROL_REQUEST_CONTROL))
+            }
         }
     }
 }

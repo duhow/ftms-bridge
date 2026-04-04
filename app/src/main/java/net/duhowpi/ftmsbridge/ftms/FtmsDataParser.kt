@@ -212,6 +212,15 @@ object FtmsDataParser {
         )
     }
 
+    /**
+     * Parses the Fitness Machine Status characteristic (0x2AD7).
+     * Returns the op-code byte (see FtmsConstants.MACHINE_STATUS_*).
+     */
+    fun parseMachineStatusOpCode(data: ByteArray): Int {
+        if (data.isEmpty()) return -1
+        return data[0].toInt() and 0xFF
+    }
+
     fun parseHeartRate(data: ByteArray): Int {
         if (data.isEmpty()) return 0
         val flags = data[0].toInt() and 0xFF

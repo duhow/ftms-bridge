@@ -66,6 +66,7 @@
     <string name="connected_label">Conectado</string>
     <string name="disconnect">Desconectar</string>
     <string name="scanning_active">Escaneando…</string>
+    <string name="device_disconnected">Dispositivo desconectado</string>
 
     <!-- Debug -->
     <string name="debug_info">Info Debug</string>

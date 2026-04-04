@@ -17,3 +17,8 @@ Initial release.
 - FIT export includes per-second records with speed, cadence, power, HR, distance, grade and resistance; consecutive identical samples are deduplicated
 - Device info (MAC address, serial number, hardware and firmware revision) shown when connected to a FTMS device, hidden if not available
 - Delete past workouts via long-press
+- BH Fitness iConcept 3.0 FTMS treadmill: subscribe to control-point notifications and send Request Control so the machine starts streaming data
+- Auto-detect machine start/stop from FTMS Machine Status characteristic and speed data; recording starts/stops automatically
+- Fixed: dashboard metrics are cleared when device disconnects
+- Show toast notification when device unexpectedly disconnects
+- Subscribe to iConcept proprietary service notify characteristics for enhanced status reporting

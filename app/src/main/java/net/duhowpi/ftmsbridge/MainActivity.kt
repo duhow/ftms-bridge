@@ -60,6 +60,7 @@ class MainActivity : AppCompatActivity() {
     private var currentSessionId: Long? = null
     private var sessionStartTime: Long = 0
     private var isRecording = false
+    private var isMachineRunning = false
 
     // Raw scan results map, updated on every BLE event
     private val scanResultsMap = mutableMapOf<String, ScannedDeviceInfo>()
@@ -308,10 +309,13 @@ class MainActivity : AppCompatActivity() {
 
             override fun onDisconnected() {
                 fitnessDevice = null
+                isMachineRunning = false
                 runOnUiThread {
                     updateConnectionStatus()
                     scanAdapter.markDisconnected(device.address)
+                    resetMetrics()
                     if (isRecording) stopRecording()
+                    Toast.makeText(this@MainActivity, getString(R.string.device_disconnected), Toast.LENGTH_SHORT).show()
                 }
             }
 
@@ -330,6 +334,13 @@ class MainActivity : AppCompatActivity() {
                 val sample = fitnessDevice?.onDataReceived(data) ?: return
                 val mergedSample = if (sample.heartRateBpm == 0 && lastHeartRateBpm > 0)
                     sample.copy(heartRateBpm = lastHeartRateBpm) else sample
+                // Detect machine running state from speed as a fallback when no
+                // machine-status characteristic is present (e.g. BH Fitness iConcept 3.0).
+                val nowRunning = mergedSample.speedKmh > 0.0
+                if (nowRunning != isMachineRunning) {
+                    isMachineRunning = nowRunning
+                    runOnUiThread { updateMachineRunningState() }
+                }
                 runOnUiThread { updateDashboard(mergedSample) }
                 if (isRecording && currentSessionId != null) saveSample(mergedSample)
             }
@@ -349,6 +360,19 @@ class MainActivity : AppCompatActivity() {
 
             override fun onDeviceInfoRead() {
                 runOnUiThread { updateFtmsDeviceInfoUI() }
+            }
+
+            override fun onMachineStatusChanged(opCode: Int, params: ByteArray) {
+                val nowRunning = when (opCode) {
+                    FtmsConstants.MACHINE_STATUS_STARTED_OR_RESUMED -> true
+                    FtmsConstants.MACHINE_STATUS_STOPPED_OR_PAUSED,
+                    FtmsConstants.MACHINE_STATUS_STOPPED_BY_SAFETY_KEY,
+                    FtmsConstants.MACHINE_STATUS_RESET -> false
+                    else -> return
+                }
+                if (nowRunning == isMachineRunning) return
+                isMachineRunning = nowRunning
+                runOnUiThread { updateMachineRunningState() }
             }
         })
     }
@@ -393,6 +417,8 @@ class MainActivity : AppCompatActivity() {
             override fun onFeaturesRead(data: ByteArray) {}
 
             override fun onDeviceInfoRead() {}
+
+            override fun onMachineStatusChanged(opCode: Int, params: ByteArray) {}
         })
     }
 
@@ -424,6 +450,15 @@ class MainActivity : AppCompatActivity() {
 
         binding.workoutButtonRow.visibility = if (ftmsConnected) View.VISIBLE else View.GONE
         binding.btnWorkoutStart.isEnabled = ftmsConnected
+    }
+
+    /** Called whenever the machine transitions between running and stopped state. */
+    private fun updateMachineRunningState() {
+        if (isMachineRunning && !isRecording) {
+            startRecording()
+        } else if (!isMachineRunning && isRecording) {
+            stopRecording()
+        }
     }
 
     private fun updateFtmsDeviceInfoUI() {
