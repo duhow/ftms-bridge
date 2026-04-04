@@ -7,3 +7,6 @@
 - FIT export correctly sets sport/sub-sport for Cross Trainer and Stair Climber sessions
 - BLE scan ignores common non-fitness devices by name (smart locks, TVs, speakers, earbuds, etc.)
 - Added About menu entry showing the current app version
+- Main screen buttons (Scan, History, Debug) are now fixed above the device scan list
+- Workout statistics are hidden until a workout begins, for a cleaner UI
+- Second device (HR sensor) connection status is hidden until a second device is connected

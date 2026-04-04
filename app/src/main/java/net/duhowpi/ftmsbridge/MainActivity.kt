@@ -493,6 +493,7 @@ class MainActivity : AppCompatActivity() {
     private fun updateConnectionStatus() {
         val ftmsConnected = ftmsConnectionManager?.isConnected == true
         val hrConnected = hrConnectionManager?.isConnected == true
+        val hasHrDevice = hrConnectionManager != null
 
         binding.indicatorFtms.setBackgroundResource(
             if (ftmsConnected) R.color.status_connected else R.color.status_disconnected
@@ -507,6 +508,9 @@ class MainActivity : AppCompatActivity() {
         binding.txtHrDevice.text = if (hrConnected)
             hrConnectionManager?.connectedDeviceName ?: getString(R.string.connected)
         else getString(R.string.not_connected)
+
+        // Show the HR status row only once a second device has been connected/attempted
+        binding.hrStatusRow.visibility = if (hasHrDevice) View.VISIBLE else View.GONE
 
         if (!ftmsConnected) {
             binding.txtFtmsDeviceInfo.visibility = View.GONE
@@ -611,6 +615,7 @@ class MainActivity : AppCompatActivity() {
         binding.valueResistance.text = "--"
         binding.txtMachineType.visibility = View.GONE
         binding.txtFtmsDeviceInfo.visibility = View.GONE
+        binding.metricsSection.visibility = View.GONE
         updateMetricVisibility(FtmsConstants.MachineType.UNKNOWN)
     }
 
@@ -622,6 +627,7 @@ class MainActivity : AppCompatActivity() {
         sessionStartTime = System.currentTimeMillis()
         binding.btnWorkoutStart.text = getString(R.string.stop_session)
         binding.recordingIndicator.visibility = View.VISIBLE
+        binding.metricsSection.visibility = View.VISIBLE
         // Hide scan results list during workout to reduce clutter
         binding.rvScanResults.visibility = View.GONE
         binding.txtScanStatus.visibility = View.GONE

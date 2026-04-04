@@ -65,11 +65,13 @@
             android:visibility="gone" />
 
         <LinearLayout
+            android:id="@+id/hrStatusRow"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
             android:gravity="center_vertical"
-            android:paddingBottom="12dp">
+            android:paddingBottom="12dp"
+            android:visibility="gone">
 
             <View
                 android:id="@+id/indicatorHr"
@@ -86,25 +88,6 @@
                 android:paddingStart="8dp"
                 android:textSize="14sp" />
         </LinearLayout>
-
-        <!-- Scan status -->
-        <TextView
-            android:id="@+id/txtScanStatus"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:textSize="12sp"
-            android:paddingBottom="4dp"
-            android:paddingStart="2dp"
-            android:visibility="gone" />
-
-        <!-- Scan Results List -->
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/rvScanResults"
-            android:layout_width="match_parent"
-            android:layout_height="220dp"
-            android:background="?attr/colorSurface"
-            android:paddingBottom="4dp"
-            android:visibility="gone" />
 
         <!-- Buttons -->
         <LinearLayout
@@ -184,6 +167,25 @@
                 android:visibility="gone" />
         </LinearLayout>
 
+        <!-- Scan status -->
+        <TextView
+            android:id="@+id/txtScanStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textSize="12sp"
+            android:paddingBottom="4dp"
+            android:paddingStart="2dp"
+            android:visibility="gone" />
+
+        <!-- Scan Results List -->
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/rvScanResults"
+            android:layout_width="match_parent"
+            android:layout_height="220dp"
+            android:background="?attr/colorSurface"
+            android:paddingBottom="4dp"
+            android:visibility="gone" />
+
         <!-- Recording indicator -->
         <TextView
             android:id="@+id/recordingIndicator"
@@ -198,9 +200,11 @@
 
         <!-- Metrics: 2 cards per row. Device-specific rows/tiles are shown/hidden at runtime. -->
         <LinearLayout
+            android:id="@+id/metricsSection"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical">
+            android:orientation="vertical"
+            android:visibility="gone">
 
             <!-- Speed | Heart Rate (always shown) -->
             <LinearLayout
