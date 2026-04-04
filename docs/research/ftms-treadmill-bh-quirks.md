@@ -80,26 +80,53 @@ Bytes (hex, LE):  8C 01  62 02  00 00 00  B4 00 00 00  00 00 00 00 00  00  00
 
 ---
 
-## 3. Indoor bike — Total Energy field repurposed for stride rate
+## 3. Indoor bike — Multiple FTMS fields repurposed or set to garbage constants
 
 ### What the spec says
 
-The Total Energy field (UINT16, kcal) in Indoor Bike Data (0x2AD2) reports cumulative
-expended energy.
+The Indoor Bike Data characteristic (0x2AD2) carries the following when the corresponding
+flag bits are set:
+- Bit 0 (cleared) → Instantaneous Speed (UINT16, km/h × 0.01)
+- Bit 8 → Expended Energy block: Total Energy (UINT16 kcal) + Energy/hr (UINT16 kcal/hr) + Energy/min (UINT8 kcal/min)
+- Bit 10 → Metabolic Equivalent (UINT8, × 0.1 MET)
 
-### What BH Fitness indoor bikes send
+### What BH Fitness indoor bikes send (flags 0x0F54)
 
-BH Fitness indoor bikes send **strides per minute × 100** in this field.
+The device sets flags bits 0, 2, 4, 6, 8, 9, 10, 11 but does NOT fill several of the
+corresponding fields with real data:
 
-```
-Example: field = 8500 → 8500 / 100 = 85.0 strides/min
-```
+| Field | Raw value (example) | Parsed by spec | Actual meaning |
+|-------|---------------------|----------------|----------------|
+| Speed (bit 0) | 0x0974 = 2420 | 24.2 km/h | **Stride counter × 100** — same bytes as Total Energy |
+| Total Energy (bit 8) | 0x0974 = 2420 | 2420 kcal | **Stride counter × 100** — divide by 100 → strides/min |
+| Energy/hr (bit 8) | 0x5400 = 21504 | 21504 kcal/hr | **Garbage constant** — always `00 54` (LE) |
+| Energy/min (bit 8) | 0x00 | 0 kcal/min | Zero; not meaningful |
+| MET (bit 10) | 0x7B = 123 | 12.3 MET | **Constant** — 0x7B across all packets; not a real reading |
+| Distance (bit 4) | 0 | 0 m | Always 0; device does not report it |
+| Elapsed Time (bit 11) | 0 | 0 s | Always 0; device does not report it |
+
+**Key finding:** The Speed field and the Total Energy field always contain the **same
+raw bytes**.  Both encode the stride counter.  The FTMS speed scaling (× 0.01) and the
+divide-by-100 interpretation of Total Energy happen to produce the same quotient, causing
+the displayed "speed" and "strides/min" to be identical — the reported bug.
+
+### Reliable fields on BH indoor bikes
+
+| Field | Notes |
+|-------|-------|
+| Cadence (rpm) | Correct; scales at × 0.5 |
+| Instantaneous Power (W) | Correct; reasonable values |
+| Heart Rate (bpm) | Correct when chest strap attached |
 
 ### Implementation
 
-`BhFitnessIndoorBike.onDataReceived()` reads the field, divides by 100 to get
-`stridesPerMin`, and zeroes out `totalEnergyKcal` so the UI does not display a
-misleading calorie count.
+`BhFitnessIndoorBike.onDataReceived()` now:
+- Zeroes `speedKmh` and `averageSpeedKmh` (not real speed)
+- Derives `stridesPerMin = totalEnergyKcal / 100.0`
+- Zeroes `totalEnergyKcal`, `energyPerHourKcal`, `energyPerMinuteKcal` (garbage/repurposed)
+- Zeroes `metabolicEquivalent` (constant 0x7B, not a real reading)
+
+See [bh-fitness-indoor-bike.md](bh-fitness-indoor-bike.md) for the full packet decode.
 
 ---
 

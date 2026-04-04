@@ -398,6 +398,10 @@ class MainActivity : AppCompatActivity() {
                 isMachineRunning = nowRunning
                 runOnUiThread { updateMachineRunningState() }
             }
+
+            override fun onIConceptData(data: ByteArray) {
+                fitnessDevice?.onIConceptData(data)
+            }
         })
     }
 
@@ -444,6 +448,8 @@ class MainActivity : AppCompatActivity() {
             override fun onDeviceInfoRead() {}
 
             override fun onMachineStatusChanged(opCode: Int, params: ByteArray) {}
+
+            override fun onIConceptData(data: ByteArray) {}
         })
     }
 

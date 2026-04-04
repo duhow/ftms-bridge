@@ -69,6 +69,7 @@ class BleConnectionManager(
         fun onFeaturesRead(data: ByteArray)
         fun onDeviceInfoRead()
         fun onMachineStatusChanged(opCode: Int, params: ByteArray)
+        fun onIConceptData(data: ByteArray)
     }
 
     fun connect(device: BluetoothDevice, connectionListener: ConnectionListener) {
@@ -388,7 +389,7 @@ class BleConnectionManager(
                 }
                 FtmsConstants.ICONCEPT_NOTIFY_1_UUID,
                 FtmsConstants.ICONCEPT_NOTIFY_2_UUID -> {
-                    debugLogger.logMessage("iConcept notify ${characteristic.uuid.toString().takeLast(4)}: ${data.joinToString(" ") { String.format("%02X", it) }}")
+                    listener?.onIConceptData(data)
                 }
             }
         }

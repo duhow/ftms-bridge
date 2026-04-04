@@ -8,6 +8,7 @@ development of FTMS Bridge. Each file covers one device family or characteristic
 | File | Contents |
 |------|----------|
 | [bh-fitness-iconcept.md](bh-fitness-iconcept.md) | BH Fitness iConcept 3.0 proprietary BLE service (0xC100) — UUIDs, packet formats, known quirks |
+| [bh-fitness-indoor-bike.md](bh-fitness-indoor-bike.md) | BH Fitness indoor bike (0x2AD2) — full packet decode, repurposed fields, reliable fields |
 | [ftms-treadmill-bh-quirks.md](ftms-treadmill-bh-quirks.md) | BH Fitness deviations from the FTMS spec on the standard 0x2ACD characteristic |
 | [log-noise-patterns.md](log-noise-patterns.md) | Patterns that flood the debug log with zero-information entries, and the mitigations applied |
 
