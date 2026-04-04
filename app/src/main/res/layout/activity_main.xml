@@ -100,7 +100,7 @@
             android:orientation="horizontal"
             android:gravity="center"
             android:paddingTop="8dp"
-            android:paddingBottom="16dp">
+            android:paddingBottom="4dp">
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnScan"
@@ -111,12 +111,12 @@
                 android:layout_marginEnd="4dp" />
 
             <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnSession"
+                android:id="@+id/btnHistory"
+                style="@style/Widget.Material3.Button.TonalButton"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="@string/start_session"
-                android:enabled="false"
+                android:text="@string/history"
                 android:layout_marginStart="4dp"
                 android:layout_marginEnd="4dp" />
 
@@ -128,6 +128,47 @@
                 android:layout_weight="1"
                 android:text="@string/debug_info"
                 android:layout_marginStart="4dp" />
+        </LinearLayout>
+
+        <!-- Workout control buttons (shown when a device is connected) -->
+        <LinearLayout
+            android:id="@+id/workoutButtonRow"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center"
+            android:paddingTop="4dp"
+            android:paddingBottom="12dp"
+            android:visibility="gone">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnWorkoutStart"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/workout_start"
+                android:layout_marginEnd="4dp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnWorkoutPause"
+                style="@style/Widget.Material3.Button.TonalButton"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/workout_pause"
+                android:layout_marginStart="4dp"
+                android:layout_marginEnd="4dp"
+                android:visibility="gone" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnWorkoutStop"
+                style="@style/Widget.Material3.Button.OutlinedButton"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/workout_stop"
+                android:layout_marginStart="4dp"
+                android:visibility="gone" />
         </LinearLayout>
 
         <!-- Recording indicator -->

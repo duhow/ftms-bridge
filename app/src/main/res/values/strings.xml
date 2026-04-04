@@ -17,6 +17,29 @@
     <string name="start_session">Start</string>
     <string name="stop_session">Stop</string>
     <string name="recording">● REC</string>
+    <string name="paused">⏸ PAUSED</string>
+
+    <!-- Workout controls -->
+    <string name="workout_start">▶ Start</string>
+    <string name="workout_pause">⏸ Pause</string>
+    <string name="workout_resume">▶ Resume</string>
+    <string name="workout_stop">◼ Stop</string>
+
+    <!-- History -->
+    <string name="history">History</string>
+    <string name="workout_history">Workout History</string>
+    <string name="no_sessions">No workouts recorded yet</string>
+    <string name="session_delete_confirm">Delete this workout?</string>
+    <string name="delete">Delete</string>
+    <string name="export_session">Export workout</string>
+    <string name="export_gpx">GPX</string>
+    <string name="export_csv">CSV</string>
+    <string name="export_format_title">Export format</string>
+    <string name="duration">Duration</string>
+    <string name="avg_speed">Avg speed</string>
+    <string name="avg_hr">Avg HR</string>
+    <string name="max_hr">Max HR</string>
+    <string name="avg_power">Avg power</string>
 
     <!-- Metrics -->
     <string name="metric_speed">Speed</string>

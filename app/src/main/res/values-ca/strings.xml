@@ -17,6 +17,29 @@
     <string name="start_session">Iniciar</string>
     <string name="stop_session">Aturar</string>
     <string name="recording">● REC</string>
+    <string name="paused">⏸ EN PAUSA</string>
+
+    <!-- Workout controls -->
+    <string name="workout_start">▶ Iniciar</string>
+    <string name="workout_pause">⏸ Pausar</string>
+    <string name="workout_resume">▶ Reprendre</string>
+    <string name="workout_stop">◼ Aturar</string>
+
+    <!-- History -->
+    <string name="history">Historial</string>
+    <string name="workout_history">Historial d\'entrenaments</string>
+    <string name="no_sessions">No hi ha entrenaments registrats</string>
+    <string name="session_delete_confirm">Eliminar aquest entrenament?</string>
+    <string name="delete">Eliminar</string>
+    <string name="export_session">Exportar entrenament</string>
+    <string name="export_gpx">GPX</string>
+    <string name="export_csv">CSV</string>
+    <string name="export_format_title">Format d\'exportació</string>
+    <string name="duration">Durada</string>
+    <string name="avg_speed">Vel. mitjana</string>
+    <string name="avg_hr">FC mitjana</string>
+    <string name="max_hr">FC màx.</string>
+    <string name="avg_power">Potència mitjana</string>
 
     <!-- Metrics -->
     <string name="metric_speed">Velocitat</string>
@@ -45,7 +68,7 @@
     <string name="scanning_active">Escanejant…</string>
 
     <!-- Debug -->
-    <string name="debug_info">Info depuració</string>
+    <string name="debug_info">Info Debug</string>
     <string name="export_logs">Exportar logs</string>
     <string name="no_log_files">No s\' han trobat arxius de log</string>
     <string name="debug_log_location">Logs: emmagatzematge extern app/debug/</string>

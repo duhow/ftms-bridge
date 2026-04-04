@@ -17,6 +17,29 @@
     <string name="start_session">Iniciar</string>
     <string name="stop_session">Detener</string>
     <string name="recording">● REC</string>
+    <string name="paused">⏸ EN PAUSA</string>
+
+    <!-- Workout controls -->
+    <string name="workout_start">▶ Iniciar</string>
+    <string name="workout_pause">⏸ Pausar</string>
+    <string name="workout_resume">▶ Reanudar</string>
+    <string name="workout_stop">◼ Detener</string>
+
+    <!-- History -->
+    <string name="history">Historial</string>
+    <string name="workout_history">Historial de entrenamientos</string>
+    <string name="no_sessions">No hay entrenamientos registrados</string>
+    <string name="session_delete_confirm">¿Eliminar este entrenamiento?</string>
+    <string name="delete">Eliminar</string>
+    <string name="export_session">Exportar entrenamiento</string>
+    <string name="export_gpx">GPX</string>
+    <string name="export_csv">CSV</string>
+    <string name="export_format_title">Formato de exportación</string>
+    <string name="duration">Duración</string>
+    <string name="avg_speed">Vel. media</string>
+    <string name="avg_hr">FC media</string>
+    <string name="max_hr">FC máx.</string>
+    <string name="avg_power">Potencia media</string>
 
     <!-- Metrics -->
     <string name="metric_speed">Velocidad</string>
@@ -45,7 +68,7 @@
     <string name="scanning_active">Escaneando…</string>
 
     <!-- Debug -->
-    <string name="debug_info">Info depuración</string>
+    <string name="debug_info">Info Debug</string>
     <string name="export_logs">Exportar logs</string>
     <string name="no_log_files">No se encontraron archivos de log</string>
     <string name="debug_log_location">Logs: almacenamiento externo app/debug/</string>

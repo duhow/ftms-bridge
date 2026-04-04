@@ -7,3 +7,11 @@ Initial release.
 - Debug Bluetooth communication logging
 - BH Fitness device support
 - Portrait and landscape layouts
+- Workout controls: Start / Pause / Resume / Stop buttons, shown when a device is connected
+- Auto-detect device type: HR-only devices (e.g. Xiaomi Smart Band) connect automatically as HR sensor
+- HR signal shown live from dedicated HR sensor even without an FTMS machine
+- Workouts can be started with only a HR sensor connected (HR-only mode)
+- Session summary (avg/max speed, power, HR) saved on workout completion
+- Workout History screen with a list of all past workouts
+- Export workouts as GPX or CSV from the History screen
+- Delete past workouts via long-press
