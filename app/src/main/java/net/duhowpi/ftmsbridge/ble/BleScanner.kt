@@ -5,15 +5,12 @@ import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothManager
 import android.bluetooth.le.BluetoothLeScanner
 import android.bluetooth.le.ScanCallback
-import android.bluetooth.le.ScanFilter
 import android.bluetooth.le.ScanResult
 import android.bluetooth.le.ScanSettings
 import android.content.Context
 import android.content.pm.PackageManager
-import android.os.ParcelUuid
 import android.util.Log
 import androidx.core.app.ActivityCompat
-import net.duhowpi.ftmsbridge.ftms.FtmsConstants
 
 class BleScanner(private val context: Context) {
     private val tag = "BleScanner"
@@ -42,22 +39,26 @@ class BleScanner(private val context: Context) {
             return
         }
 
-        val filters = listOf(
-            ScanFilter.Builder()
-                .setServiceUuid(ParcelUuid(FtmsConstants.FTMS_SERVICE_UUID))
-                .build(),
-            ScanFilter.Builder()
-                .setServiceUuid(ParcelUuid(FtmsConstants.HR_SERVICE_UUID))
-                .build()
-        )
-
+        // Scan without service UUID filters to also pick up devices like
+        // Gadgetbridge HR proxy that may not include service UUIDs in advertisement
         val settings = ScanSettings.Builder()
             .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
+            .setCallbackType(ScanSettings.CALLBACK_TYPE_ALL_MATCHES)
+            .setMatchMode(ScanSettings.MATCH_MODE_AGGRESSIVE)
+            .setNumOfMatches(ScanSettings.MATCH_NUM_MAX_ADVERTISEMENT)
             .build()
 
         scanCallback = object : ScanCallback() {
             override fun onScanResult(callbackType: Int, result: ScanResult) {
-                listener.onDeviceFound(result)
+                if (ActivityCompat.checkSelfPermission(
+                        context, Manifest.permission.BLUETOOTH_CONNECT
+                    ) != PackageManager.PERMISSION_GRANTED
+                ) return
+                // Only report devices with a visible name to avoid noise
+                val name = result.device.name
+                if (!name.isNullOrBlank()) {
+                    listener.onDeviceFound(result)
+                }
             }
 
             override fun onScanFailed(errorCode: Int) {
@@ -67,9 +68,10 @@ class BleScanner(private val context: Context) {
             }
         }
 
-        scanner?.startScan(filters, settings, scanCallback)
+        // Pass null for filters to scan all BLE devices
+        scanner?.startScan(null, settings, scanCallback)
         isScanning = true
-        Log.i(tag, "BLE scan started")
+        Log.i(tag, "BLE scan started (unfiltered, named devices only)")
     }
 
     fun stopScan() {
@@ -78,6 +80,14 @@ class BleScanner(private val context: Context) {
             return
         }
         scanCallback?.let { scanner?.stopScan(it) }
+        scanCallback = null
+        isScanning = false
+        Log.i(tag, "BLE scan stopped")
+    }
+
+    fun isBluetoothEnabled(): Boolean = bluetoothAdapter?.isEnabled == true
+}
+
         scanCallback = null
         isScanning = false
         Log.i(tag, "BLE scan stopped")

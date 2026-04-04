@@ -37,4 +37,19 @@
     <string name="unit_km">km</string>
     <string name="unit_kcal">kcal</string>
     <string name="unit_percent">%</string>
+
+    <!-- Scan list -->
+    <string name="connect">Connect</string>
+    <string name="connected_label">Connected</string>
+    <string name="disconnect">Disconnect</string>
+    <string name="scanning_active">Scanning…</string>
+
+    <!-- Debug -->
+    <string name="debug_info">Debug Info</string>
+    <string name="export_logs">Export Logs</string>
+    <string name="no_log_files">No log files found</string>
+    <string name="debug_log_location">Log files: app external storage/debug/</string>
+    <string name="capabilities">Capabilities</string>
+    <string name="recent_bt_events">Recent BT Events</string>
+    <string name="log_files">Log Files</string>
 </resources>

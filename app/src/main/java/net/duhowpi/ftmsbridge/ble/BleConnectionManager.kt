@@ -31,6 +31,11 @@ class BleConnectionManager(
     var connectedDeviceName: String? = null
         private set
 
+    var connectedDeviceAddress: String? = null
+        private set
+
+    val recentEvents = ArrayDeque<String>()
+
     interface ConnectionListener {
         fun onConnected(deviceName: String)
         fun onDisconnected()
@@ -48,6 +53,8 @@ class BleConnectionManager(
         this.listener = connectionListener
         val name = device.name ?: "Unknown"
         connectedDeviceName = name
+        connectedDeviceAddress = device.address
+        recentEvents.clear()
         debugLogger.startSession(name, device.address)
         debugLogger.logMessage("Connecting to $name (${device.address})")
         gatt = device.connectGatt(context, false, gattCallback, BluetoothDevice.TRANSPORT_LE)
@@ -60,6 +67,8 @@ class BleConnectionManager(
         gatt = null
         isConnected = false
         connectedDeviceName = null
+        connectedDeviceAddress = null
+        recentEvents.clear()
         debugLogger.stopSession()
         listener?.onDisconnected()
     }
@@ -73,6 +82,16 @@ class BleConnectionManager(
             descriptor.value = BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
             pendingDescriptorWrites.add(descriptor)
             writeNextDescriptor()
+        }
+    }
+
+    private fun addRecentEvent(direction: String, uuid: String, data: ByteArray) {
+        val hex = data.take(20).joinToString(" ") { String.format("%02X", it) }
+        val suffix = if (data.size > 20) "... (${data.size}B)" else " (${data.size}B)"
+        val entry = "$direction ${uuid.takeLast(4)}: $hex$suffix"
+        synchronized(recentEvents) {
+            if (recentEvents.size >= 30) recentEvents.removeFirst()
+            recentEvents.addLast(entry)
         }
     }
 
@@ -101,6 +120,7 @@ class BleConnectionManager(
                     debugLogger.logMessage("GATT disconnected (status=$status)")
                     isConnected = false
                     connectedDeviceName = null
+                    connectedDeviceAddress = null
                     debugLogger.stopSession()
                     listener?.onDisconnected()
                 }
@@ -186,6 +206,7 @@ class BleConnectionManager(
             @Suppress("DEPRECATION")
             val data = characteristic.value ?: return
             debugLogger.logEvent("READ", characteristic.uuid.toString(), data)
+            addRecentEvent("READ", characteristic.uuid.toString(), data)
 
             if (characteristic.uuid == FtmsConstants.FITNESS_MACHINE_FEATURE_UUID) {
                 listener?.onFeaturesRead(data)
@@ -200,6 +221,7 @@ class BleConnectionManager(
             @Suppress("DEPRECATION")
             val data = characteristic.value ?: return
             debugLogger.logEvent("NOTIFY", characteristic.uuid.toString(), data)
+            addRecentEvent("NOTIFY", characteristic.uuid.toString(), data)
 
             when (characteristic.uuid) {
                 FtmsConstants.TREADMILL_DATA_UUID,

@@ -71,7 +71,7 @@
                 android:layout_height="36dp"
                 android:text="@string/scan"
                 android:textSize="11sp"
-                android:layout_marginEnd="4dp" />
+                android:layout_marginEnd="2dp" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnSession"
@@ -80,15 +80,33 @@
                 android:layout_height="36dp"
                 android:text="@string/start_session"
                 android:textSize="11sp"
-                android:enabled="false" />
+                android:enabled="false"
+                android:layout_marginEnd="2dp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnDebug"
+                style="@style/Widget.Material3.Button.TonalButton"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:text="@string/debug_info"
+                android:textSize="11sp" />
         </LinearLayout>
 
-        <!-- Scan status -->
+        <!-- Scan status + list -->
         <TextView
             android:id="@+id/txtScanStatus"
-            android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:textSize="11sp"
+            android:paddingBottom="2dp"
+            android:paddingStart="2dp"
+            android:visibility="gone" />
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/rvScanResults"
+            android:layout_width="match_parent"
+            android:layout_height="160dp"
+            android:background="?attr/colorSurface"
             android:paddingBottom="4dp"
             android:visibility="gone" />
 
