@@ -2,6 +2,7 @@ package net.duhowpi.ftmsbridge.ble
 
 import android.Manifest
 import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothManager
 import android.bluetooth.le.BluetoothLeScanner
 import android.bluetooth.le.ScanCallback
@@ -86,4 +87,23 @@ class BleScanner(private val context: Context) {
     }
 
     fun isBluetoothEnabled(): Boolean = bluetoothAdapter?.isEnabled == true
+
+    /**
+     * Returns all BLE (LE or dual-mode) devices that are already bonded to this phone.
+     * These can be connected via GATT without a prior scan — useful for devices like
+     * Gadgetbridge-managed wearables (e.g. Mi Band 7) that are paired but not currently
+     * advertising a discoverable service UUID.
+     */
+    fun getBondedBleDevices(): List<BluetoothDevice> {
+        if (ActivityCompat.checkSelfPermission(
+                context, Manifest.permission.BLUETOOTH_CONNECT
+            ) != PackageManager.PERMISSION_GRANTED
+        ) return emptyList()
+        return bluetoothAdapter?.bondedDevices
+            ?.filter {
+                it.type == BluetoothDevice.DEVICE_TYPE_LE ||
+                it.type == BluetoothDevice.DEVICE_TYPE_DUAL
+            }
+            ?: emptyList()
+    }
 }

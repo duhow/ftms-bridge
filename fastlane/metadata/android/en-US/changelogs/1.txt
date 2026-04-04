@@ -28,6 +28,8 @@ Initial release.
 - Fixed: BH Fitness indoor bike shows strides/min (from proprietary energy field) with correct label
 - Fixed: session time now uses wall-clock when device does not provide elapsed time (BH Fitness treadmill/bike)
 - Fixed: energy/calories tile always displays a value; for BH Fitness indoor bikes it shows strides/min instead of a misleading kcal reading
+- Bonded BLE devices (e.g. Xiaomi Mi Band paired via Gadgetbridge) are now shown in the device list after scanning, even if not currently advertising
+- To use Mi Band 7 as HR sensor via Gadgetbridge: enable "3rd party realtime HR access" and "Visible while connected" in Gadgetbridge device settings, then scan and select the device as HR Sensor
 - Fixed History button — now opens the Workout History screen
 - Workout History lists all recorded sessions with machine type, date, duration, distance and avg HR
 - Tap a session to export as FIT or CSV file
