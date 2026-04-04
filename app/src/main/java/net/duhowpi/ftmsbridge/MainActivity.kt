@@ -501,17 +501,37 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updateDashboard(sample: FitnessSample) {
+        // Prefer device-reported elapsed time; fall back to wall-clock when recording.
+        // BH Fitness devices either omit the elapsed-time field entirely or always send 0.
+        val elapsedSec = if (sample.elapsedTimeSec > 0) {
+            sample.elapsedTimeSec
+        } else if (isRecording && sessionStartTime > 0) {
+            ((System.currentTimeMillis() - sessionStartTime) / 1000).toInt()
+        } else 0
+
         binding.valueSpeed.text = String.format("%.1f", sample.speedKmh)
         binding.valueCadence.text = if (sample.cadenceRpm > 0) String.format("%.0f", sample.cadenceRpm) else "--"
         binding.valuePower.text = if (sample.instantaneousPowerW > 0) "${sample.instantaneousPowerW}" else "--"
         binding.valueDistance.text = String.format("%.2f", sample.totalDistanceM / 1000.0)
         if (sample.heartRateBpm > 0) binding.valueHeartRate.text = "${sample.heartRateBpm}"
-        binding.valueEnergy.text = if (sample.totalEnergyKcal > 0) "${sample.totalEnergyKcal}" else "--"
+
+        // Energy tile: show strides/min (BH Fitness indoor bike) when available,
+        // otherwise show calories. Always show a numeric value once data is received.
+        if (sample.stridesPerMin > 0) {
+            binding.labelEnergy.setText(R.string.metric_strides)
+            binding.unitEnergy.setText(R.string.unit_per_min)
+            binding.valueEnergy.text = String.format("%.1f", sample.stridesPerMin)
+        } else {
+            binding.labelEnergy.setText(R.string.metric_energy)
+            binding.unitEnergy.setText(R.string.unit_kcal)
+            binding.valueEnergy.text = "${sample.totalEnergyKcal}"
+        }
+
         binding.valueInclination.text = if (sample.inclinationPercent != 0.0)
             String.format("%.1f", sample.inclinationPercent) else "--"
         binding.valueResistance.text = if (sample.resistanceLevel > 0) "${sample.resistanceLevel}" else "--"
-        val minutes = sample.elapsedTimeSec / 60
-        val seconds = sample.elapsedTimeSec % 60
+        val minutes = elapsedSec / 60
+        val seconds = elapsedSec % 60
         binding.valueElapsedTime.text = String.format("%d:%02d", minutes, seconds)
     }
 
@@ -563,12 +583,15 @@ class MainActivity : AppCompatActivity() {
 
     private fun saveSample(sample: FitnessSample) {
         val sessionId = currentSessionId ?: return
+        // Use wall-clock elapsed time when device sends 0 (BH Fitness quirk).
+        val elapsedSec = if (sample.elapsedTimeSec > 0) sample.elapsedTimeSec
+        else ((System.currentTimeMillis() - sessionStartTime) / 1000).toInt()
         lifecycleScope.launch(Dispatchers.IO) {
             db.sampleDao().insert(
                 WorkoutSample(
                     sessionId = sessionId,
                     timestampMs = System.currentTimeMillis(),
-                    elapsedTimeSec = sample.elapsedTimeSec,
+                    elapsedTimeSec = elapsedSec,
                     speedKmh = sample.speedKmh,
                     cadenceRpm = sample.cadenceRpm,
                     instantaneousPowerW = sample.instantaneousPowerW,

@@ -48,6 +48,7 @@
     <string name="metric_heart_rate">Freqüència cardíaca</string>
     <string name="metric_distance">Distància</string>
     <string name="metric_energy">Energia</string>
+    <string name="metric_strides">Gambades</string>
     <string name="metric_elapsed_time">Temps</string>
     <string name="metric_inclination">Inclinació</string>
     <string name="metric_resistance">Resistència</string>
@@ -55,6 +56,7 @@
     <!-- Units -->
     <string name="unit_kmh">km/h</string>
     <string name="unit_rpm">rpm</string>
+    <string name="unit_per_min">/min</string>
     <string name="unit_watts">W</string>
     <string name="unit_bpm">bpm</string>
     <string name="unit_km">km</string>

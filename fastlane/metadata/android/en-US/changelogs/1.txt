@@ -24,3 +24,7 @@ Initial release.
 - Previously connected devices remain visible in the list after disconnect, with a Reconnect button — no need to re-scan
 - Fixed: dashboard metrics are cleared when device disconnects
 - Show notification when device unexpectedly disconnects
+- Fixed: BH Fitness treadmill incline was displayed 6× too high — now correctly divided
+- Fixed: BH Fitness indoor bike shows strides/min (from proprietary energy field) with correct label
+- Fixed: session time now uses wall-clock when device does not provide elapsed time (BH Fitness treadmill/bike)
+- Fixed: calories tile always shows the received value (0 kcal) rather than hiding it

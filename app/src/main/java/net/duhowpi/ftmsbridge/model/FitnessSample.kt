@@ -14,6 +14,9 @@ data class FitnessSample(
     val totalEnergyKcal: Int = 0,
     val energyPerHourKcal: Int = 0,
     val energyPerMinuteKcal: Int = 0,
+    // BH Fitness indoor bikes encode strides/min×100 in the energy field.
+    // This field holds the corrected value after dividing by 100.
+    val stridesPerMin: Double = 0.0,
     val heartRateBpm: Int = 0,
     val metabolicEquivalent: Double = 0.0,
     val inclinationPercent: Double = 0.0,
