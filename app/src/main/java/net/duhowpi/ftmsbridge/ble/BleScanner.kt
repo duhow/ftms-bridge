@@ -87,11 +87,3 @@ class BleScanner(private val context: Context) {
 
     fun isBluetoothEnabled(): Boolean = bluetoothAdapter?.isEnabled == true
 }
-
-        scanCallback = null
-        isScanning = false
-        Log.i(tag, "BLE scan stopped")
-    }
-
-    fun isBluetoothEnabled(): Boolean = bluetoothAdapter?.isEnabled == true
-}
