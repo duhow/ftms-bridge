@@ -346,6 +346,10 @@ class MainActivity : AppCompatActivity() {
                 debugLogger.logMessage("FTMS Capabilities: ${fitnessDevice?.capabilities}")
                 Log.i(tag, "FTMS Capabilities: ${fitnessDevice?.capabilities}")
             }
+
+            override fun onDeviceInfoRead() {
+                runOnUiThread { updateFtmsDeviceInfoUI() }
+            }
         })
     }
 
@@ -387,6 +391,8 @@ class MainActivity : AppCompatActivity() {
             }
 
             override fun onFeaturesRead(data: ByteArray) {}
+
+            override fun onDeviceInfoRead() {}
         })
     }
 
@@ -410,7 +416,29 @@ class MainActivity : AppCompatActivity() {
             hrConnectionManager?.connectedDeviceName ?: getString(R.string.connected)
         else getString(R.string.not_connected)
 
+        if (!ftmsConnected) {
+            binding.txtFtmsDeviceInfo.visibility = View.GONE
+        } else {
+            updateFtmsDeviceInfoUI()
+        }
+
         binding.btnSession.isEnabled = ftmsConnected
+    }
+
+    private fun updateFtmsDeviceInfoUI() {
+        val cm = ftmsConnectionManager ?: return
+        val parts = buildList {
+            cm.connectedDeviceAddress?.let { add("MAC: $it") }
+            cm.connectedDeviceSerial?.takeIf { it.isNotBlank() }?.let { add("S/N: $it") }
+            cm.connectedDeviceHwRevision?.takeIf { it.isNotBlank() }?.let { add("HW: $it") }
+            cm.connectedDeviceFwRevision?.takeIf { it.isNotBlank() }?.let { add("FW: $it") }
+        }
+        if (parts.isEmpty()) {
+            binding.txtFtmsDeviceInfo.visibility = View.GONE
+        } else {
+            binding.txtFtmsDeviceInfo.text = parts.joinToString("  |  ")
+            binding.txtFtmsDeviceInfo.visibility = View.VISIBLE
+        }
     }
 
     private fun updateDashboard(sample: FitnessSample) {
@@ -439,6 +467,7 @@ class MainActivity : AppCompatActivity() {
         binding.valueInclination.text = "--"
         binding.valueResistance.text = "--"
         binding.txtMachineType.visibility = View.GONE
+        binding.txtFtmsDeviceInfo.visibility = View.GONE
     }
 
     // ---- Session recording --------------------------------------------------

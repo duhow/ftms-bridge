@@ -91,6 +91,15 @@
                 android:textSize="11sp" />
         </LinearLayout>
 
+        <TextView
+            android:id="@+id/txtFtmsDeviceInfo"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingBottom="2dp"
+            android:textSize="10sp"
+            android:textColor="?android:attr/textColorSecondary"
+            android:visibility="gone" />
+
         <!-- Workout control buttons (shown when a device is connected) -->
         <LinearLayout
             android:id="@+id/workoutButtonRow"

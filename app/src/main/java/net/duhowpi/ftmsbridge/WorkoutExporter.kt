@@ -116,6 +116,23 @@ object WorkoutExporter {
         return file
     }
 
+    fun writeBinaryToFile(dir: File, name: String, content: ByteArray): File {
+        dir.mkdirs()
+        val file = File(dir, name)
+        file.writeBytes(content)
+        return file
+    }
+
+    /**
+     * Generates a FIT activity file from a session and its samples.
+     * Produces a binary FIT file with per-sample records (speed, cadence, power, HR,
+     * distance, grade, resistance), plus session, lap, and activity summaries.
+     * Consecutive identical samples are deduplicated.
+     */
+    fun toFit(session: WorkoutSession, samples: List<WorkoutSample>): ByteArray {
+        return FitEncoder.encode(session, samples)
+    }
+
     private fun escapeXml(text: String): String = text
         .replace("&", "&amp;")
         .replace("<", "&lt;")

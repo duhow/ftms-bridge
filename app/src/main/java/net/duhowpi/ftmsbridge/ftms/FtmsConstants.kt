@@ -22,6 +22,12 @@ object FtmsConstants {
     val HR_SERVICE_UUID: UUID = uuidFrom16Bit(0x180D)
     val HR_MEASUREMENT_UUID: UUID = uuidFrom16Bit(0x2A37)
 
+    // Device Information Service
+    val DEVICE_INFO_SERVICE_UUID: UUID = uuidFrom16Bit(0x180A)
+    val SERIAL_NUMBER_UUID: UUID = uuidFrom16Bit(0x2A25)
+    val FIRMWARE_REVISION_UUID: UUID = uuidFrom16Bit(0x2A26)
+    val HARDWARE_REVISION_UUID: UUID = uuidFrom16Bit(0x2A27)
+
     // CCCD for enabling notifications
     val CCCD_UUID: UUID = uuidFrom16Bit(0x2902)
 

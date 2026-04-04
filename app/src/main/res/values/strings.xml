@@ -32,7 +32,7 @@
     <string name="session_delete_confirm">Delete this workout?</string>
     <string name="delete">Delete</string>
     <string name="export_session">Export workout</string>
-    <string name="export_gpx">GPX</string>
+    <string name="export_fit">FIT</string>
     <string name="export_csv">CSV</string>
     <string name="export_format_title">Export format</string>
     <string name="duration">Duration</string>

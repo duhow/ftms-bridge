@@ -13,5 +13,7 @@ Initial release.
 - Workouts can be started with only a HR sensor connected (HR-only mode)
 - Session summary (avg/max speed, power, HR) saved on workout completion
 - Workout History screen with a list of all past workouts
-- Export workouts as GPX or CSV from the History screen
+- Export workouts as FIT or CSV from the History screen (FIT replaces GPX for full indoor data)
+- FIT export includes per-second records with speed, cadence, power, HR, distance, grade and resistance; consecutive identical samples are deduplicated
+- Device info (MAC address, serial number, hardware and firmware revision) shown when connected to a FTMS device, hidden if not available
 - Delete past workouts via long-press

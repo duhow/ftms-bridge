@@ -84,14 +84,14 @@ class WorkoutHistoryActivity : AppCompatActivity() {
 
     private fun showExportDialog(session: WorkoutSession) {
         val options = arrayOf(
-            getString(R.string.export_gpx),
+            getString(R.string.export_fit),
             getString(R.string.export_csv)
         )
         AlertDialog.Builder(this)
             .setTitle(getString(R.string.export_format_title))
             .setItems(options) { _, which ->
                 when (which) {
-                    0 -> exportSession(session, "gpx")
+                    0 -> exportSession(session, "fit")
                     1 -> exportSession(session, "csv")
                 }
             }
@@ -103,15 +103,20 @@ class WorkoutHistoryActivity : AppCompatActivity() {
         lifecycleScope.launch {
             val (file, mimeType) = withContext(Dispatchers.IO) {
                 val samples = db.sampleDao().getAllBySession(session.id)
-                val content = when (format) {
-                    "gpx" -> WorkoutExporter.toGpx(session, samples)
-                    else -> WorkoutExporter.toCsv(session, samples)
-                }
                 val dir = getExternalFilesDir(null)?.resolve("exports") ?: filesDir.resolve("exports")
                 val fileName = WorkoutExporter.exportFileName(session, format)
-                val outFile = WorkoutExporter.writeToFile(dir, fileName, content)
-                val mime = if (format == "gpx") "application/gpx+xml" else "text/csv"
-                Pair(outFile, mime)
+                when (format) {
+                    "fit" -> {
+                        val bytes = WorkoutExporter.toFit(session, samples)
+                        val outFile = WorkoutExporter.writeBinaryToFile(dir, fileName, bytes)
+                        Pair(outFile, "application/vnd.ant.fit")
+                    }
+                    else -> {
+                        val content = WorkoutExporter.toCsv(session, samples)
+                        val outFile = WorkoutExporter.writeToFile(dir, fileName, content)
+                        Pair(outFile, "text/csv")
+                    }
+                }
             }
             val uri = FileProvider.getUriForFile(this@WorkoutHistoryActivity, "${packageName}.fileprovider", file)
             val intent = Intent(Intent.ACTION_SEND).apply {

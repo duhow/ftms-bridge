@@ -24,6 +24,8 @@ class BleConnectionManager(
     private var listener: ConnectionListener? = null
     private val pendingDescriptorWrites = LinkedList<BluetoothGattDescriptor>()
     private var writingDescriptor = false
+    private val pendingCharReads = LinkedList<BluetoothGattCharacteristic>()
+    private var readingChar = false
 
     var isConnected = false
         private set
@@ -32,6 +34,15 @@ class BleConnectionManager(
         private set
 
     var connectedDeviceAddress: String? = null
+        private set
+
+    var connectedDeviceSerial: String? = null
+        private set
+
+    var connectedDeviceHwRevision: String? = null
+        private set
+
+    var connectedDeviceFwRevision: String? = null
         private set
 
     val recentEvents = ArrayDeque<String>()
@@ -43,6 +54,7 @@ class BleConnectionManager(
         fun onFtmsData(uuid: UUID, data: ByteArray)
         fun onHeartRateData(data: ByteArray)
         fun onFeaturesRead(data: ByteArray)
+        fun onDeviceInfoRead()
     }
 
     fun connect(device: BluetoothDevice, connectionListener: ConnectionListener) {
@@ -54,7 +66,12 @@ class BleConnectionManager(
         val name = device.name ?: "Unknown"
         connectedDeviceName = name
         connectedDeviceAddress = device.address
+        connectedDeviceSerial = null
+        connectedDeviceHwRevision = null
+        connectedDeviceFwRevision = null
         recentEvents.clear()
+        pendingCharReads.clear()
+        readingChar = false
         debugLogger.startSession(name, device.address)
         debugLogger.logMessage("Connecting to $name (${device.address})")
         gatt = device.connectGatt(context, false, gattCallback, BluetoothDevice.TRANSPORT_LE)
@@ -68,7 +85,12 @@ class BleConnectionManager(
         isConnected = false
         connectedDeviceName = null
         connectedDeviceAddress = null
+        connectedDeviceSerial = null
+        connectedDeviceHwRevision = null
+        connectedDeviceFwRevision = null
         recentEvents.clear()
+        pendingCharReads.clear()
+        readingChar = false
         debugLogger.stopSession()
         listener?.onDisconnected()
     }
@@ -104,6 +126,27 @@ class BleConnectionManager(
         gatt?.writeDescriptor(descriptor)
     }
 
+    private fun scheduleCharRead(characteristic: BluetoothGattCharacteristic) {
+        pendingCharReads.add(characteristic)
+        readNextChar()
+    }
+
+    private fun readNextChar() {
+        if (readingChar) return
+        val char = pendingCharReads.poll() ?: return
+        readingChar = true
+        if (ActivityCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+            readingChar = false
+            readNextChar()
+            return
+        }
+        @Suppress("DEPRECATION")
+        if (gatt?.readCharacteristic(char) != true) {
+            readingChar = false
+            readNextChar()
+        }
+    }
+
     private val gattCallback = object : BluetoothGattCallback() {
         override fun onConnectionStateChange(gatt: BluetoothGatt, status: Int, newState: Int) {
             if (ActivityCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) return
@@ -121,6 +164,11 @@ class BleConnectionManager(
                     isConnected = false
                     connectedDeviceName = null
                     connectedDeviceAddress = null
+                    connectedDeviceSerial = null
+                    connectedDeviceHwRevision = null
+                    connectedDeviceFwRevision = null
+                    pendingCharReads.clear()
+                    readingChar = false
                     debugLogger.stopSession()
                     listener?.onDisconnected()
                 }
@@ -153,8 +201,7 @@ class BleConnectionManager(
                 val featureChar = ftmsService.getCharacteristic(FtmsConstants.FITNESS_MACHINE_FEATURE_UUID)
                 if (featureChar != null) {
                     if (ActivityCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED) {
-                        @Suppress("DEPRECATION")
-                        gatt.readCharacteristic(featureChar)
+                        scheduleCharRead(featureChar)
                     }
                 }
 
@@ -194,6 +241,21 @@ class BleConnectionManager(
             }
 
             listener?.onServicesReady(ftmsChars, hasHeartRate)
+
+            // Schedule reads for Device Information Service characteristics
+            if (ActivityCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED) {
+                val devInfoService = gatt.getService(FtmsConstants.DEVICE_INFO_SERVICE_UUID)
+                if (devInfoService != null) {
+                    debugLogger.logMessage("Device Information Service found")
+                    listOf(
+                        FtmsConstants.SERIAL_NUMBER_UUID,
+                        FtmsConstants.HARDWARE_REVISION_UUID,
+                        FtmsConstants.FIRMWARE_REVISION_UUID
+                    ).forEach { uuid ->
+                        devInfoService.getCharacteristic(uuid)?.let { scheduleCharRead(it) }
+                    }
+                }
+            }
         }
 
         @Deprecated("Deprecated in API 33")
@@ -202,15 +264,32 @@ class BleConnectionManager(
             characteristic: BluetoothGattCharacteristic,
             status: Int
         ) {
-            if (status != BluetoothGatt.GATT_SUCCESS) return
+            readingChar = false
+            if (status != BluetoothGatt.GATT_SUCCESS) {
+                readNextChar()
+                return
+            }
             @Suppress("DEPRECATION")
-            val data = characteristic.value ?: return
+            val data = characteristic.value ?: run { readNextChar(); return }
             debugLogger.logEvent("READ", characteristic.uuid.toString(), data)
             addRecentEvent("READ", characteristic.uuid.toString(), data)
 
-            if (characteristic.uuid == FtmsConstants.FITNESS_MACHINE_FEATURE_UUID) {
-                listener?.onFeaturesRead(data)
+            when (characteristic.uuid) {
+                FtmsConstants.FITNESS_MACHINE_FEATURE_UUID -> listener?.onFeaturesRead(data)
+                FtmsConstants.SERIAL_NUMBER_UUID -> {
+                    connectedDeviceSerial = String(data, Charsets.UTF_8).trim()
+                    listener?.onDeviceInfoRead()
+                }
+                FtmsConstants.HARDWARE_REVISION_UUID -> {
+                    connectedDeviceHwRevision = String(data, Charsets.UTF_8).trim()
+                    listener?.onDeviceInfoRead()
+                }
+                FtmsConstants.FIRMWARE_REVISION_UUID -> {
+                    connectedDeviceFwRevision = String(data, Charsets.UTF_8).trim()
+                    listener?.onDeviceInfoRead()
+                }
             }
+            readNextChar()
         }
 
         @Deprecated("Deprecated in API 33")
