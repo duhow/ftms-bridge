@@ -1,3 +1,19 @@
 Initial release.
 
-- Write your changes here.
+- Connect to FTMS-compatible treadmills and indoor bikes
+- Heart rate sensor support via BLE (Gadgetbridge compatible)
+- Real-time dashboard with speed, cadence, power, distance, HR, energy
+- Session recording to local database
+- Debug Bluetooth communication logging
+- BH Fitness device support
+- Portrait and landscape layouts
+- Workout controls: Start / Pause / Resume / Stop buttons, shown when a device is connected
+- Auto-detect device type: HR-only devices (e.g. Xiaomi Smart Band) connect automatically as HR sensor
+- HR signal shown live from dedicated HR sensor even without an FTMS machine
+- Workouts can be started with only a HR sensor connected (HR-only mode)
+- Session summary (avg/max speed, power, HR) saved on workout completion
+- Workout History screen with a list of all past workouts
+- Export workouts as FIT or CSV from the History screen (FIT replaces GPX for full indoor data)
+- FIT export includes per-second records with speed, cadence, power, HR, distance, grade and resistance; consecutive identical samples are deduplicated
+- Device info (MAC address, serial number, hardware and firmware revision) shown when connected to a FTMS device, hidden if not available
+- Delete past workouts via long-press

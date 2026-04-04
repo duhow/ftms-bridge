@@ -1,3 +1,78 @@
 <resources>
-    <string name="app_name">My App</string>
+    <string name="app_name">FTMS Bridge</string>
+
+    <!-- Connection -->
+    <string name="scan">Escanejar</string>
+    <string name="stop_scan">Aturar</string>
+    <string name="connected">Connectat</string>
+    <string name="not_connected">No connectat</string>
+    <string name="devices_found">%d dispositiu(s) trobat(s)</string>
+    <string name="no_devices_found">No s\'han trobat dispositius</string>
+    <string name="select_fitness_machine">Selecciona la màquina fitness</string>
+    <string name="select_hr_sensor">Selecciona el sensor de freqüència cardíaca</string>
+    <string name="scan_failed">Error d\'escaneig (error %d)</string>
+    <string name="permissions_required">Calen permisos de Bluetooth</string>
+
+    <!-- Session -->
+    <string name="start_session">Iniciar</string>
+    <string name="stop_session">Aturar</string>
+    <string name="recording">● REC</string>
+    <string name="paused">⏸ EN PAUSA</string>
+
+    <!-- Workout controls -->
+    <string name="workout_start">▶ Iniciar</string>
+    <string name="workout_pause">⏸ Pausar</string>
+    <string name="workout_resume">▶ Reprendre</string>
+    <string name="workout_stop">◼ Aturar</string>
+
+    <!-- History -->
+    <string name="history">Historial</string>
+    <string name="workout_history">Historial d\'entrenaments</string>
+    <string name="no_sessions">No hi ha entrenaments registrats</string>
+    <string name="session_delete_confirm">Eliminar aquest entrenament?</string>
+    <string name="delete">Eliminar</string>
+    <string name="export_session">Exportar entrenament</string>
+    <string name="export_fit">FIT</string>
+    <string name="export_csv">CSV</string>
+    <string name="export_format_title">Format d\'exportació</string>
+    <string name="duration">Durada</string>
+    <string name="avg_speed">Vel. mitjana</string>
+    <string name="avg_hr">FC mitjana</string>
+    <string name="max_hr">FC màx.</string>
+    <string name="avg_power">Potència mitjana</string>
+
+    <!-- Metrics -->
+    <string name="metric_speed">Velocitat</string>
+    <string name="metric_cadence">Cadència</string>
+    <string name="metric_power">Potència</string>
+    <string name="metric_heart_rate">Freqüència cardíaca</string>
+    <string name="metric_distance">Distància</string>
+    <string name="metric_energy">Energia</string>
+    <string name="metric_elapsed_time">Temps</string>
+    <string name="metric_inclination">Inclinació</string>
+    <string name="metric_resistance">Resistència</string>
+
+    <!-- Units -->
+    <string name="unit_kmh">km/h</string>
+    <string name="unit_rpm">rpm</string>
+    <string name="unit_watts">W</string>
+    <string name="unit_bpm">bpm</string>
+    <string name="unit_km">km</string>
+    <string name="unit_kcal">kcal</string>
+    <string name="unit_percent">%</string>
+
+    <!-- Scan list -->
+    <string name="connect">Connectar</string>
+    <string name="connected_label">Connectat</string>
+    <string name="disconnect">Desconnectar</string>
+    <string name="scanning_active">Escanejant…</string>
+
+    <!-- Debug -->
+    <string name="debug_info">Info Debug</string>
+    <string name="export_logs">Exportar logs</string>
+    <string name="no_log_files">No s\' han trobat arxius de log</string>
+    <string name="debug_log_location">Logs: emmagatzematge extern app/debug/</string>
+    <string name="capabilities">Capacitats</string>
+    <string name="recent_bt_events">Esdeveniments BT recents</string>
+    <string name="log_files">Arxius de log</string>
 </resources>

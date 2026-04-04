@@ -4,3 +4,8 @@
 
 # Keep the app entry point
 # Keep BuildConfig fields used at runtime
+
+# Room
+-keep class * extends androidx.room.RoomDatabase
+-keep @androidx.room.Entity class *
+-dontwarn androidx.room.paging.**
