@@ -27,7 +27,8 @@ Initial release.
 - Fixed: BH Fitness treadmill incline was displayed 6× too high — now correctly divided
 - Fixed: BH Fitness indoor bike shows strides/min (from proprietary energy field) with correct label
 - Fixed: session time now uses wall-clock when device does not provide elapsed time (BH Fitness treadmill/bike)
-- Fixed: energy/calories tile always displays a value; for BH Fitness indoor bikes it shows strides/min instead of a misleading kcal reading- Fixed History button — now opens the Workout History screen
+- Fixed: energy/calories tile always displays a value; for BH Fitness indoor bikes it shows strides/min instead of a misleading kcal reading
+- Fixed History button — now opens the Workout History screen
 - Workout History lists all recorded sessions with machine type, date, duration, distance and avg HR
 - Tap a session to export as FIT or CSV file
 - Scan list is hidden during an active workout to reduce clutter
