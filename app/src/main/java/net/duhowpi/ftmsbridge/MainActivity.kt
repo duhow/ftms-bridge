@@ -69,6 +69,7 @@ class MainActivity : AppCompatActivity() {
 
     private var currentSessionId: Long? = null
     private var sessionStartTime: Long = 0
+    private var elapsedFallbackStartTime: Long = 0
     private var isRecording = false
     private var isMachineRunning = false
 
@@ -419,6 +420,9 @@ class MainActivity : AppCompatActivity() {
                     isMachineRunning = nowRunning
                     runOnUiThread { updateMachineRunningState() }
                 }
+                if (isRecording && mergedSample.elapsedTimeSec <= 0 && elapsedFallbackStartTime == 0L && nowRunning) {
+                    elapsedFallbackStartTime = mergedSample.timestampMs
+                }
                 runOnUiThread { updateDashboard(mergedSample) }
                 if (isRecording && currentSessionId != null) saveSample(mergedSample)
             }
@@ -572,8 +576,8 @@ class MainActivity : AppCompatActivity() {
         // BH Fitness devices either omit the elapsed-time field entirely or always send 0.
         val elapsedSec = if (sample.elapsedTimeSec > 0) {
             sample.elapsedTimeSec
-        } else if (isRecording && sessionStartTime > 0) {
-            ((System.currentTimeMillis() - sessionStartTime) / 1000).toInt()
+        } else if (isRecording && elapsedFallbackStartTime > 0) {
+            ((sample.timestampMs - elapsedFallbackStartTime).coerceAtLeast(0L) / 1000).toInt()
         } else 0
 
         binding.valueSpeed.text = String.format("%.1f", sample.speedKmh)
@@ -649,6 +653,7 @@ class MainActivity : AppCompatActivity() {
         val device = fitnessDevice ?: return
         isRecording = true
         sessionStartTime = System.currentTimeMillis()
+        elapsedFallbackStartTime = 0L
         binding.btnWorkoutStart.text = getString(R.string.stop_session)
         binding.recordingIndicator.visibility = View.VISIBLE
         binding.metricsSection.visibility = View.VISIBLE
@@ -668,6 +673,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun stopRecording() {
         isRecording = false
+        elapsedFallbackStartTime = 0L
         binding.btnWorkoutStart.text = getString(R.string.start_session)
         binding.recordingIndicator.visibility = View.GONE
         val sessionId = currentSessionId ?: return
@@ -683,7 +689,9 @@ class MainActivity : AppCompatActivity() {
         val sessionId = currentSessionId ?: return
         // Use wall-clock elapsed time when device sends 0 (BH Fitness quirk).
         val elapsedSec = if (sample.elapsedTimeSec > 0) sample.elapsedTimeSec
-        else ((System.currentTimeMillis() - sessionStartTime) / 1000).toInt()
+        else if (elapsedFallbackStartTime > 0) {
+            ((sample.timestampMs - elapsedFallbackStartTime).coerceAtLeast(0L) / 1000).toInt()
+        } else 0
         lifecycleScope.launch(Dispatchers.IO) {
             db.sampleDao().insert(
                 WorkoutSample(

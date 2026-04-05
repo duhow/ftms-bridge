@@ -11,3 +11,4 @@ Add user-facing changes for the next release here.
 - Hidden BH indoor bike speed display because it duplicates stride-equivalent data
 - Added treadmill speed and inclination control popups on metric tiles with slider and quick +/- buttons
 - Added safety danger-zone indication while selecting high speed or extreme incline values
+- Fixed treadmill session timer offset so app elapsed time aligns with real machine movement start
