@@ -22,6 +22,7 @@ class BhFitnessTreadmill(deviceName: String) :
     @Volatile private var iConceptDistanceM: Int = 0
     @Volatile private var iConceptCalories: Int = 0
     @Volatile private var lastSampleTimestampMs: Long = 0L
+    @Volatile private var hasWorkoutStartAnchor: Boolean = false
     @Volatile private var derivedElapsedSec: Double = 0.0
     @Volatile private var derivedDistanceM: Double = 0.0
     @Volatile private var derivedEnergyKcal: Double = 0.0
@@ -74,11 +75,12 @@ class BhFitnessTreadmill(deviceName: String) :
         }
         lastSampleTimestampMs = nowMs
 
-        if (dtSec > 0.0) {
+        if (dtSec > 0.0 && hasWorkoutStartAnchor) {
             derivedElapsedSec += dtSec
         }
         val elapsedSec = if (sample.elapsedTimeSec > 0) {
             derivedElapsedSec = kotlin.math.max(derivedElapsedSec, sample.elapsedTimeSec.toDouble())
+            hasWorkoutStartAnchor = true
             sample.elapsedTimeSec
         } else {
             kotlin.math.round(derivedElapsedSec).toInt()
@@ -132,7 +134,10 @@ class BhFitnessTreadmill(deviceName: String) :
         val parsed = FtmsDataParser.parseIConceptWorkoutData(data) ?: return
         iConceptDistanceM = parsed.totalDistanceM
         iConceptCalories = parsed.totalEnergyKcal
-        derivedElapsedSec = kotlin.math.max(derivedElapsedSec, parsed.elapsedTimeSec.toDouble())
+        if (parsed.elapsedTimeSec > 0) {
+            derivedElapsedSec = kotlin.math.max(derivedElapsedSec, parsed.elapsedTimeSec.toDouble())
+            hasWorkoutStartAnchor = true
+        }
         // Use iConcept snapshot as lower-bound baseline if present, then continue
         // with derived progression because this device does not keep streaming counters.
         derivedDistanceM = kotlin.math.max(derivedDistanceM, parsed.totalDistanceM.toDouble())

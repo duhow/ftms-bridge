@@ -94,10 +94,14 @@ and `total_kcal=0`.  It does **not** repeat during the workout.
 Consequence: elapsed time, distance, and energy appear to freeze at their initial
 values for the entire session.
 
-**Elapsed time fix:** `BhFitnessTreadmill` advances elapsed time monotonically from packet
-timestamp deltas (`sample.timestampMs`) whenever FTMS elapsed remains zero. If a non-zero
-elapsed value is ever reported, it is used as a lower-bound sync point and the derived
-timer continues from there.
+**Elapsed time fix (start-signal anchored):** `BhFitnessTreadmill` does **not** start the
+derived timer at BLE connect. It waits for a workout-start anchor:
+- C112 elapsed snapshot (typically `0:02`) when present, or
+- first non-zero FTMS elapsed value.
+
+Only after this anchor is seen does elapsed advance from packet timestamp deltas
+(`sample.timestampMs`) while FTMS elapsed remains zero. This prevents the timer from
+starting several seconds early due to connection/setup delay.
 
 **Distance and energy fallback:** Because C112 does not continue streaming, the app now
 derives:
