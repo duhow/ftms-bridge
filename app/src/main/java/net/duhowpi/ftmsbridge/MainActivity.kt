@@ -986,17 +986,6 @@ class MainActivity : AppCompatActivity() {
         return value in Short.MIN_VALUE..Short.MAX_VALUE
     }
 
-    companion object {
-        private const val SPEED_MIN_KMH = 0.5
-        private const val SPEED_MAX_KMH = 30.0
-        private const val INCLINE_MIN_PERCENT = -3.0
-        private const val INCLINE_MAX_PERCENT = 16.0
-        private const val INCLINE_DEFAULT_PERCENT = 0.0
-        private const val SPEED_DANGER_KMH = 20.0
-        private const val INCLINE_DANGER_PERCENT = 12.0
-        private const val INCLINE_DECLINE_DANGER_PERCENT = -2.0
-    }
-
     private fun exportDebugLogs() {
         val logFiles = BtDebugLogger.getAllLogFiles(this)
         if (logFiles.isEmpty()) {
@@ -1090,6 +1079,15 @@ class MainActivity : AppCompatActivity() {
     }
 
     companion object {
+        private const val SPEED_MIN_KMH = 0.5
+        private const val SPEED_MAX_KMH = 30.0
+        private const val INCLINE_MIN_PERCENT = -3.0
+        private const val INCLINE_MAX_PERCENT = 16.0
+        private const val INCLINE_DEFAULT_PERCENT = 0.0
+        private const val SPEED_DANGER_KMH = 20.0
+        private const val INCLINE_DANGER_PERCENT = 12.0
+        private const val INCLINE_DECLINE_DANGER_PERCENT = -2.0
+
         /** Device name prefixes that identify non-fitness BLE peripherals. */
         private val IGNORED_DEVICE_PREFIXES = listOf(
             "Nuki_",        // Nuki smart locks

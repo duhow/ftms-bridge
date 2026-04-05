@@ -76,8 +76,8 @@
     <string name="control_set_incline_title">Ajustar inclinación</string>
     <string name="control_speed_label">Velocidad objetivo</string>
     <string name="control_incline_label">Inclinación objetivo</string>
-    <string name="control_range_speed">Rango: %.1f–%.1f km/h</string>
-    <string name="control_range_incline">Rango: %d–%d%%</string>
+    <string name="control_range_speed">Rango: %1$.1f–%2$.1f km/h</string>
+    <string name="control_range_incline">Rango: %1$d–%2$d%%</string>
     <string name="control_safe_zone">Zona segura</string>
     <string name="control_danger_zone">Zona de peligro: use precaución</string>
     <string name="control_dec_large">-1.0</string>
