@@ -1,5 +1,6 @@
 package net.duhowpi.ftmsbridge.device
 
+import android.util.Log
 import net.duhowpi.ftmsbridge.ftms.FtmsConstants
 import net.duhowpi.ftmsbridge.model.FitnessSample
 
@@ -7,17 +8,29 @@ class BhFitnessIndoorBike(deviceName: String) :
     FtmsDevice(deviceName, FtmsConstants.MachineType.INDOOR_BIKE) {
 
     companion object {
+        private const val TAG = "BhFitnessIndoorBike"
         private const val MAX_VALID_SPEED_KMH = 80.0
         private const val MAX_VALID_CADENCE_RPM = 220.0
         private const val MAX_SPEED_STEP_PER_SEC = 20.0
         private const val MAX_CADENCE_STEP_PER_SEC = 80.0
+        private const val SECONDS_PER_HOUR = 3600.0
+        private const val METERS_PER_KM = 1000.0
+        // Compile-time conversion from km/h to m/s.
+        private const val METERS_PER_KMH_PER_SEC = METERS_PER_KM / SECONDS_PER_HOUR
+        private const val JOULES_PER_KCAL = 4184.0
+        private const val STRIDES_ENCODING_FACTOR = 100.0
     }
 
-    @Volatile private var lastSampleTimestampMs: Long = 0L
-    @Volatile private var cumulativeDistanceM: Double = 0.0
-    @Volatile private var cumulativeEnergyKcal: Double = 0.0
-    @Volatile private var lastAcceptedSpeedKmh: Double = 0.0
-    @Volatile private var lastAcceptedCadenceRpm: Double = 0.0
+    private fun stridesFromEnergy(energyField: Int): Double {
+        return if (energyField > 0) energyField / STRIDES_ENCODING_FACTOR else 0.0
+    }
+
+    private var lastSampleTimestampMs: Long = 0L
+    private var cumulativeDistanceM: Double = 0.0
+    private var cumulativeEnergyKcal: Double = 0.0
+    private var hasAcceptedBaseline: Boolean = false
+    private var lastAcceptedSpeedKmh: Double = 0.0
+    private var lastAcceptedCadenceRpm: Double = 0.0
 
     // BH Fitness indoor bikes repurpose several standard FTMS fields:
     //
@@ -35,18 +48,47 @@ class BhFitnessIndoorBike(deviceName: String) :
     //  Some sessions show occasional one-packet speed/cadence spikes. To avoid
     //  false dashboard/export jumps we clamp physically impossible values and
     //  reject abrupt single-step deltas relative to packet interval.
+    @Synchronized
     override fun onDataReceived(data: ByteArray): FitnessSample? {
         val sample = super.onDataReceived(data) ?: return null
         val nowMs = sample.timestampMs
         val dtSec = if (lastSampleTimestampMs > 0L) {
-            ((nowMs - lastSampleTimestampMs).coerceAtLeast(0L)) / 1000.0
+            val rawDeltaMs = nowMs - lastSampleTimestampMs
+            if (rawDeltaMs < 0L) {
+                Log.w(
+                    TAG,
+                    "Negative sample delta (${rawDeltaMs}ms), treating as 0 (nowMs=$nowMs lastMs=$lastSampleTimestampMs)"
+                )
+            }
+            rawDeltaMs.coerceAtLeast(0L) / 1000.0
         } else {
             0.0
         }
         lastSampleTimestampMs = nowMs
 
         val rawSpeedKmh = sample.speedKmh
-        val speedStepLimit = if (dtSec > 0.0) MAX_SPEED_STEP_PER_SEC * dtSec else Double.MAX_VALUE
+        val rawCadenceRpm = sample.cadenceRpm
+        if (!hasAcceptedBaseline) {
+            val baselineSpeed = rawSpeedKmh.coerceIn(0.0, MAX_VALID_SPEED_KMH)
+            val baselineCadence = rawCadenceRpm.coerceIn(0.0, MAX_VALID_CADENCE_RPM)
+            hasAcceptedBaseline = true
+            lastAcceptedSpeedKmh = baselineSpeed
+            lastAcceptedCadenceRpm = baselineCadence
+            val baselineStrides = stridesFromEnergy(sample.totalEnergyKcal)
+            return sample.copy(
+                speedKmh = baselineSpeed,
+                averageSpeedKmh = 0.0,
+                cadenceRpm = baselineCadence,
+                totalDistanceM = 0,
+                stridesPerMin = baselineStrides,
+                totalEnergyKcal = 0,
+                energyPerHourKcal = 0,
+                energyPerMinuteKcal = 0,
+                metabolicEquivalent = 0.0
+            )
+        }
+
+        val speedStepLimit = MAX_SPEED_STEP_PER_SEC * dtSec
         val speedDelta = kotlin.math.abs(rawSpeedKmh - lastAcceptedSpeedKmh)
         val syntheticSpeedKmh = when {
             rawSpeedKmh < 0.0 || rawSpeedKmh > MAX_VALID_SPEED_KMH -> lastAcceptedSpeedKmh
@@ -55,8 +97,7 @@ class BhFitnessIndoorBike(deviceName: String) :
         }
         lastAcceptedSpeedKmh = syntheticSpeedKmh
 
-        val rawCadenceRpm = sample.cadenceRpm
-        val cadenceStepLimit = if (dtSec > 0.0) MAX_CADENCE_STEP_PER_SEC * dtSec else Double.MAX_VALUE
+        val cadenceStepLimit = MAX_CADENCE_STEP_PER_SEC * dtSec
         val cadenceDelta = kotlin.math.abs(rawCadenceRpm - lastAcceptedCadenceRpm)
         val filteredCadenceRpm = when {
             rawCadenceRpm < 0.0 || rawCadenceRpm > MAX_VALID_CADENCE_RPM -> lastAcceptedCadenceRpm
@@ -65,11 +106,12 @@ class BhFitnessIndoorBike(deviceName: String) :
         }
         lastAcceptedCadenceRpm = filteredCadenceRpm
 
-        val strides = if (sample.totalEnergyKcal > 0) sample.totalEnergyKcal / 100.0 else 0.0
+        val strides = stridesFromEnergy(sample.totalEnergyKcal)
 
         if (dtSec > 0.0) {
-            cumulativeDistanceM += syntheticSpeedKmh * (dtSec / 3600.0) * 1000.0
-            val energyDeltaKcal = (sample.instantaneousPowerW.coerceAtLeast(0) * dtSec) / 4184.0
+            cumulativeDistanceM += syntheticSpeedKmh * dtSec * METERS_PER_KMH_PER_SEC
+            val powerWatts = sample.instantaneousPowerW.coerceAtLeast(0).toDouble()
+            val energyDeltaKcal = (powerWatts * dtSec) / JOULES_PER_KCAL
             cumulativeEnergyKcal += energyDeltaKcal
         }
 
@@ -77,9 +119,9 @@ class BhFitnessIndoorBike(deviceName: String) :
             speedKmh = syntheticSpeedKmh,
             averageSpeedKmh = 0.0,
             cadenceRpm = filteredCadenceRpm,
-            totalDistanceM = cumulativeDistanceM.toInt(),
+            totalDistanceM = kotlin.math.round(cumulativeDistanceM).toInt(),
             stridesPerMin = strides,
-            totalEnergyKcal = cumulativeEnergyKcal.toInt(),
+            totalEnergyKcal = kotlin.math.round(cumulativeEnergyKcal).toInt(),
             energyPerHourKcal = 0,
             energyPerMinuteKcal = 0,
             metabolicEquivalent = 0.0
