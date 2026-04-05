@@ -70,6 +70,25 @@
     <string name="reconnect">Reconectar</string>
     <string name="scanning_active">Escaneando…</string>
     <string name="device_disconnected">Dispositivo desconectado</string>
+    <string name="control_not_available">El control no está disponible para esta máquina</string>
+    <string name="control_send_failed">No se pudo enviar el comando a la máquina</string>
+    <string name="control_set_speed_title">Ajustar velocidad</string>
+    <string name="control_set_incline_title">Ajustar inclinación</string>
+    <string name="control_speed_label">Velocidad objetivo</string>
+    <string name="control_incline_label">Inclinación objetivo</string>
+    <string name="control_range_speed">Rango: %.1f–%.1f km/h</string>
+    <string name="control_range_incline">Rango: %d–%d%%</string>
+    <string name="control_safe_zone">Zona segura</string>
+    <string name="control_danger_zone">Zona de peligro: use precaución</string>
+    <string name="control_dec_large">-1.0</string>
+    <string name="control_dec_small">-0.1</string>
+    <string name="control_inc_small">+0.1</string>
+    <string name="control_inc_large">+1.0</string>
+    <string name="control_dec_incline_large">-1</string>
+    <string name="control_dec_incline_small">-0.5</string>
+    <string name="control_inc_incline_small">+0.5</string>
+    <string name="control_inc_incline_large">+1</string>
+    <string name="control_apply">Aplicar</string>
 
     <!-- Debug -->
     <string name="debug_info">Info Debug</string>

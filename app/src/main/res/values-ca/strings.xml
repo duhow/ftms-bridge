@@ -70,6 +70,25 @@
     <string name="reconnect">Reconnectar</string>
     <string name="scanning_active">Escanejant…</string>
     <string name="device_disconnected">Dispositiu desconnectat</string>
+    <string name="control_not_available">El control no està disponible per a aquesta màquina</string>
+    <string name="control_send_failed">No s'ha pogut enviar l'ordre a la màquina</string>
+    <string name="control_set_speed_title">Ajustar velocitat</string>
+    <string name="control_set_incline_title">Ajustar inclinació</string>
+    <string name="control_speed_label">Velocitat objectiu</string>
+    <string name="control_incline_label">Inclinació objectiu</string>
+    <string name="control_range_speed">Rang: %.1f–%.1f km/h</string>
+    <string name="control_range_incline">Rang: %d–%d%%</string>
+    <string name="control_safe_zone">Zona segura</string>
+    <string name="control_danger_zone">Zona de perill: fes-ho amb precaució</string>
+    <string name="control_dec_large">-1.0</string>
+    <string name="control_dec_small">-0.1</string>
+    <string name="control_inc_small">+0.1</string>
+    <string name="control_inc_large">+1.0</string>
+    <string name="control_dec_incline_large">-1</string>
+    <string name="control_dec_incline_small">-0.5</string>
+    <string name="control_inc_incline_small">+0.5</string>
+    <string name="control_inc_incline_large">+1</string>
+    <string name="control_apply">Aplicar</string>
 
     <!-- Debug -->
     <string name="debug_info">Info Debug</string>
