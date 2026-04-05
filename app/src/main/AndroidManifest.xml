@@ -38,6 +38,11 @@
             android:exported="false"
             android:parentActivityName=".MainActivity" />
 
+        <activity
+            android:name=".WorkoutDetailActivity"
+            android:exported="false"
+            android:parentActivityName=".WorkoutHistoryActivity" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"

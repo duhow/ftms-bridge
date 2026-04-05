@@ -1,6 +1,7 @@
 package net.duhowpi.ftmsbridge
 
 import android.Manifest
+import android.graphics.drawable.Animatable
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothClass
 import android.bluetooth.BluetoothDevice
@@ -89,6 +90,10 @@ class MainActivity : AppCompatActivity() {
     // Whether permissions were requested from scan button (so we auto-start scan)
     private var pendingScanAfterPermission = false
 
+    // Recording throttle: minimum 2s between saves; identical data saved at most every 5s
+    private var lastSavedSampleMs: Long = 0
+    private var lastSavedSampleData: FitnessSample? = null
+
     // Throttled scan list updates (1 second)
     private val updateHandler = Handler(Looper.getMainLooper())
     private val scanListUpdateRunnable = object : Runnable {
@@ -114,6 +119,7 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         } else {
+            pendingScanAfterPermission = false
             Toast.makeText(this, getString(R.string.permissions_required), Toast.LENGTH_LONG).show()
         }
     }
@@ -137,6 +143,8 @@ class MainActivity : AppCompatActivity() {
         hrDebugLogger = BtDebugLogger(BuildConfig.BT_DEBUG_LOG, this)
         bleScanner = BleScanner(this)
 
+        createDebugSampleDataIfNeeded()
+
         setupScanList()
         setupUI()
 
@@ -151,6 +159,8 @@ class MainActivity : AppCompatActivity() {
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         return when (item.itemId) {
+            R.id.action_history -> { startActivity(Intent(this, WorkoutHistoryActivity::class.java)); true }
+            R.id.action_debug -> { showDebugDialog(); true }
             R.id.action_about -> { showAboutDialog(); true }
             else -> super.onOptionsItemSelected(item)
         }
@@ -184,15 +194,10 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        binding.btnHistory.setOnClickListener {
-            startActivity(Intent(this, WorkoutHistoryActivity::class.java))
-        }
-
         binding.btnWorkoutStart.setOnClickListener {
             if (isRecording) stopRecording() else startRecording()
         }
 
-        binding.btnDebug.setOnClickListener { showDebugDialog() }
         binding.cardSpeed.setOnClickListener { showSpeedControlDialog() }
         binding.cardInclination.setOnClickListener { showInclineControlDialog() }
 
@@ -218,13 +223,21 @@ class MainActivity : AppCompatActivity() {
         ActivityCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_GRANTED
     }
 
-    /** Request permissions on startup — does NOT start scanning. */
+    /** Request permissions on startup — auto-starts scan if already granted. */
     private fun requestPermissionsIfNeeded() {
         val needed = getRequiredPermissions().filter {
             ActivityCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
         }
         if (needed.isNotEmpty()) {
+            pendingScanAfterPermission = true
             permissionLauncher.launch(needed.toTypedArray())
+        } else {
+            // All permissions already granted — auto-start scan
+            if (bleScanner.isBluetoothEnabled()) {
+                startScanning()
+            } else {
+                enableBtLauncher.launch(Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE))
+            }
         }
     }
 
@@ -249,7 +262,10 @@ class MainActivity : AppCompatActivity() {
         binding.rvScanResults.visibility = View.VISIBLE
         binding.txtScanStatus.visibility = View.VISIBLE
         binding.txtScanStatus.text = getString(R.string.scanning_active)
-        binding.btnScan.text = getString(R.string.stop_scan)
+
+        // Spin the scan button icon while scanning (animated vector rotates only the icon)
+        binding.btnScan.setIconResource(R.drawable.ic_refresh_anim)
+        (binding.btnScan.icon as? Animatable)?.start()
 
         bleScanner.startScan(object : BleScanner.ScanListener {
             override fun onDeviceFound(result: ScanResult) {
@@ -295,7 +311,6 @@ class MainActivity : AppCompatActivity() {
 
             override fun onScanFailed(errorCode: Int) {
                 runOnUiThread {
-                    binding.btnScan.text = getString(R.string.scan)
                     Toast.makeText(
                         this@MainActivity,
                         getString(R.string.scan_failed, errorCode),
@@ -319,11 +334,14 @@ class MainActivity : AppCompatActivity() {
         updateHandler.removeCallbacks(scanListUpdateRunnable)
         addBondedDevicesToList()
         updateScanListUI() // final refresh
-        binding.btnScan.text = getString(R.string.scan)
         binding.txtScanStatus.text = getString(R.string.devices_found, scanResultsMap.size)
+        // Stop spinning and restore static icon
+        (binding.btnScan.icon as? Animatable)?.stop()
+        binding.btnScan.setIconResource(R.drawable.ic_refresh)
     }
 
     private fun updateScanListUI() {
+        if (isRecording) return
         // Merge current scan results with known devices (previously connected) that
         // are not present in the current scan — so the user can always reconnect.
         val combined = scanResultsMap.toMutableMap()
@@ -402,6 +420,16 @@ class MainActivity : AppCompatActivity() {
                 val name = device.name ?: getString(R.string.unknown_device)
                 fitnessDevice = FtmsDevice.createFromCharacteristics(name, ftmsCharacteristics)
                 runOnUiThread {
+                    // Update scan entry with detected machine type
+                    val mt = fitnessDevice?.machineType?.name
+                    if (mt != null) {
+                        scanResultsMap[device.address]?.let { existing ->
+                            scanResultsMap[device.address] = existing.copy(machineType = mt)
+                        }
+                        knownDevicesMap[device.address]?.let { existing ->
+                            knownDevicesMap[device.address] = existing.copy(machineType = mt)
+                        }
+                    }
                     markScanEntryHr(device.address, hasHeartRate)
                     updateConnectionStatus()
                     updateScanListUI()
@@ -737,6 +765,8 @@ class MainActivity : AppCompatActivity() {
         sessionStartTime = System.currentTimeMillis()
         elapsedFallbackStartTime = 0L
         lastFallbackElapsedSec = 0
+        lastSavedSampleMs = 0
+        lastSavedSampleData = null
         binding.btnWorkoutStart.text = getString(R.string.stop_session)
         binding.recordingIndicator.visibility = View.VISIBLE
         binding.metricsSection.visibility = View.VISIBLE
@@ -747,7 +777,10 @@ class MainActivity : AppCompatActivity() {
             val session = WorkoutSession(
                 startTimeMs = sessionStartTime,
                 machineType = device.machineType.name,
-                deviceName = device.deviceName
+                deviceName = device.deviceName,
+                deviceAddress = ftmsConnectionManager?.connectedDeviceAddress ?: "",
+                hrDeviceName = hrConnectionManager?.connectedDeviceName ?: "",
+                hrDeviceAddress = hrConnectionManager?.connectedDeviceAddress ?: ""
             )
             currentSessionId = db.sessionDao().insert(session)
             Log.i(tag, "Session started: $currentSessionId")
@@ -771,6 +804,27 @@ class MainActivity : AppCompatActivity() {
 
     private fun saveSample(sample: FitnessSample) {
         val sessionId = currentSessionId ?: return
+        val nowMs = System.currentTimeMillis()
+        val msSinceLast = nowMs - lastSavedSampleMs
+
+        // Minimum recording interval: 2 seconds
+        if (msSinceLast < 2_000) return
+
+        // If all measured values are identical to the last saved sample, only save every 5 seconds
+        val prev = lastSavedSampleData
+        if (prev != null && msSinceLast < 5_000 &&
+            prev.speedKmh           == sample.speedKmh &&
+            prev.cadenceRpm         == sample.cadenceRpm &&
+            prev.instantaneousPowerW == sample.instantaneousPowerW &&
+            prev.heartRateBpm       == sample.heartRateBpm &&
+            prev.totalDistanceM     == sample.totalDistanceM &&
+            prev.resistanceLevel    == sample.resistanceLevel &&
+            prev.inclinationPercent == sample.inclinationPercent
+        ) return
+
+        lastSavedSampleMs = nowMs
+        lastSavedSampleData = sample
+
         // Use wall-clock elapsed time when device sends 0 (BH Fitness quirk).
         val elapsedSec = if (sample.elapsedTimeSec > 0) sample.elapsedTimeSec
         else if (elapsedFallbackStartTime > 0) {
@@ -1068,26 +1122,16 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun exportDebugLogs() {
-        val logFiles = BtDebugLogger.getAllLogFiles(this)
-        if (logFiles.isEmpty()) {
+        val logFile = debugLogger.getAppLogFile()
+        if (logFile == null) {
             Toast.makeText(this, getString(R.string.no_log_files), Toast.LENGTH_SHORT).show()
             return
         }
-        val uris = logFiles.map { file ->
-            FileProvider.getUriForFile(this, "${packageName}.fileprovider", file)
-        }
-        val intent = if (uris.size == 1) {
-            Intent(Intent.ACTION_SEND).apply {
-                type = "text/plain"
-                putExtra(Intent.EXTRA_STREAM, uris[0])
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            }
-        } else {
-            Intent(Intent.ACTION_SEND_MULTIPLE).apply {
-                type = "text/plain"
-                putParcelableArrayListExtra(Intent.EXTRA_STREAM, ArrayList(uris))
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            }
+        val uri = FileProvider.getUriForFile(this, "${packageName}.fileprovider", logFile)
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_STREAM, uri)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
         startActivity(Intent.createChooser(intent, getString(R.string.export_logs)))
     }
@@ -1172,6 +1216,94 @@ class MainActivity : AppCompatActivity() {
             if (name.contains(fragment, ignoreCase = true)) return true
         }
         return false
+    }
+
+    /**
+     * Seeds two fake workout sessions (treadmill + indoor bike) with realistic sample data
+     * when running in debug mode ([BuildConfig.BT_DEBUG_LOG] == true) and the database is empty.
+     * This allows testing the Workout History and Detail views without a real device.
+     * Only runs once: subsequent launches skip seeding because sessions already exist.
+     */
+    private fun createDebugSampleDataIfNeeded() {
+        if (!BuildConfig.BT_DEBUG_LOG) return
+        lifecycleScope.launch(Dispatchers.IO) {
+            if (db.sessionDao().getAll().isNotEmpty()) return@launch
+            val now = System.currentTimeMillis()
+            // Fake treadmill session: 90 minutes ago
+            val treadmillStart = now - 90 * 60 * 1000L
+            val treadmillEnd = treadmillStart + 30 * 60 * 1000L
+            val treadmillSession = WorkoutSession(
+                startTimeMs = treadmillStart,
+                endTimeMs = treadmillEnd,
+                machineType = "TREADMILL",
+                deviceName = "Debug Treadmill",
+                totalElapsedTimeSec = 30 * 60,
+                totalDistanceM = 5200,
+                totalEnergyKcal = 320,
+                avgSpeedKmh = 10.4,
+                maxSpeedKmh = 12.0,
+                deviceAddress = "AA:BB:CC:DD:EE:01"
+            )
+            val treadmillId = db.sessionDao().insert(treadmillSession)
+            var treadmillDistanceM = 0
+            val treadmillSamples = (0 until 60).map { i ->
+                val elapsed = i * 30
+                val phase = i.toDouble() / 60.0
+                val speed = 6.0 + 4.0 * Math.sin(phase * Math.PI * 2) + 0.5 * (Math.random() - 0.5)
+                val incline = 2.5 + 2.5 * Math.sin(phase * Math.PI)
+                // Accumulate distance over 30-second interval at current speed
+                treadmillDistanceM += (speed * 30.0 / 3.6).toInt()
+                WorkoutSample(
+                    sessionId = treadmillId,
+                    timestampMs = treadmillStart + elapsed * 1000L,
+                    elapsedTimeSec = elapsed,
+                    speedKmh = speed.coerceIn(0.0, 20.0),
+                    inclinationPercent = incline.coerceIn(-3.0, 15.0),
+                    totalDistanceM = treadmillDistanceM,
+                    totalEnergyKcal = (elapsed * 10 / 60)
+                )
+            }
+            db.sampleDao().insertAll(treadmillSamples)
+
+            // Fake indoor bike session: 60 minutes ago
+            val bikeStart = now - 60 * 60 * 1000L
+            val bikeEnd = bikeStart + 20 * 60 * 1000L
+            val bikeSession = WorkoutSession(
+                startTimeMs = bikeStart,
+                endTimeMs = bikeEnd,
+                machineType = "INDOOR_BIKE",
+                deviceName = "Debug Indoor Bike",
+                totalElapsedTimeSec = 20 * 60,
+                totalDistanceM = 7800,
+                totalEnergyKcal = 210,
+                avgCadenceRpm = 75.0,
+                maxPowerW = 180,
+                deviceAddress = "AA:BB:CC:DD:EE:02",
+                hrDeviceName = "Mi Band 3",
+                hrDeviceAddress = "AA:BB:CC:DD:EE:03"
+            )
+            val bikeId = db.sessionDao().insert(bikeSession)
+            var bikeDistanceM = 0
+            val bikeSamples = (0 until 40).map { i ->
+                val elapsed = i * 30
+                val phase = i.toDouble() / 40.0
+                val cadence = 60.0 + 30.0 * Math.abs(Math.sin(phase * Math.PI * 3)) + 2.0 * (Math.random() - 0.5)
+                val resistance = (3 + (5 * Math.abs(Math.sin(phase * Math.PI * 2))).toInt()).coerceIn(1, 11)
+                // Accumulate distance over 30-second interval (cadence × wheel factor)
+                bikeDistanceM += (cadence * 2 * 30 / 60).toInt()
+                WorkoutSample(
+                    sessionId = bikeId,
+                    timestampMs = bikeStart + elapsed * 1000L,
+                    elapsedTimeSec = elapsed,
+                    cadenceRpm = cadence.coerceIn(0.0, 120.0),
+                    resistanceLevel = resistance,
+                    totalDistanceM = bikeDistanceM,
+                    totalEnergyKcal = (elapsed * 8 / 60)
+                )
+            }
+            db.sampleDao().insertAll(bikeSamples)
+            Log.i(tag, "Debug sample data created")
+        }
     }
 
     companion object {

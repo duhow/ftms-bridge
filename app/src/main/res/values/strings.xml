@@ -50,6 +50,7 @@
     <string name="metric_energy">Energy</string>
     <string name="metric_strides">Strides</string>
     <string name="metric_elapsed_time">Time</string>
+    <string name="lap_km_header">Km</string>
     <string name="metric_inclination">Inclination</string>
     <string name="metric_resistance">Resistance</string>
 
@@ -109,4 +110,8 @@
     <string name="about">About</string>
     <string name="about_title">About FTMS Bridge</string>
     <string name="about_version">Version: %s</string>
+
+    <!-- Workout detail -->
+    <string name="detail_devices_label">Devices</string>
+    <string name="detail_laps_label">Laps</string>
 </resources>

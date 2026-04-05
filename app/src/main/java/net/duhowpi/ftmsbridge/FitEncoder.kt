@@ -71,6 +71,11 @@ internal object FitEncoder {
     private const val INVALID_UINT16 = 0xFFFF
     private const val INVALID_UINT32 = 0xFFFFFFFFL
 
+    // ── FIT event_type values ───────────────────────────────────────────────
+
+    private const val EVENT_TYPE_STOP     = 1  // stop (intermediate lap)
+    private const val EVENT_TYPE_STOP_ALL = 4  // stop_all (final event)
+
     /**
      * Writes a FIT definition message.
      * @param local      Local message type (0–15)
@@ -212,29 +217,121 @@ internal object FitEncoder {
             buf.u8(resist)
         }
 
-        // Stop event: event=0 (timer), event_type=4 (stop_all)
-        buf.u8(1); buf.u32(endTs); buf.u8(0); buf.u8(4); buf.u32(0L)
+        // Stop event: event=0 (timer), event_type=stop_all
+        buf.u8(1); buf.u32(endTs); buf.u8(0); buf.u8(EVENT_TYPE_STOP_ALL); buf.u32(0L)
 
         // ── Local 3: lap ────────────────────────────────────────────────────
         buf.defMsg(3, GLOBAL_LAP, listOf(
             Triple(253, 4, BT_UINT32), // timestamp
             Triple(2,   4, BT_UINT32), // start_time
-            Triple(7,   4, BT_UINT32), // total_elapsed_time  (scale=1000; stored as ms)
-            Triple(8,   4, BT_UINT32), // total_timer_time
+            Triple(7,   4, BT_UINT32), // total_elapsed_time  (ms)
+            Triple(8,   4, BT_UINT32), // total_timer_time    (ms)
             Triple(9,   4, BT_UINT32), // total_distance      (cm)
             Triple(11,  2, BT_UINT16), // total_calories
+            Triple(13,  2, BT_UINT16), // avg_speed           (mm/s)
+            Triple(14,  2, BT_UINT16), // max_speed           (mm/s)
+            Triple(15,  1, BT_UINT8),  // avg_heart_rate      (bpm)
+            Triple(16,  1, BT_UINT8),  // max_heart_rate
+            Triple(17,  1, BT_UINT8),  // avg_cadence         (rpm)
+            Triple(21,  2, BT_UINT16), // avg_power           (W)
             Triple(0,   1, BT_ENUM),   // event
             Triple(1,   1, BT_ENUM)    // event_type
         ))
-        buf.u8(3)
-        buf.u32(endTs)
-        buf.u32(startTs)
-        buf.u32(elapsedMs)
-        buf.u32(elapsedMs)
-        buf.u32(totalDistCm)
-        buf.u16(totalCals ?: INVALID_UINT16)
-        buf.u8(9)  // event = lap
-        buf.u8(1)  // event_type = stop
+
+        // Build per-km laps from sample data, plus final partial lap
+        data class LapInfo(
+            val startTs: Long, val endTs: Long,
+            val elapsedMs: Long, val distCm: Long,
+            val avgSpeedMmS: Int, val maxSpeedMmS: Int,
+            val avgHr: Int, val maxHr: Int,
+            val avgCadence: Int, val avgPower: Int,
+            val calories: Int?, val isLast: Boolean
+        )
+
+        val lapList = mutableListOf<LapInfo>()
+        val lapDistanceM = 1000
+        var lapNum = 1
+        var lapStartIdx = 0
+        var lapStartTsMs = session.startTimeMs
+
+        fun buildLap(lapSamples: List<WorkoutSample>, lapEndTsMs: Long, isLast: Boolean): LapInfo {
+            val lapElapsedMs = lapEndTsMs - lapStartTsMs
+            val lapStartDist = if (lapStartIdx > 0) samples[lapStartIdx - 1].totalDistanceM else 0
+            val lapEndDist = lapSamples.lastOrNull()?.totalDistanceM ?: lapStartDist
+            val lapDistCm = (lapEndDist - lapStartDist).toLong().coerceAtLeast(0L) * 100
+            val hrS = lapSamples.filter { it.heartRateBpm > 0 }
+            val spdS = lapSamples.filter { it.speedKmh > 0 }
+            val cadS = lapSamples.filter { it.cadenceRpm > 0 }
+            val pwrS = lapSamples.filter { it.instantaneousPowerW > 0 }
+            val lapAvgSpeedMmS = if (spdS.isNotEmpty()) ((spdS.map { it.speedKmh }.average() / 3.6) * 1000.0).toInt() else 0
+            val lapMaxSpeedMmS = (lapSamples.maxOfOrNull { it.speedKmh } ?: 0.0).let { ((it / 3.6) * 1000.0).toInt() }
+            val lapAvgHr = if (hrS.isNotEmpty()) hrS.map { it.heartRateBpm }.average().toInt() else 0
+            val lapMaxHr = lapSamples.maxOfOrNull { it.heartRateBpm } ?: 0
+            val lapAvgCad = if (cadS.isNotEmpty()) cadS.map { it.cadenceRpm }.average().toInt() else 0
+            val lapAvgPwr = if (pwrS.isNotEmpty()) pwrS.map { it.instantaneousPowerW }.average().toInt() else 0
+            return LapInfo(
+                startTs = fitTs(lapStartTsMs), endTs = fitTs(lapEndTsMs),
+                elapsedMs = lapElapsedMs, distCm = lapDistCm,
+                avgSpeedMmS = lapAvgSpeedMmS, maxSpeedMmS = lapMaxSpeedMmS,
+                avgHr = lapAvgHr, maxHr = lapMaxHr,
+                avgCadence = lapAvgCad, avgPower = lapAvgPwr,
+                calories = null, isLast = isLast
+            )
+        }
+
+        if (samples.isNotEmpty()) {
+            samples.forEachIndexed { idx, sample ->
+                if (sample.totalDistanceM >= lapNum * lapDistanceM) {
+                    val lapSamples = samples.subList(lapStartIdx, idx + 1)
+                    val lapEndTsMs = sample.timestampMs
+                    lapList.add(buildLap(lapSamples, lapEndTsMs, false))
+                    lapNum++
+                    lapStartTsMs = lapEndTsMs
+                    lapStartIdx = idx + 1
+                }
+            }
+            // Final partial lap (or the only lap if distance < 1km)
+            if (lapStartIdx < samples.size) {
+                val lapSamples = samples.subList(lapStartIdx, samples.size)
+                lapList.add(buildLap(lapSamples, endMs, true))
+            } else if (lapList.isEmpty()) {
+                // No distance data at all — write a single summary lap
+                lapList.add(buildLap(samples, endMs, true))
+            }
+        }
+
+        // If we have no lap data (empty samples), fall back to single session lap
+        if (lapList.isEmpty()) {
+            buf.u8(3)
+            buf.u32(endTs); buf.u32(startTs)
+            buf.u32(elapsedMs); buf.u32(elapsedMs)
+            buf.u32(totalDistCm)
+            buf.u16(totalCals ?: INVALID_UINT16)
+            buf.u16(if (avgSpeedMmS > 0) avgSpeedMmS.coerceIn(0, 65534) else INVALID_UINT16)
+            buf.u16(if (maxSpeedMmS > 0) maxSpeedMmS.coerceIn(0, 65534) else INVALID_UINT16)
+            buf.u8(if (avgHr > 0) avgHr.coerceIn(1, 254) else INVALID_UINT8)
+            buf.u8(if (maxHr > 0) maxHr.coerceIn(1, 254) else INVALID_UINT8)
+            buf.u8(if (avgCadence > 0) avgCadence.coerceIn(1, 254) else INVALID_UINT8)
+            buf.u16(if (avgPower > 0) avgPower.coerceIn(1, 65534) else INVALID_UINT16)
+            buf.u8(9)  // event = lap
+            buf.u8(EVENT_TYPE_STOP)
+        } else {
+            lapList.forEachIndexed { i, lap ->
+                buf.u8(3)
+                buf.u32(lap.endTs); buf.u32(lap.startTs)
+                buf.u32(lap.elapsedMs); buf.u32(lap.elapsedMs)
+                buf.u32(lap.distCm)
+                buf.u16(INVALID_UINT16)  // per-lap calories not tracked
+                buf.u16(if (lap.avgSpeedMmS > 0) lap.avgSpeedMmS.coerceIn(0, 65534) else INVALID_UINT16)
+                buf.u16(if (lap.maxSpeedMmS > 0) lap.maxSpeedMmS.coerceIn(0, 65534) else INVALID_UINT16)
+                buf.u8(if (lap.avgHr > 0) lap.avgHr.coerceIn(1, 254) else INVALID_UINT8)
+                buf.u8(if (lap.maxHr > 0) lap.maxHr.coerceIn(1, 254) else INVALID_UINT8)
+                buf.u8(if (lap.avgCadence > 0) lap.avgCadence.coerceIn(1, 254) else INVALID_UINT8)
+                buf.u16(if (lap.avgPower > 0) lap.avgPower.coerceIn(1, 65534) else INVALID_UINT16)
+                buf.u8(9)  // event = lap
+                buf.u8(if (lap.isLast) EVENT_TYPE_STOP_ALL else EVENT_TYPE_STOP)
+            }
+        }
 
         // ── Local 4: session ────────────────────────────────────────────────
         buf.defMsg(4, GLOBAL_SESSION, listOf(
@@ -265,7 +362,7 @@ internal object FitEncoder {
         buf.u8(sport)
         buf.u8(subSport)
         buf.u8(8)  // event = session
-        buf.u8(1)  // event_type = stop
+        buf.u8(EVENT_TYPE_STOP)
         buf.u16(if (avgSpeedMmS > 0) avgSpeedMmS.coerceIn(0, 65534) else INVALID_UINT16)
         buf.u16(if (maxSpeedMmS > 0) maxSpeedMmS.coerceIn(0, 65534) else INVALID_UINT16)
         buf.u8(if (avgHr > 0) avgHr.coerceIn(1, 254) else INVALID_UINT8)
@@ -290,7 +387,7 @@ internal object FitEncoder {
         buf.u16(1)        // num_sessions
         buf.u8(0)         // type = manual
         buf.u8(26)        // event = activity
-        buf.u8(1)         // event_type = stop
+        buf.u8(EVENT_TYPE_STOP)
 
         // ── Assemble FIT file ───────────────────────────────────────────────
         val dataBytes = buf.toByteArray()

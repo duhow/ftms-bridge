@@ -1,0 +1,166 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="?android:colorBackground">
+
+    <androidx.appcompat.widget.Toolbar
+        android:id="@+id/toolbar"
+        android:layout_width="match_parent"
+        android:layout_height="?attr/actionBarSize"
+        android:background="?attr/colorSurface"
+        android:elevation="4dp" />
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <TextView
+                android:id="@+id/txtDetailDate"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textSize="13sp"
+                android:textColor="?android:attr/textColorSecondary"
+                android:paddingBottom="12dp" />
+
+            <!-- Summary stats row -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:paddingBottom="16dp">
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical"
+                    android:gravity="center">
+                    <TextView
+                        android:id="@+id/txtDetailTime"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textSize="22sp"
+                        android:textStyle="bold" />
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/metric_elapsed_time"
+                        android:textSize="11sp"
+                        android:textColor="?android:attr/textColorSecondary" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical"
+                    android:gravity="center">
+                    <TextView
+                        android:id="@+id/txtDetailDistance"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textSize="22sp"
+                        android:textStyle="bold" />
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/unit_km"
+                        android:textSize="11sp"
+                        android:textColor="?android:attr/textColorSecondary" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical"
+                    android:gravity="center">
+                    <TextView
+                        android:id="@+id/txtDetailCalories"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textSize="22sp"
+                        android:textStyle="bold" />
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/unit_kcal"
+                        android:textSize="11sp"
+                        android:textColor="?android:attr/textColorSecondary" />
+                </LinearLayout>
+
+            </LinearLayout>
+
+            <!-- Chart label -->
+            <TextView
+                android:id="@+id/txtChartLabel"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:paddingBottom="4dp" />
+
+            <!-- Line chart -->
+            <net.duhowpi.ftmsbridge.LineChartView
+                android:id="@+id/lineChart"
+                android:layout_width="match_parent"
+                android:layout_height="200dp"
+                android:background="?attr/colorSurface" />
+
+            <!-- Device details -->
+            <TextView
+                android:id="@+id/txtDetailDevicesLabel"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/detail_devices_label"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:paddingTop="16dp"
+                android:paddingBottom="4dp" />
+
+            <TextView
+                android:id="@+id/txtDetailFtmsDevice"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textSize="12sp"
+                android:fontFamily="monospace" />
+
+            <TextView
+                android:id="@+id/txtDetailHrDevice"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textSize="12sp"
+                android:fontFamily="monospace"
+                android:visibility="gone" />
+
+            <!-- Laps table -->
+            <TextView
+                android:id="@+id/txtLapsLabel"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/detail_laps_label"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:paddingTop="16dp"
+                android:paddingBottom="4dp"
+                android:visibility="gone" />
+
+            <LinearLayout
+                android:id="@+id/layoutLapsTable"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone" />
+
+        </LinearLayout>
+    </ScrollView>
+
+</LinearLayout>
