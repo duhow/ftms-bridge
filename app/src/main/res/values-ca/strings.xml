@@ -70,6 +70,10 @@
     <string name="reconnect">Reconnectar</string>
     <string name="scanning_active">Escanejant…</string>
     <string name="device_disconnected">Dispositiu desconnectat</string>
+    <string name="unknown_device">Dispositiu desconegut</string>
+    <string name="type_not_detected_message">Tipus no detectat. Connecta com a:</string>
+    <string name="connect_as_ftms">Màquina FTMS</string>
+    <string name="connect_as_hr">Sensor FC</string>
     <string name="control_not_available">El control no està disponible per a aquesta màquina</string>
     <string name="control_send_failed">No s\'ha pogut enviar l\'ordre a la màquina</string>
     <string name="control_set_speed_title">Ajustar velocitat</string>

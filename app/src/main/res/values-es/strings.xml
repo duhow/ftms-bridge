@@ -70,6 +70,10 @@
     <string name="reconnect">Reconectar</string>
     <string name="scanning_active">Escaneando…</string>
     <string name="device_disconnected">Dispositivo desconectado</string>
+    <string name="unknown_device">Dispositivo desconocido</string>
+    <string name="type_not_detected_message">Tipo no detectado. Conectar como:</string>
+    <string name="connect_as_ftms">Máquina FTMS</string>
+    <string name="connect_as_hr">Sensor FC</string>
     <string name="control_not_available">El control no está disponible para esta máquina</string>
     <string name="control_send_failed">No se pudo enviar el comando a la máquina</string>
     <string name="control_set_speed_title">Ajustar velocidad</string>

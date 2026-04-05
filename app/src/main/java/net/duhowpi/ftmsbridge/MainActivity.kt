@@ -63,6 +63,7 @@ class MainActivity : AppCompatActivity() {
 
     private var ftmsConnectionManager: BleConnectionManager? = null
     private var hrConnectionManager: BleConnectionManager? = null
+    private var probeConnectionManager: BleConnectionManager? = null
 
     private var fitnessDevice: FtmsDevice? = null
     private var heartRateSensor: HeartRateSensor? = null
@@ -354,16 +355,7 @@ class MainActivity : AppCompatActivity() {
         when {
             info.isFtms -> connectFtmsDevice(info.device)
             info.isHr -> connectHrDevice(info.device)
-            else -> {
-                // Unknown type: try as FTMS first, fall back to HR
-                AlertDialog.Builder(this)
-                    .setTitle(info.name)
-                    .setMessage("Type not detected. Connect as:")
-                    .setPositiveButton("FTMS Machine") { _, _ -> connectFtmsDevice(info.device) }
-                    .setNeutralButton("HR Sensor") { _, _ -> connectHrDevice(info.device) }
-                    .setNegativeButton(android.R.string.cancel, null)
-                    .show()
-            }
+            else -> probeAndConnect(info.device)
         }
     }
 
@@ -532,7 +524,76 @@ class MainActivity : AppCompatActivity() {
         })
     }
 
-    // ---- UI status ----------------------------------------------------------
+    /**
+     * Connects to [device] using a lightweight probe connection to discover its GATT services.
+     * Once services are known, automatically routes to [connectFtmsDevice] or [connectHrDevice].
+     * Falls back to a manual-selection dialog only if service discovery yields no recognisable type.
+     *
+     * This is used for bonded devices whose service UUIDs are not cached in the Android OS
+     * Bluetooth database (e.g. a Mi Band that has never been connected via this app).
+     */
+    private fun probeAndConnect(device: BluetoothDevice) {
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) return
+        probeConnectionManager?.disconnect()
+        probeConnectionManager = BleConnectionManager(this, debugLogger)
+        probeConnectionManager?.connect(device, object : BleConnectionManager.ConnectionListener {
+            override fun onConnected(deviceName: String) {
+                runOnUiThread {
+                    updateConnectionStatus()
+                    scanAdapter.markConnected(device.address)
+                }
+            }
+
+            override fun onDisconnected() {
+                // Only update UI if the probe was not superseded by a real connection.
+                if (probeConnectionManager != null) {
+                    probeConnectionManager = null
+                    runOnUiThread {
+                        updateConnectionStatus()
+                        scanAdapter.markDisconnected(device.address)
+                        updateScanListUI()
+                    }
+                }
+            }
+
+            override fun onServicesReady(ftmsCharacteristics: List<UUID>, hasHeartRate: Boolean) {
+                val hasFtms = ftmsCharacteristics.isNotEmpty()
+                // Null out first so the onDisconnected guard above does not fire UI updates
+                // when we intentionally disconnect the probe below.
+                val probeMgr = probeConnectionManager
+                probeConnectionManager = null
+                runOnUiThread {
+                    // Disconnect probe before opening the real connection.
+                    probeMgr?.disconnect()
+                    when {
+                        hasFtms -> {
+                            connectFtmsDevice(device)
+                        }
+                        hasHeartRate -> {
+                            connectHrDevice(device)
+                        }
+                        else -> {
+                            // Still unknown — fall back to manual selection dialog
+                            AlertDialog.Builder(this@MainActivity)
+                                .setTitle(device.name ?: getString(R.string.unknown_device))
+                                .setMessage(getString(R.string.type_not_detected_message))
+                                .setPositiveButton(getString(R.string.connect_as_ftms)) { _, _ -> connectFtmsDevice(device) }
+                                .setNeutralButton(getString(R.string.connect_as_hr)) { _, _ -> connectHrDevice(device) }
+                                .setNegativeButton(android.R.string.cancel, null)
+                                .show()
+                        }
+                    }
+                }
+            }
+
+            override fun onFtmsData(uuid: UUID, data: ByteArray) {}
+            override fun onHeartRateData(data: ByteArray) {}
+            override fun onFeaturesRead(data: ByteArray) {}
+            override fun onDeviceInfoRead() {}
+            override fun onMachineStatusChanged(opCode: Int, params: ByteArray) {}
+            override fun onIConceptData(data: ByteArray) {}
+        })
+    }
 
     private fun updateConnectionStatus() {
         val ftmsConnected = ftmsConnectionManager?.isConnected == true
@@ -1040,6 +1101,7 @@ class MainActivity : AppCompatActivity() {
         if (isRecording) stopRecording()
         ftmsConnectionManager?.disconnect()
         hrConnectionManager?.disconnect()
+        probeConnectionManager?.disconnect()
         debugLogger.close()
         hrDebugLogger.close()
     }
@@ -1053,10 +1115,15 @@ class MainActivity : AppCompatActivity() {
      * device managed by Gadgetbridge that uses proprietary service UUIDs and is therefore
      * filtered out during the active scan.
      *
-     * To expose real-time HR from a Gadgetbridge-managed device:
-     *   1. Open Gadgetbridge → device settings → enable "3rd party realtime HR access".
-     *   2. Enable "Visible while connected" in the same device settings.
-     *   3. Select the device (shown here as "Paired") and choose "HR Sensor".
+     * Android's Bluetooth stack caches the GATT service UUIDs after the first successful
+     * connection to a bonded device ([BluetoothDevice.getUuids]).  Those cached UUIDs are
+     * used here to pre-populate [ScannedDeviceInfo.isFtms] and [ScannedDeviceInfo.isHr] so
+     * that tapping "Connect" on a previously-connected Mi Band routes directly to
+     * [connectHrDevice] without showing the manual type-selection dialog.
+     *
+     * If the cache is empty (device has never been connected through the Android BT stack),
+     * both flags remain false and [probeAndConnect] will auto-detect the type on first
+     * connection by performing GATT service discovery.
      */
     private fun addBondedDevicesToList() {
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) return
@@ -1070,16 +1137,25 @@ class MainActivity : AppCompatActivity() {
             val majorClass = device.bluetoothClass?.majorDeviceClass
             if (majorClass == BluetoothClass.Device.Major.AUDIO_VIDEO) return@forEach
             if (isIgnoredDevice(name)) return@forEach
+
+            // Use Android-cached service UUIDs to pre-detect device type.
+            // These are populated by the OS after the first GATT service discovery with the
+            // device; empty list means this is the first time we see it.
+            val cachedUuids = device.uuids?.map { it.uuid } ?: emptyList()
+            val isFtms = cachedUuids.contains(FtmsConstants.FTMS_SERVICE_UUID)
+            val isHr = cachedUuids.contains(FtmsConstants.HR_SERVICE_UUID) ||
+                    cachedUuids.contains(FtmsConstants.MIBAND_HR_SERVICE_UUID)
+
             scanResultsMap[device.address] = ScannedDeviceInfo(
                 name = name,
                 address = device.address,
                 rssi = Int.MIN_VALUE,
-                isFtms = false,
-                isHr = false,
+                isFtms = isFtms,
+                isHr = isHr,
                 device = device,
                 isBonded = true
             )
-            debugLogger.logMessage("Bonded BLE device added to list: $name (${device.address})")
+            debugLogger.logMessage("Bonded BLE device added to list: $name (${device.address}) FTMS=$isFtms HR=$isHr cachedUUIDs=${cachedUuids.size}")
         }
     }
 
