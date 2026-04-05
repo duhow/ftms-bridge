@@ -147,12 +147,12 @@ class LineChartView @JvmOverloads constructor(
             val min = s.points.min()
             val max = s.points.max()
             val range = (max - min).takeIf { it > 0f } ?: 1f
+            val lastIdx = (s.points.size - 1).coerceAtLeast(1)
 
             linePaint.color = s.color
             val path = Path()
             s.points.forEachIndexed { i, v ->
-                // coerceAtLeast(1) prevents division by zero for a single-point series
-                val x = chartLeft + (i.toFloat() / (s.points.size - 1).coerceAtLeast(1)) * chartW
+                val x = chartLeft + (i.toFloat() / lastIdx) * chartW
                 val y = chartBottom - ((v - min) / range) * chartH
                 if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
             }
@@ -198,7 +198,8 @@ class LineChartView @JvmOverloads constructor(
                 val max = s.points.max()
                 val range = (max - min).takeIf { it > 0f } ?: 1f
                 val v = s.points[tipIdx]
-                val dotX = chartLeft + (tipIdx.toFloat() / (s.points.size - 1).coerceAtLeast(1)) * chartW
+                val lastIdx = (s.points.size - 1).coerceAtLeast(1)
+                val dotX = chartLeft + (tipIdx.toFloat() / lastIdx) * chartW
                 val dotY = chartBottom - ((v - min) / range) * chartH
                 dotPaint.color = s.color
                 canvas.drawCircle(dotX, dotY, 8f, dotPaint)

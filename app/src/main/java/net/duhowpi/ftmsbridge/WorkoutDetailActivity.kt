@@ -1,7 +1,7 @@
 package net.duhowpi.ftmsbridge
 
-import android.graphics.Typeface
 import android.content.Intent
+import android.graphics.Typeface
 import android.graphics.Color
 import android.os.Bundle
 import android.view.Menu
