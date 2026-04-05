@@ -89,7 +89,8 @@
     <string name="control_inc_incline_small">+0.5</string>
     <string name="control_inc_incline_large">+1</string>
     <string name="control_apply">Apply</string>
-    <string name="control_cd_adjust">Adjust by %1$s</string>
+    <string name="control_cd_increase_by">Increase by %1$s</string>
+    <string name="control_cd_decrease_by">Decrease by %1$s</string>
 
     <!-- Debug -->
     <string name="debug_info">Debug Info</string>

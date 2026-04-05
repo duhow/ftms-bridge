@@ -421,7 +421,7 @@ class MainActivity : AppCompatActivity() {
                     isMachineRunning = nowRunning
                     runOnUiThread { updateMachineRunningState() }
                 }
-                if (isRecording && mergedSample.elapsedTimeSec <= 0 && elapsedFallbackStartTime == 0L && nowRunning) {
+                if (shouldAnchorFallbackTimer(mergedSample, nowRunning)) {
                     elapsedFallbackStartTime = mergedSample.timestampMs
                 }
                 runOnUiThread { updateDashboard(mergedSample) }
@@ -885,10 +885,10 @@ class MainActivity : AppCompatActivity() {
         decSmall.text = smallDecLabel
         incSmall.text = smallIncLabel
         incLarge.text = largeIncLabel
-        decLarge.contentDescription = getString(R.string.control_cd_adjust, largeDecLabel)
-        decSmall.contentDescription = getString(R.string.control_cd_adjust, smallDecLabel)
-        incSmall.contentDescription = getString(R.string.control_cd_adjust, smallIncLabel)
-        incLarge.contentDescription = getString(R.string.control_cd_adjust, largeIncLabel)
+        decLarge.contentDescription = getString(R.string.control_cd_decrease_by, largeDecLabel.removePrefix("-"))
+        decSmall.contentDescription = getString(R.string.control_cd_decrease_by, smallDecLabel.removePrefix("-"))
+        incSmall.contentDescription = getString(R.string.control_cd_increase_by, smallIncLabel.removePrefix("+"))
+        incLarge.contentDescription = getString(R.string.control_cd_increase_by, largeIncLabel.removePrefix("+"))
 
         val maxProgress = ((max - min) / step).roundToInt().coerceAtLeast(1)
         seek.max = maxProgress
@@ -940,7 +940,7 @@ class MainActivity : AppCompatActivity() {
     private fun sendTargetSpeedKmh(speedKmh: Double): Boolean {
         val clamped = speedKmh.coerceIn(SPEED_MIN_KMH, SPEED_MAX_KMH)
         val encoded = (clamped * 100.0).roundToInt()
-        if (encoded !in Short.MIN_VALUE..Short.MAX_VALUE) {
+        if (!isEncodableAsSint16(encoded)) {
             Log.w(tag, "Encoded speed out of range: $encoded")
             return false
         }
@@ -955,7 +955,7 @@ class MainActivity : AppCompatActivity() {
     private fun sendTargetInclinePercent(inclinePercent: Double): Boolean {
         val clamped = inclinePercent.coerceIn(INCLINE_MIN_PERCENT, INCLINE_MAX_PERCENT)
         val encoded = (clamped * 10.0).roundToInt()
-        if (encoded !in Short.MIN_VALUE..Short.MAX_VALUE) {
+        if (!isEncodableAsSint16(encoded)) {
             Log.w(tag, "Encoded incline out of range: $encoded")
             return false
         }
@@ -976,6 +976,14 @@ class MainActivity : AppCompatActivity() {
         val elapsed = (deltaMs / 1000).toInt()
         lastFallbackElapsedSec = elapsed
         return elapsed
+    }
+
+    private fun shouldAnchorFallbackTimer(sample: FitnessSample, nowRunning: Boolean): Boolean {
+        return isRecording && nowRunning && sample.elapsedTimeSec <= 0 && elapsedFallbackStartTime == 0L
+    }
+
+    private fun isEncodableAsSint16(value: Int): Boolean {
+        return value in Short.MIN_VALUE..Short.MAX_VALUE
     }
 
     companion object {
