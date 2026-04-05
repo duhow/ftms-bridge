@@ -236,6 +236,8 @@ class MainActivity : AppCompatActivity() {
             if (isRecording) stopRecording() else startRecording()
         }
 
+        binding.btnWorkoutStop.setOnClickListener { stopRecording() }
+
         binding.cardSpeed.setOnClickListener { showSpeedControlDialog() }
         binding.cardInclination.setOnClickListener { showInclineControlDialog() }
         binding.lapColSpeed.setOnClickListener { showSpeedControlDialog() }
@@ -985,6 +987,7 @@ class MainActivity : AppCompatActivity() {
         isChartViewActive = false
         binding.lapSection.visibility = View.VISIBLE
         binding.chartSection.visibility = View.GONE
+        binding.btnWorkoutStop.visibility = View.VISIBLE
         lifecycleScope.launch(Dispatchers.IO) {
             val session = WorkoutSession(
                 startTimeMs = sessionStartTime,
@@ -1010,6 +1013,7 @@ class MainActivity : AppCompatActivity() {
         binding.viewToggleRow.visibility = View.GONE
         binding.lapSection.visibility = View.GONE
         binding.chartSection.visibility = View.GONE
+        binding.btnWorkoutStop.visibility = View.GONE
         // Restore metric cards hidden during recording
         binding.cardHeartRate.visibility = View.VISIBLE
         binding.rowDistanceEnergy.visibility = View.VISIBLE
