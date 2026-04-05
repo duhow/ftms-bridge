@@ -791,13 +791,14 @@ class MainActivity : AppCompatActivity() {
             Toast.makeText(this, getString(R.string.control_not_available), Toast.LENGTH_SHORT).show()
             return
         }
-        val current = (lastFtmsSample?.speedKmh ?: 0.5).coerceIn(SPEED_MIN_KMH, SPEED_MAX_KMH)
+        val current = (lastFtmsSample?.speedKmh ?: SPEED_MIN_KMH).coerceIn(SPEED_MIN_KMH, SPEED_MAX_KMH)
         showAdjustDialog(
             title = getString(R.string.control_set_speed_title),
             label = getString(R.string.control_speed_label),
             min = SPEED_MIN_KMH,
             max = SPEED_MAX_KMH,
             step = 0.1,
+            largeStep = 1.0,
             initial = current,
             unitFormatter = { value -> String.format("%.1f %s", value, getString(R.string.unit_kmh)) },
             rangeText = getString(R.string.control_range_speed, SPEED_MIN_KMH, SPEED_MAX_KMH),
@@ -818,13 +819,14 @@ class MainActivity : AppCompatActivity() {
             Toast.makeText(this, getString(R.string.control_not_available), Toast.LENGTH_SHORT).show()
             return
         }
-        val current = (lastFtmsSample?.inclinationPercent ?: 0.0).coerceIn(INCLINE_MIN_PERCENT, INCLINE_MAX_PERCENT)
+        val current = (lastFtmsSample?.inclinationPercent ?: INCLINE_DEFAULT_PERCENT).coerceIn(INCLINE_MIN_PERCENT, INCLINE_MAX_PERCENT)
         showAdjustDialog(
             title = getString(R.string.control_set_incline_title),
             label = getString(R.string.control_incline_label),
             min = INCLINE_MIN_PERCENT,
             max = INCLINE_MAX_PERCENT,
             step = 0.5,
+            largeStep = 1.0,
             initial = current,
             unitFormatter = { value -> "${value.roundToInt()}${getString(R.string.unit_percent)}" },
             rangeText = getString(R.string.control_range_incline, INCLINE_MIN_PERCENT.roundToInt(), INCLINE_MAX_PERCENT.roundToInt()),
@@ -844,6 +846,7 @@ class MainActivity : AppCompatActivity() {
         min: Double,
         max: Double,
         step: Double,
+        largeStep: Double,
         initial: Double,
         unitFormatter: (Double) -> String,
         rangeText: String,
@@ -900,10 +903,10 @@ class MainActivity : AppCompatActivity() {
             override fun onStopTrackingTouch(seekBar: SeekBar?) {}
         })
 
-        decLarge.setOnClickListener { selected -= 1.0; updateViews() }
+        decLarge.setOnClickListener { selected -= largeStep; updateViews() }
         decSmall.setOnClickListener { selected -= step; updateViews() }
         incSmall.setOnClickListener { selected += step; updateViews() }
-        incLarge.setOnClickListener { selected += 1.0; updateViews() }
+        incLarge.setOnClickListener { selected += largeStep; updateViews() }
 
         updateViews()
 
@@ -946,6 +949,7 @@ class MainActivity : AppCompatActivity() {
         private const val SPEED_MAX_KMH = 30.0
         private const val INCLINE_MIN_PERCENT = -3.0
         private const val INCLINE_MAX_PERCENT = 16.0
+        private const val INCLINE_DEFAULT_PERCENT = 0.0
         private const val SPEED_DANGER_KMH = 20.0
         private const val INCLINE_DANGER_PERCENT = 12.0
         private const val INCLINE_DECLINE_DANGER_PERCENT = -2.0
