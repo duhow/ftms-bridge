@@ -95,7 +95,7 @@
     <!-- Debug -->
     <string name="debug_info">Info Debug</string>
     <string name="export_logs">Exportar logs</string>
-    <string name="no_log_files">No s\' han trobat arxius de log</string>
+    <string name="no_log_files">No s'han trobat arxius de log</string>
     <string name="debug_log_location">Logs: emmagatzematge extern app/debug/</string>
     <string name="capabilities">Capacitats</string>
     <string name="recent_bt_events">Esdeveniments BT recents</string>
