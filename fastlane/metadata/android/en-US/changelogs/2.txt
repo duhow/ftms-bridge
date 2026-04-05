@@ -12,3 +12,5 @@ Add user-facing changes for the next release here.
 - Added treadmill speed and inclination control popups on metric tiles with slider and quick +/- buttons
 - Added safety danger-zone indication while selecting high speed or extreme incline values
 - Fixed treadmill session timer offset so app elapsed time aligns with real machine movement start
+- Device scan list now correctly shows "HR" label for devices whose HR capability is confirmed at connection time (e.g. Mi Band not advertising HR UUID in scan record)
+- Added Heart Rate Control Point command (BLE 0x2A39) on connect to start continuous HR streaming on devices that require it (e.g. some Mi Band variants)

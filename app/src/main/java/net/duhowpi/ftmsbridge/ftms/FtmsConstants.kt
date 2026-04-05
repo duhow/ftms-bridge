@@ -23,6 +23,7 @@ object FtmsConstants {
     // Heart Rate Service
     val HR_SERVICE_UUID: UUID = uuidFrom16Bit(0x180D)
     val HR_MEASUREMENT_UUID: UUID = uuidFrom16Bit(0x2A37)
+    val HR_CONTROL_POINT_UUID: UUID = uuidFrom16Bit(0x2A39)
 
     // Device Information Service
     val DEVICE_INFO_SERVICE_UUID: UUID = uuidFrom16Bit(0x180A)

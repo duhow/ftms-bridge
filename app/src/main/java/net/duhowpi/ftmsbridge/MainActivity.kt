@@ -366,6 +366,19 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    /**
+     * If [hasHeartRate] is true, ensures the [ScannedDeviceInfo] entry for [address] is
+     * marked with [ScannedDeviceInfo.isHr] = true so the scan list label updates from
+     * "BLE" / "Paired" to "HR" (or "FTMS+HR") once the actual service is confirmed at
+     * connection time.  Must be called on any thread; UI refresh is done on the main thread.
+     */
+    private fun markScanEntryHr(address: String, hasHeartRate: Boolean) {
+        if (!hasHeartRate) return
+        scanResultsMap[address]?.let { existing ->
+            if (!existing.isHr) scanResultsMap[address] = existing.copy(isHr = true)
+        }
+    }
+
     private fun connectFtmsDevice(device: BluetoothDevice) {
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) return
         ftmsConnectionManager?.disconnect()
@@ -395,8 +408,10 @@ class MainActivity : AppCompatActivity() {
                 if (ActivityCompat.checkSelfPermission(this@MainActivity, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) return
                 val name = device.name ?: "Unknown"
                 fitnessDevice = FtmsDevice.createFromCharacteristics(name, ftmsCharacteristics)
+                markScanEntryHr(device.address, hasHeartRate)
                 runOnUiThread {
                     updateConnectionStatus()
+                    updateScanListUI()
                     binding.txtMachineType.text = fitnessDevice?.machineType?.name ?: "?"
                     binding.txtMachineType.visibility = View.VISIBLE
                     updateMetricVisibility(fitnessDevice?.machineType ?: FtmsConstants.MachineType.UNKNOWN)
@@ -489,7 +504,11 @@ class MainActivity : AppCompatActivity() {
             }
 
             override fun onServicesReady(ftmsCharacteristics: List<UUID>, hasHeartRate: Boolean) {
-                runOnUiThread { updateConnectionStatus() }
+                markScanEntryHr(device.address, hasHeartRate)
+                runOnUiThread {
+                    updateConnectionStatus()
+                    updateScanListUI()
+                }
             }
 
             override fun onFtmsData(uuid: UUID, data: ByteArray) {}

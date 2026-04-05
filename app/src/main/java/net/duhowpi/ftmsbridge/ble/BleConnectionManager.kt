@@ -312,6 +312,14 @@ class BleConnectionManager(
                     hasHeartRate = true
                     enableNotification(hrChar)
                 }
+                // Heart Rate Control Point (0x2A39): some devices (e.g. Mi Band variants)
+                // require writing 0x01 to this characteristic to start continuous HR streaming.
+                val hrCpChar = hrService.getCharacteristic(FtmsConstants.HR_CONTROL_POINT_UUID)
+                if (hrCpChar != null &&
+                    (hrCpChar.properties and BluetoothGattCharacteristic.PROPERTY_WRITE) != 0) {
+                    debugLogger.logMessage("HR Control Point found – writing 0x01 to start continuous HR")
+                    enqueueOp(GattOp.WriteChar(hrCpChar, byteArrayOf(0x01)))
+                }
             }
 
             // iConcept 3.0 / BH Fitness proprietary service — subscribe to notify chars
