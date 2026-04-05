@@ -37,6 +37,9 @@ jobs:
           ruby-version: '3.4'
           bundler-cache: true
 
+      - name: Run linter
+        run: python tools/lint.py
+
       - name: Build debug APK
         run: bundle exec fastlane build
 

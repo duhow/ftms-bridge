@@ -38,6 +38,9 @@ jobs:
           ruby-version: '3.4'
           bundler-cache: true
 
+      - name: Run linter
+        run: python tools/lint.py
+
       - name: Decode Android keystore
         run: |
           echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > "$RUNNER_TEMP/$KEYSTORE_FILE"

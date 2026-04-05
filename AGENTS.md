@@ -14,6 +14,23 @@ Check historic commits to avoid making up new scopes every time.
 - If touching UI text, keep user-facing wording clear and consistent.
 - Avoid introducing new dependencies unless absolutely necessary.
 
+## Final checks
+
+Whenever you change code, always run the linter as a final step:
+
+```bash
+python tools/lint.py
+```
+
+The script checks:
+- **XML validity** - all resource XML files parse without error
+- **Language parity** - every locale `values-XX/strings.xml` contains the same keys as the base `values/strings.xml`
+- **Language arrays** - `language_codes` and `language_names` in `arrays.xml` have the same item count; non-default codes appear in `locale_config.xml`
+- **Bracket balance** - `()`, `{}`, `[]` are balanced in Kotlin/Java source files
+
+Exit code equals the number of failed checks (standalone mode).
+Fix the reported issues to avoid hallucinations or moved/copied code that is wrong.
+
 ## IMPORTANT: Layout changes
 
 - `activity_main.xml` exists in **both**:
