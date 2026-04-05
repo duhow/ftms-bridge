@@ -19,12 +19,12 @@ class BhFitnessIndoorBike(deviceName: String) :
         private const val METERS_PER_KMH_PER_SEC = METERS_PER_KM / SECONDS_PER_HOUR
         private const val JOULES_PER_KCAL = 4184.0
         private const val STRIDES_ENCODING_FACTOR = 100.0
-        private const val MIN_MOVING_POWER_W = 5
-        private const val MIN_MOVING_CADENCE_RPM = 10.0
+        const val MIN_MOVING_POWER_W = 5
+        const val MIN_MOVING_CADENCE_RPM = 10.0
         private const val MIN_LEVEL_TORQUE_NM = 2.0
         private const val LEVEL_TORQUE_STEP_NM = 2.0
         private const val MAX_LEVEL = 11
-        private const val TWO_PI = Math.PI * 2.0
+        private const val TWO_PI_RADIANS = kotlin.math.PI * 2.0
     }
 
     private fun stridesFromEnergy(energyField: Int): Double {
@@ -44,12 +44,14 @@ class BhFitnessIndoorBike(deviceName: String) :
             lastDerivedLevel = 0
             return 0
         }
-        val angularVelocityRadPerSec = cadenceRpm * TWO_PI / 60.0
+        val angularVelocityRadPerSec = cadenceRpm * TWO_PI_RADIANS / 60.0
         if (angularVelocityRadPerSec <= 0.0) {
             lastDerivedLevel = 0
             return 0
         }
         val torqueNm = powerW.toDouble() / angularVelocityRadPerSec
+        // Empirical mapping for BH indoor-bike console levels:
+        // level ~= round((torqueNm - 2.0) / 2.0) + 1, clamped to 1..11 while moving.
         val level = kotlin.math.round((torqueNm - MIN_LEVEL_TORQUE_NM) / LEVEL_TORQUE_STEP_NM).toInt() + 1
         val clampedLevel = level.coerceIn(1, MAX_LEVEL)
         lastDerivedLevel = clampedLevel
@@ -81,9 +83,10 @@ class BhFitnessIndoorBike(deviceName: String) :
         val dtSec = if (lastSampleTimestampMs > 0L) {
             val rawDeltaMs = nowMs - lastSampleTimestampMs
             if (rawDeltaMs < 0L) {
+                val deltaSec = kotlin.math.abs(rawDeltaMs) / 1000.0
                 Log.w(
                     TAG,
-                    "Negative sample delta (${rawDeltaMs}ms), treating as 0 (nowMs=$nowMs lastMs=$lastSampleTimestampMs)"
+                    "Negative sample delta ${rawDeltaMs}ms (~${"%.3f".format(deltaSec)}s); treating as 0 (clock adjustment?)"
                 )
             }
             rawDeltaMs.coerceAtLeast(0L) / 1000.0
@@ -139,8 +142,8 @@ class BhFitnessIndoorBike(deviceName: String) :
 
         if (dtSec > 0.0) {
             cumulativeDistanceM += syntheticSpeedKmh * dtSec * METERS_PER_KMH_PER_SEC
-            val powerWatts = sample.instantaneousPowerW.coerceAtLeast(0).toDouble()
-            val energyDeltaKcal = (powerWatts * dtSec) / JOULES_PER_KCAL
+            val nonNegativePowerW = sample.instantaneousPowerW.coerceAtLeast(0).toDouble()
+            val energyDeltaKcal = (nonNegativePowerW * dtSec) / JOULES_PER_KCAL
             cumulativeEnergyKcal += energyDeltaKcal
         }
 

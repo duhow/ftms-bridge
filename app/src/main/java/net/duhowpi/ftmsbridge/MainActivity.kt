@@ -35,6 +35,7 @@ import net.duhowpi.ftmsbridge.data.AppDatabase
 import net.duhowpi.ftmsbridge.data.WorkoutSample
 import net.duhowpi.ftmsbridge.data.WorkoutSession
 import net.duhowpi.ftmsbridge.databinding.ActivityMainBinding
+import net.duhowpi.ftmsbridge.device.BhFitnessIndoorBike
 import net.duhowpi.ftmsbridge.device.FtmsDevice
 import net.duhowpi.ftmsbridge.device.HeartRateSensor
 import net.duhowpi.ftmsbridge.ftms.FtmsCapabilities
@@ -400,7 +401,8 @@ class MainActivity : AppCompatActivity() {
                 // BH indoor bikes do not provide a meaningful speed field, so use cadence/power.
                 val machineType = fitnessDevice?.machineType
                 val nowRunning = if (machineType == FtmsConstants.MachineType.INDOOR_BIKE) {
-                    mergedSample.cadenceRpm > 10.0 || mergedSample.instantaneousPowerW > 5
+                    mergedSample.cadenceRpm > BhFitnessIndoorBike.MIN_MOVING_CADENCE_RPM ||
+                            mergedSample.instantaneousPowerW > BhFitnessIndoorBike.MIN_MOVING_POWER_W
                 } else {
                     mergedSample.speedKmh > 0.1
                 }
@@ -602,7 +604,6 @@ class MainActivity : AppCompatActivity() {
      */
     private fun updateMetricVisibility(machineType: FtmsConstants.MachineType) {
         val isTreadmill = machineType == FtmsConstants.MachineType.TREADMILL
-        val isIndoorBike = machineType == FtmsConstants.MachineType.INDOOR_BIKE
         val isBike = machineType == FtmsConstants.MachineType.INDOOR_BIKE ||
                 machineType == FtmsConstants.MachineType.CROSS_TRAINER
         val showSpeed = machineType != FtmsConstants.MachineType.INDOOR_BIKE
@@ -610,10 +611,6 @@ class MainActivity : AppCompatActivity() {
         binding.rowCadencePower.visibility = if (isBike) View.VISIBLE else View.GONE
         binding.cardInclination.visibility = if (isTreadmill) View.VISIBLE else View.GONE
         binding.cardResistance.visibility = if (isBike) View.VISIBLE else View.GONE
-        // When speed is hidden on indoor bike, keep HR tile as the only first-row metric.
-        binding.cardHeartRate.layoutParams = (binding.cardHeartRate.layoutParams as LinearLayout.LayoutParams).apply {
-            weight = if (isIndoorBike) 2f else 1f
-        }
     }
 
     private fun resetMetrics() {
