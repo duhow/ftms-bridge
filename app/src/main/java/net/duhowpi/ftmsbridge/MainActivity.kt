@@ -15,6 +15,8 @@ import android.util.Log
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
+import android.widget.Button
+import android.widget.SeekBar
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
@@ -22,6 +24,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.DividerItemDecoration
@@ -43,6 +46,8 @@ import net.duhowpi.ftmsbridge.ftms.FtmsConstants
 import net.duhowpi.ftmsbridge.ftms.FtmsDataParser
 import net.duhowpi.ftmsbridge.model.FitnessSample
 import net.duhowpi.ftmsbridge.model.ScannedDeviceInfo
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 import java.util.UUID
 import kotlin.math.roundToInt
 
@@ -76,6 +81,7 @@ class MainActivity : AppCompatActivity() {
 
     // Last known HR for merging into FTMS samples
     private var lastHeartRateBpm = 0
+    private var lastFtmsSample: FitnessSample? = null
 
     // Whether permissions were requested from scan button (so we auto-start scan)
     private var pendingScanAfterPermission = false
@@ -184,6 +190,8 @@ class MainActivity : AppCompatActivity() {
         }
 
         binding.btnDebug.setOnClickListener { showDebugDialog() }
+        binding.cardSpeed.setOnClickListener { showSpeedControlDialog() }
+        binding.cardInclination.setOnClickListener { showInclineControlDialog() }
 
         updateConnectionStatus()
         resetMetrics()
@@ -397,6 +405,7 @@ class MainActivity : AppCompatActivity() {
                 val sample = fitnessDevice?.onDataReceived(data) ?: return
                 val mergedSample = if (sample.heartRateBpm == 0 && lastHeartRateBpm > 0)
                     sample.copy(heartRateBpm = lastHeartRateBpm) else sample
+                lastFtmsSample = mergedSample
                 // Detect machine running state for devices without machine-status updates.
                 // BH indoor bikes do not provide a meaningful speed field, so use cadence/power.
                 val isBhIndoorBike = fitnessDevice is BhFitnessIndoorBike
@@ -524,6 +533,7 @@ class MainActivity : AppCompatActivity() {
 
         if (!ftmsConnected) {
             binding.txtFtmsDeviceInfo.visibility = View.GONE
+            lastFtmsSample = null
         } else {
             updateFtmsDeviceInfoUI()
         }
@@ -772,6 +782,173 @@ class MainActivity : AppCompatActivity() {
         if (caps.supportsElapsedTime) features.add("Time")
         if (caps.supportsResistanceLevel) features.add("Resistance")
         return features.joinToString(", ").ifEmpty { "None detected" }
+    }
+
+    private fun showSpeedControlDialog() {
+        val cm = ftmsConnectionManager
+        val machine = fitnessDevice
+        if (cm?.isConnected != true || machine?.machineType != FtmsConstants.MachineType.TREADMILL) {
+            Toast.makeText(this, getString(R.string.control_not_available), Toast.LENGTH_SHORT).show()
+            return
+        }
+        val current = (lastFtmsSample?.speedKmh ?: 0.5).coerceIn(SPEED_MIN_KMH, SPEED_MAX_KMH)
+        showAdjustDialog(
+            title = getString(R.string.control_set_speed_title),
+            label = getString(R.string.control_speed_label),
+            min = SPEED_MIN_KMH,
+            max = SPEED_MAX_KMH,
+            step = 0.1,
+            initial = current,
+            unitFormatter = { value -> String.format("%.1f %s", value, getString(R.string.unit_kmh)) },
+            rangeText = getString(R.string.control_range_speed, SPEED_MIN_KMH, SPEED_MAX_KMH),
+            dangerPredicate = { value -> value >= SPEED_DANGER_KMH },
+            smallDecLabel = getString(R.string.control_dec_small),
+            largeDecLabel = getString(R.string.control_dec_large),
+            smallIncLabel = getString(R.string.control_inc_small),
+            largeIncLabel = getString(R.string.control_inc_large)
+        ) { selected ->
+            sendTargetSpeedKmh(selected)
+        }
+    }
+
+    private fun showInclineControlDialog() {
+        val cm = ftmsConnectionManager
+        val machine = fitnessDevice
+        if (cm?.isConnected != true || machine?.machineType != FtmsConstants.MachineType.TREADMILL) {
+            Toast.makeText(this, getString(R.string.control_not_available), Toast.LENGTH_SHORT).show()
+            return
+        }
+        val current = (lastFtmsSample?.inclinationPercent ?: 0.0).coerceIn(INCLINE_MIN_PERCENT, INCLINE_MAX_PERCENT)
+        showAdjustDialog(
+            title = getString(R.string.control_set_incline_title),
+            label = getString(R.string.control_incline_label),
+            min = INCLINE_MIN_PERCENT,
+            max = INCLINE_MAX_PERCENT,
+            step = 0.5,
+            initial = current,
+            unitFormatter = { value -> "${value.roundToInt()}${getString(R.string.unit_percent)}" },
+            rangeText = getString(R.string.control_range_incline, INCLINE_MIN_PERCENT.roundToInt(), INCLINE_MAX_PERCENT.roundToInt()),
+            dangerPredicate = { value -> value >= INCLINE_DANGER_PERCENT || value <= INCLINE_DECLINE_DANGER_PERCENT },
+            smallDecLabel = getString(R.string.control_dec_incline_small),
+            largeDecLabel = getString(R.string.control_dec_incline_large),
+            smallIncLabel = getString(R.string.control_inc_incline_small),
+            largeIncLabel = getString(R.string.control_inc_incline_large)
+        ) { selected ->
+            sendTargetInclinePercent(selected)
+        }
+    }
+
+    private fun showAdjustDialog(
+        title: String,
+        label: String,
+        min: Double,
+        max: Double,
+        step: Double,
+        initial: Double,
+        unitFormatter: (Double) -> String,
+        rangeText: String,
+        dangerPredicate: (Double) -> Boolean,
+        smallDecLabel: String,
+        largeDecLabel: String,
+        smallIncLabel: String,
+        largeIncLabel: String,
+        onApply: (Double) -> Boolean
+    ) {
+        val view = layoutInflater.inflate(R.layout.dialog_adjust_metric, null)
+        val labelView = view.findViewById<TextView>(R.id.txtDialogMetricLabel)
+        val valueView = view.findViewById<TextView>(R.id.txtDialogMetricValue)
+        val rangeView = view.findViewById<TextView>(R.id.txtDialogRange)
+        val dangerView = view.findViewById<TextView>(R.id.txtDialogDanger)
+        val seek = view.findViewById<SeekBar>(R.id.seekDialogMetric)
+        val decLarge = view.findViewById<Button>(R.id.btnDialogDecLarge)
+        val decSmall = view.findViewById<Button>(R.id.btnDialogDecSmall)
+        val incSmall = view.findViewById<Button>(R.id.btnDialogIncSmall)
+        val incLarge = view.findViewById<Button>(R.id.btnDialogIncLarge)
+
+        labelView.text = label
+        rangeView.text = rangeText
+        decLarge.text = largeDecLabel
+        decSmall.text = smallDecLabel
+        incSmall.text = smallIncLabel
+        incLarge.text = largeIncLabel
+
+        val maxProgress = ((max - min) / step).roundToInt().coerceAtLeast(1)
+        seek.max = maxProgress
+        var selected = ((initial - min) / step).roundToInt().coerceIn(0, maxProgress) * step + min
+
+        fun updateViews() {
+            val clamped = selected.coerceIn(min, max)
+            selected = clamped
+            seek.progress = ((clamped - min) / step).roundToInt().coerceIn(0, maxProgress)
+            valueView.text = unitFormatter(clamped)
+            val isDanger = dangerPredicate(clamped)
+            dangerView.text = getString(if (isDanger) R.string.control_danger_zone else R.string.control_safe_zone)
+            dangerView.setTextColor(
+                ContextCompat.getColor(
+                    this,
+                    if (isDanger) android.R.color.holo_red_dark else android.R.color.darker_gray
+                )
+            )
+        }
+
+        seek.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                selected = min + (progress * step)
+                updateViews()
+            }
+            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
+            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
+        })
+
+        decLarge.setOnClickListener { selected -= 1.0; updateViews() }
+        decSmall.setOnClickListener { selected -= step; updateViews() }
+        incSmall.setOnClickListener { selected += step; updateViews() }
+        incLarge.setOnClickListener { selected += 1.0; updateViews() }
+
+        updateViews()
+
+        AlertDialog.Builder(this)
+            .setTitle(title)
+            .setView(view)
+            .setPositiveButton(getString(R.string.control_apply)) { _, _ ->
+                if (!onApply(selected)) {
+                    Toast.makeText(this, getString(R.string.control_send_failed), Toast.LENGTH_SHORT).show()
+                }
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun sendTargetSpeedKmh(speedKmh: Double): Boolean {
+        val clamped = speedKmh.coerceIn(SPEED_MIN_KMH, SPEED_MAX_KMH)
+        val encoded = (clamped * 100.0).roundToInt()
+        val payload = ByteBuffer.allocate(3)
+            .order(ByteOrder.LITTLE_ENDIAN)
+            .put(FtmsConstants.CONTROL_SET_TARGET_SPEED)
+            .putShort(encoded.toShort())
+            .array()
+        return ftmsConnectionManager?.sendControlPoint(payload) == true
+    }
+
+    private fun sendTargetInclinePercent(inclinePercent: Double): Boolean {
+        val clamped = inclinePercent.coerceIn(INCLINE_MIN_PERCENT, INCLINE_MAX_PERCENT)
+        val encoded = (clamped * 10.0).roundToInt()
+        val payload = ByteBuffer.allocate(3)
+            .order(ByteOrder.LITTLE_ENDIAN)
+            .put(FtmsConstants.CONTROL_SET_TARGET_INCLINATION)
+            .putShort(encoded.toShort())
+            .array()
+        return ftmsConnectionManager?.sendControlPoint(payload) == true
+    }
+
+    companion object {
+        private const val SPEED_MIN_KMH = 0.5
+        private const val SPEED_MAX_KMH = 30.0
+        private const val INCLINE_MIN_PERCENT = -3.0
+        private const val INCLINE_MAX_PERCENT = 16.0
+        private const val SPEED_DANGER_KMH = 20.0
+        private const val INCLINE_DANGER_PERCENT = 12.0
+        private const val INCLINE_DECLINE_DANGER_PERCENT = -2.0
     }
 
     private fun exportDebugLogs() {

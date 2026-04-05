@@ -133,6 +133,13 @@ class BleConnectionManager(
         enqueueOp(GattOp.WriteChar(char, data))
     }
 
+    fun sendControlPoint(data: ByteArray): Boolean {
+        if (!isConnected) return false
+        val char = controlPointChar ?: return false
+        enqueueOp(GattOp.WriteChar(char, data))
+        return true
+    }
+
     private fun enqueueOp(op: GattOp) {
         gattQueue.add(op)
         advanceQueue()
