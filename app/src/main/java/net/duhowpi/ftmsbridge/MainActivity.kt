@@ -15,6 +15,8 @@ import android.util.Log
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
+import android.widget.Button
+import android.widget.SeekBar
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
@@ -22,6 +24,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.DividerItemDecoration
@@ -43,6 +46,8 @@ import net.duhowpi.ftmsbridge.ftms.FtmsConstants
 import net.duhowpi.ftmsbridge.ftms.FtmsDataParser
 import net.duhowpi.ftmsbridge.model.FitnessSample
 import net.duhowpi.ftmsbridge.model.ScannedDeviceInfo
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 import java.util.UUID
 import kotlin.math.roundToInt
 
@@ -64,6 +69,8 @@ class MainActivity : AppCompatActivity() {
 
     private var currentSessionId: Long? = null
     private var sessionStartTime: Long = 0
+    private var elapsedFallbackStartTime: Long = 0
+    private var lastFallbackElapsedSec: Int = 0
     private var isRecording = false
     private var isMachineRunning = false
 
@@ -76,6 +83,7 @@ class MainActivity : AppCompatActivity() {
 
     // Last known HR for merging into FTMS samples
     private var lastHeartRateBpm = 0
+    private var lastFtmsSample: FitnessSample? = null
 
     // Whether permissions were requested from scan button (so we auto-start scan)
     private var pendingScanAfterPermission = false
@@ -184,6 +192,8 @@ class MainActivity : AppCompatActivity() {
         }
 
         binding.btnDebug.setOnClickListener { showDebugDialog() }
+        binding.cardSpeed.setOnClickListener { showSpeedControlDialog() }
+        binding.cardInclination.setOnClickListener { showInclineControlDialog() }
 
         updateConnectionStatus()
         resetMetrics()
@@ -397,6 +407,7 @@ class MainActivity : AppCompatActivity() {
                 val sample = fitnessDevice?.onDataReceived(data) ?: return
                 val mergedSample = if (sample.heartRateBpm == 0 && lastHeartRateBpm > 0)
                     sample.copy(heartRateBpm = lastHeartRateBpm) else sample
+                lastFtmsSample = mergedSample
                 // Detect machine running state for devices without machine-status updates.
                 // BH indoor bikes do not provide a meaningful speed field, so use cadence/power.
                 val isBhIndoorBike = fitnessDevice is BhFitnessIndoorBike
@@ -409,6 +420,9 @@ class MainActivity : AppCompatActivity() {
                 if (nowRunning != isMachineRunning) {
                     isMachineRunning = nowRunning
                     runOnUiThread { updateMachineRunningState() }
+                }
+                if (shouldAnchorFallbackTimer(mergedSample, nowRunning)) {
+                    elapsedFallbackStartTime = mergedSample.timestampMs
                 }
                 runOnUiThread { updateDashboard(mergedSample) }
                 if (isRecording && currentSessionId != null) saveSample(mergedSample)
@@ -524,6 +538,7 @@ class MainActivity : AppCompatActivity() {
 
         if (!ftmsConnected) {
             binding.txtFtmsDeviceInfo.visibility = View.GONE
+            lastFtmsSample = null
         } else {
             updateFtmsDeviceInfoUI()
         }
@@ -562,8 +577,8 @@ class MainActivity : AppCompatActivity() {
         // BH Fitness devices either omit the elapsed-time field entirely or always send 0.
         val elapsedSec = if (sample.elapsedTimeSec > 0) {
             sample.elapsedTimeSec
-        } else if (isRecording && sessionStartTime > 0) {
-            ((System.currentTimeMillis() - sessionStartTime) / 1000).toInt()
+        } else if (isRecording && elapsedFallbackStartTime > 0) {
+            calculateFallbackElapsedSec(sample.timestampMs)
         } else 0
 
         binding.valueSpeed.text = String.format("%.1f", sample.speedKmh)
@@ -639,6 +654,8 @@ class MainActivity : AppCompatActivity() {
         val device = fitnessDevice ?: return
         isRecording = true
         sessionStartTime = System.currentTimeMillis()
+        elapsedFallbackStartTime = 0L
+        lastFallbackElapsedSec = 0
         binding.btnWorkoutStart.text = getString(R.string.stop_session)
         binding.recordingIndicator.visibility = View.VISIBLE
         binding.metricsSection.visibility = View.VISIBLE
@@ -658,6 +675,8 @@ class MainActivity : AppCompatActivity() {
 
     private fun stopRecording() {
         isRecording = false
+        elapsedFallbackStartTime = 0L
+        lastFallbackElapsedSec = 0
         binding.btnWorkoutStart.text = getString(R.string.start_session)
         binding.recordingIndicator.visibility = View.GONE
         val sessionId = currentSessionId ?: return
@@ -673,7 +692,9 @@ class MainActivity : AppCompatActivity() {
         val sessionId = currentSessionId ?: return
         // Use wall-clock elapsed time when device sends 0 (BH Fitness quirk).
         val elapsedSec = if (sample.elapsedTimeSec > 0) sample.elapsedTimeSec
-        else ((System.currentTimeMillis() - sessionStartTime) / 1000).toInt()
+        else if (elapsedFallbackStartTime > 0) {
+            calculateFallbackElapsedSec(sample.timestampMs)
+        } else 0
         lifecycleScope.launch(Dispatchers.IO) {
             db.sampleDao().insert(
                 WorkoutSample(
@@ -774,6 +795,197 @@ class MainActivity : AppCompatActivity() {
         return features.joinToString(", ").ifEmpty { "None detected" }
     }
 
+    private fun showSpeedControlDialog() {
+        val cm = ftmsConnectionManager
+        val machine = fitnessDevice
+        if (cm?.isConnected != true || machine?.machineType != FtmsConstants.MachineType.TREADMILL) {
+            Toast.makeText(this, getString(R.string.control_not_available), Toast.LENGTH_SHORT).show()
+            return
+        }
+        val current = (lastFtmsSample?.speedKmh ?: SPEED_MIN_KMH).coerceIn(SPEED_MIN_KMH, SPEED_MAX_KMH)
+        showAdjustDialog(
+            title = getString(R.string.control_set_speed_title),
+            label = getString(R.string.control_speed_label),
+            min = SPEED_MIN_KMH,
+            max = SPEED_MAX_KMH,
+            step = 0.1,
+            largeStep = 1.0,
+            initial = current,
+            unitFormatter = { value -> String.format("%.1f %s", value, getString(R.string.unit_kmh)) },
+            rangeText = getString(R.string.control_range_speed, SPEED_MIN_KMH, SPEED_MAX_KMH),
+            dangerPredicate = { value -> value >= SPEED_DANGER_KMH },
+            smallDecLabel = getString(R.string.control_dec_small),
+            largeDecLabel = getString(R.string.control_dec_large),
+            smallIncLabel = getString(R.string.control_inc_small),
+            largeIncLabel = getString(R.string.control_inc_large)
+        ) { selected ->
+            sendTargetSpeedKmh(selected)
+        }
+    }
+
+    private fun showInclineControlDialog() {
+        val cm = ftmsConnectionManager
+        val machine = fitnessDevice
+        if (cm?.isConnected != true || machine?.machineType != FtmsConstants.MachineType.TREADMILL) {
+            Toast.makeText(this, getString(R.string.control_not_available), Toast.LENGTH_SHORT).show()
+            return
+        }
+        val current = (lastFtmsSample?.inclinationPercent ?: INCLINE_DEFAULT_PERCENT).coerceIn(INCLINE_MIN_PERCENT, INCLINE_MAX_PERCENT)
+        showAdjustDialog(
+            title = getString(R.string.control_set_incline_title),
+            label = getString(R.string.control_incline_label),
+            min = INCLINE_MIN_PERCENT,
+            max = INCLINE_MAX_PERCENT,
+            step = 0.5,
+            largeStep = 1.0,
+            initial = current,
+            unitFormatter = { value -> "${value.roundToInt()}${getString(R.string.unit_percent)}" },
+            rangeText = getString(R.string.control_range_incline, INCLINE_MIN_PERCENT.roundToInt(), INCLINE_MAX_PERCENT.roundToInt()),
+            dangerPredicate = { value -> value >= INCLINE_DANGER_PERCENT || value <= INCLINE_DECLINE_DANGER_PERCENT },
+            smallDecLabel = getString(R.string.control_dec_incline_small),
+            largeDecLabel = getString(R.string.control_dec_incline_large),
+            smallIncLabel = getString(R.string.control_inc_incline_small),
+            largeIncLabel = getString(R.string.control_inc_incline_large)
+        ) { selected ->
+            sendTargetInclinePercent(selected)
+        }
+    }
+
+    private fun showAdjustDialog(
+        title: String,
+        label: String,
+        min: Double,
+        max: Double,
+        step: Double,
+        largeStep: Double,
+        initial: Double,
+        unitFormatter: (Double) -> String,
+        rangeText: String,
+        dangerPredicate: (Double) -> Boolean,
+        smallDecLabel: String,
+        largeDecLabel: String,
+        smallIncLabel: String,
+        largeIncLabel: String,
+        onApply: (Double) -> Boolean
+    ) {
+        val view = layoutInflater.inflate(R.layout.dialog_adjust_metric, null)
+        val labelView = view.findViewById<TextView>(R.id.txtDialogMetricLabel)
+        val valueView = view.findViewById<TextView>(R.id.txtDialogMetricValue)
+        val rangeView = view.findViewById<TextView>(R.id.txtDialogRange)
+        val dangerView = view.findViewById<TextView>(R.id.txtDialogDanger)
+        val seek = view.findViewById<SeekBar>(R.id.seekDialogMetric)
+        val decLarge = view.findViewById<Button>(R.id.btnDialogDecLarge)
+        val decSmall = view.findViewById<Button>(R.id.btnDialogDecSmall)
+        val incSmall = view.findViewById<Button>(R.id.btnDialogIncSmall)
+        val incLarge = view.findViewById<Button>(R.id.btnDialogIncLarge)
+
+        labelView.text = label
+        rangeView.text = rangeText
+        decLarge.text = largeDecLabel
+        decSmall.text = smallDecLabel
+        incSmall.text = smallIncLabel
+        incLarge.text = largeIncLabel
+        decLarge.contentDescription = getString(R.string.control_cd_decrease_by, largeDecLabel.removePrefix("-"))
+        decSmall.contentDescription = getString(R.string.control_cd_decrease_by, smallDecLabel.removePrefix("-"))
+        incSmall.contentDescription = getString(R.string.control_cd_increase_by, smallIncLabel.removePrefix("+"))
+        incLarge.contentDescription = getString(R.string.control_cd_increase_by, largeIncLabel.removePrefix("+"))
+
+        val maxProgress = ((max - min) / step).roundToInt().coerceAtLeast(1)
+        seek.max = maxProgress
+        var selected = initial.coerceIn(min, max)
+
+        fun updateViews() {
+            val clamped = selected.coerceIn(min, max)
+            selected = clamped
+            seek.progress = ((clamped - min) / step).roundToInt().coerceIn(0, maxProgress)
+            valueView.text = unitFormatter(clamped)
+            val isDanger = dangerPredicate(clamped)
+            dangerView.text = getString(if (isDanger) R.string.control_danger_zone else R.string.control_safe_zone)
+            dangerView.setTextColor(
+                ContextCompat.getColor(
+                    this,
+                    if (isDanger) android.R.color.holo_red_dark else android.R.color.darker_gray
+                )
+            )
+        }
+
+        seek.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                selected = min + (progress * step)
+                updateViews()
+            }
+            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
+            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
+        })
+
+        decLarge.setOnClickListener { selected -= largeStep; updateViews() }
+        decSmall.setOnClickListener { selected -= step; updateViews() }
+        incSmall.setOnClickListener { selected += step; updateViews() }
+        incLarge.setOnClickListener { selected += largeStep; updateViews() }
+
+        updateViews()
+
+        AlertDialog.Builder(this)
+            .setTitle(title)
+            .setView(view)
+            .setPositiveButton(getString(R.string.control_apply)) { _, _ ->
+                if (!onApply(selected)) {
+                    Toast.makeText(this, getString(R.string.control_send_failed), Toast.LENGTH_SHORT).show()
+                }
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun sendTargetSpeedKmh(speedKmh: Double): Boolean {
+        val clamped = speedKmh.coerceIn(SPEED_MIN_KMH, SPEED_MAX_KMH)
+        val encoded = (clamped * 100.0).roundToInt()
+        if (!isEncodableAsSint16(encoded)) {
+            Log.w(tag, "Encoded speed out of range: $encoded")
+            return false
+        }
+        val payload = ByteBuffer.allocate(3)
+            .order(ByteOrder.LITTLE_ENDIAN)
+            .put(FtmsConstants.CONTROL_SET_TARGET_SPEED)
+            .putShort(encoded.toShort())
+            .array()
+        return ftmsConnectionManager?.sendControlPoint(payload) == true
+    }
+
+    private fun sendTargetInclinePercent(inclinePercent: Double): Boolean {
+        val clamped = inclinePercent.coerceIn(INCLINE_MIN_PERCENT, INCLINE_MAX_PERCENT)
+        val encoded = (clamped * 10.0).roundToInt()
+        if (!isEncodableAsSint16(encoded)) {
+            Log.w(tag, "Encoded incline out of range: $encoded")
+            return false
+        }
+        val payload = ByteBuffer.allocate(3)
+            .order(ByteOrder.LITTLE_ENDIAN)
+            .put(FtmsConstants.CONTROL_SET_TARGET_INCLINATION)
+            .putShort(encoded.toShort())
+            .array()
+        return ftmsConnectionManager?.sendControlPoint(payload) == true
+    }
+
+    private fun calculateFallbackElapsedSec(sampleTimestampMs: Long): Int {
+        val deltaMs = sampleTimestampMs - elapsedFallbackStartTime
+        if (deltaMs < 0L) {
+            Log.w(tag, "Fallback elapsed delta was negative: sampleTs=$sampleTimestampMs, anchor=$elapsedFallbackStartTime")
+            return lastFallbackElapsedSec
+        }
+        val elapsed = (deltaMs / 1000).toInt()
+        lastFallbackElapsedSec = elapsed
+        return elapsed
+    }
+
+    private fun shouldAnchorFallbackTimer(sample: FitnessSample, nowRunning: Boolean): Boolean {
+        return isRecording && nowRunning && sample.elapsedTimeSec <= 0 && elapsedFallbackStartTime == 0L
+    }
+
+    private fun isEncodableAsSint16(value: Int): Boolean {
+        return value in Short.MIN_VALUE..Short.MAX_VALUE
+    }
+
     private fun exportDebugLogs() {
         val logFiles = BtDebugLogger.getAllLogFiles(this)
         if (logFiles.isEmpty()) {
@@ -867,6 +1079,15 @@ class MainActivity : AppCompatActivity() {
     }
 
     companion object {
+        private const val SPEED_MIN_KMH = 0.5
+        private const val SPEED_MAX_KMH = 30.0
+        private const val INCLINE_MIN_PERCENT = -3.0
+        private const val INCLINE_MAX_PERCENT = 16.0
+        private const val INCLINE_DEFAULT_PERCENT = 0.0
+        private const val SPEED_DANGER_KMH = 20.0
+        private const val INCLINE_DANGER_PERCENT = 12.0
+        private const val INCLINE_DECLINE_DANGER_PERCENT = -2.0
+
         /** Device name prefixes that identify non-fitness BLE peripherals. */
         private val IGNORED_DEVICE_PREFIXES = listOf(
             "Nuki_",        // Nuki smart locks

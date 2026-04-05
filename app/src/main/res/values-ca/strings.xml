@@ -70,11 +70,32 @@
     <string name="reconnect">Reconnectar</string>
     <string name="scanning_active">Escanejant…</string>
     <string name="device_disconnected">Dispositiu desconnectat</string>
+    <string name="control_not_available">El control no està disponible per a aquesta màquina</string>
+    <string name="control_send_failed">No s\'ha pogut enviar l\'ordre a la màquina</string>
+    <string name="control_set_speed_title">Ajustar velocitat</string>
+    <string name="control_set_incline_title">Ajustar inclinació</string>
+    <string name="control_speed_label">Velocitat objectiu</string>
+    <string name="control_incline_label">Inclinació objectiu</string>
+    <string name="control_range_speed">Rang: %1$.1f–%2$.1f km/h</string>
+    <string name="control_range_incline">Rang: %1$d–%2$d%%</string>
+    <string name="control_safe_zone">Zona segura</string>
+    <string name="control_danger_zone">Zona de perill: fes-ho amb precaució</string>
+    <string name="control_dec_large">-1.0</string>
+    <string name="control_dec_small">-0.1</string>
+    <string name="control_inc_small">+0.1</string>
+    <string name="control_inc_large">+1.0</string>
+    <string name="control_dec_incline_large">-1</string>
+    <string name="control_dec_incline_small">-0.5</string>
+    <string name="control_inc_incline_small">+0.5</string>
+    <string name="control_inc_incline_large">+1</string>
+    <string name="control_apply">Aplicar</string>
+    <string name="control_cd_increase_by">Augmentar en %1$s</string>
+    <string name="control_cd_decrease_by">Reduir en %1$s</string>
 
     <!-- Debug -->
     <string name="debug_info">Info Debug</string>
     <string name="export_logs">Exportar logs</string>
-    <string name="no_log_files">No s\' han trobat arxius de log</string>
+    <string name="no_log_files">No s\'han trobat arxius de log</string>
     <string name="debug_log_location">Logs: emmagatzematge extern app/debug/</string>
     <string name="capabilities">Capacitats</string>
     <string name="recent_bt_events">Esdeveniments BT recents</string>
