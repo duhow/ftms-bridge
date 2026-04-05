@@ -1,3 +1,4 @@
 Add user-facing changes for the next release here.
 - Fixed BH Fitness treadmill elapsed time stuck at 0:02 — timer now advances correctly
 - Inclination shown as whole number percent instead of one decimal place
+- Fixed negative (decline) incline showing as large positive value

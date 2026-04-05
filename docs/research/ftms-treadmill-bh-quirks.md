@@ -38,24 +38,41 @@ The same factor applies to the Ramp Angle Grade field (also INT16, units 0.1°).
 
 ### Implementation
 
-`BhFitnessTreadmill.onDataReceived()` divides both `inclinationPercent` and
-`rampAngleDeg` by `6.25` after the standard FTMS parse.
+`BhFitnessTreadmill.onDataReceived()` applies the correct formula based on whether the
+device is currently in decline mode (see below).
 
 The UI displays inclination as a **rounded integer** (e.g. `3` instead of `2.88`),
 matching the whole-number percent labels shown on the machine console.
 
-### Negative inclination
+### Negative inclination (T01 model)
 
-Because the field is signed INT16, negative raw values (downhill) work correctly
-once the standard Kotlin `buf.short.toInt()` signed-extend is applied.
-Example: raw `−62` → −62 × 0.1 / 6.25 = **−0.99 %** (rounds to −1 % in the UI).
+The T01 model **does not** use negative INT16 values for decline.  Instead it sends
+**positive** raw values in the range [300, 550] that are decoded with a different
+formula:
 
-> ⚠️ **Open question:** a capture on the T01 model (session log 2026-04-05) shows
-> raw inclination = **450** (→ 7.2 % after correction) at a time when the machine
-> console reportedly displayed **−1 %** decline.  It is not yet known whether the
-> T01 encodes decline as a positive offset (e.g. a different physical range), or
-> whether the console reading was misread.  Future captures with confirmed
-> console-vs-BLE comparison are needed before adding a decline correction.
+```
+actual_percent = (raw - 500) / 62.5
+```
+
+Confirmed observations (session 2026-04-05, CC:79:88:30:7D:57):
+
+| Console display | Raw INT16 | Standard formula (raw/62.5) | Decline formula ((raw-500)/62.5) |
+|-----------------|-----------|-----------------------------|----------------------------------|
+| −1 %            | 450       | +7.2 % (wrong)              | **−0.8 % → rounds to −1 %**     |
+| −2 %            | 380       | +6.1 % (wrong)              | **−1.9 % → rounds to −2 %**     |
+| −3 %            | 320       | +5.1 % (wrong)              | **−2.9 % → rounds to −3 %**     |
+
+Because the decline raw range [300, 550] overlaps with the positive incline range
+(e.g. raw=450 = +7.2% when inclining), the two modes are distinguished by the
+**transition behaviour**: when the user presses the decline button the raw value
+**jumps in a single step** from flat (raw=0) to ~450, whereas positive incline
+increases **gradually** in ~60-unit steps.
+
+`BhFitnessTreadmill` tracks this transition with a `declineMode` flag:
+- Enter decline mode: raw jumps from <50 to >270 in one packet.
+- Exit decline mode: raw drops back below 50 (machine returns to flat).
+- A `hasSeenFlat` guard prevents false triggers when connecting to a machine that is
+  already at high positive incline (the machine must pass through flat first).
 
 ---
 
