@@ -25,3 +25,7 @@ Add user-facing changes for the next release here.
 - History button moved to the toolbar; scan button is now a compact Bluetooth icon
 - App now auto-starts Bluetooth scan on launch when permissions are already granted
 - Laps table in workout detail now shows km distance column header and includes the final partial km lap
+- Scan button now uses a refresh icon with a visible background; icon spins while scanning is active
+- Heart rate is now shown as a red line in the workout chart when HR data is available
+- FIT export now records one lap per km (plus the final partial km) with per-lap speed, HR, cadence, and power averages
+- Reduced recording frequency: samples saved at most every 2 seconds; unchanged data saved at most every 5 seconds

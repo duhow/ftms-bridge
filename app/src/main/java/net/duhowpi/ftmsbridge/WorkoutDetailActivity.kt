@@ -126,24 +126,40 @@ class WorkoutDetailActivity : AppCompatActivity() {
             return
         }
 
+        val hrPoints = samples.map { it.heartRateBpm.toFloat() }
+        val hasHr = hrPoints.any { it > 0f }
+        val hrSeries = if (hasHr)
+            LineChartView.DataSeries(getString(R.string.metric_heart_rate), Color.RED, hrPoints, yMin = 40f, yMax = 180f)
+        else null
+
         if (isTreadmill) {
-            binding.txtChartLabel.text = "${getString(R.string.metric_speed)} / ${getString(R.string.metric_inclination)}"
+            val seriesLabel = if (hasHr)
+                "${getString(R.string.metric_speed)} / ${getString(R.string.metric_inclination)} / ${getString(R.string.metric_heart_rate)}"
+            else
+                "${getString(R.string.metric_speed)} / ${getString(R.string.metric_inclination)}"
+            binding.txtChartLabel.text = seriesLabel
             val speedPoints = samples.map { it.speedKmh.toFloat() }
             val inclinePoints = samples.map { it.inclinationPercent.toFloat() }
-            binding.lineChart.setData(
+            val allSeries = mutableListOf(
                 LineChartView.DataSeries(getString(R.string.metric_speed), Color.parseColor("#2196F3"), speedPoints),
-                LineChartView.DataSeries(getString(R.string.metric_inclination), Color.parseColor("#FF9800"), inclinePoints),
-                durationSec = durationSec
+                LineChartView.DataSeries(getString(R.string.metric_inclination), Color.parseColor("#FF9800"), inclinePoints)
             )
+            if (hrSeries != null) allSeries.add(hrSeries)
+            binding.lineChart.setData(*allSeries.toTypedArray(), durationSec = durationSec)
         } else {
-            binding.txtChartLabel.text = "${getString(R.string.metric_strides)} / ${getString(R.string.metric_resistance)}"
+            val seriesLabel = if (hasHr)
+                "${getString(R.string.metric_strides)} / ${getString(R.string.metric_resistance)} / ${getString(R.string.metric_heart_rate)}"
+            else
+                "${getString(R.string.metric_strides)} / ${getString(R.string.metric_resistance)}"
+            binding.txtChartLabel.text = seriesLabel
             val stridesPoints = samples.map { it.cadenceRpm.toFloat() }
             val resistancePoints = samples.map { it.resistanceLevel.toFloat() }
-            binding.lineChart.setData(
+            val allSeries = mutableListOf(
                 LineChartView.DataSeries(getString(R.string.metric_strides), Color.parseColor("#4CAF50"), stridesPoints),
-                LineChartView.DataSeries(getString(R.string.metric_resistance), Color.parseColor("#9C27B0"), resistancePoints),
-                durationSec = durationSec
+                LineChartView.DataSeries(getString(R.string.metric_resistance), Color.parseColor("#9C27B0"), resistancePoints)
             )
+            if (hrSeries != null) allSeries.add(hrSeries)
+            binding.lineChart.setData(*allSeries.toTypedArray(), durationSec = durationSec)
         }
     }
 

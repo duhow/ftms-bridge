@@ -110,7 +110,7 @@
             <!-- Scan icon button -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnScan"
-                style="@style/Widget.Material3.Button.IconButton"
+                style="@style/Widget.Material3.Button.TonalButton.Icon"
                 android:layout_width="48dp"
                 android:layout_height="48dp"
                 android:layout_gravity="center_vertical"
@@ -119,7 +119,7 @@
                 android:minHeight="0dp"
                 android:padding="0dp"
                 android:text=""
-                app:icon="@drawable/ic_bluetooth"
+                app:icon="@drawable/ic_refresh"
                 app:iconSize="24dp"
                 app:iconGravity="textStart" />
         </LinearLayout>

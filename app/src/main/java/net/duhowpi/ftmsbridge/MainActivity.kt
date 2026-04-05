@@ -1,6 +1,7 @@
 package net.duhowpi.ftmsbridge
 
 import android.Manifest
+import android.animation.ObjectAnimator
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothClass
 import android.bluetooth.BluetoothDevice
@@ -89,6 +90,13 @@ class MainActivity : AppCompatActivity() {
     // Whether permissions were requested from scan button (so we auto-start scan)
     private var pendingScanAfterPermission = false
 
+    // Spin animation for the scan button
+    private var scanButtonAnimator: ObjectAnimator? = null
+
+    // Recording throttle: minimum 2s between saves; identical data saved at most every 5s
+    private var lastSavedSampleMs: Long = 0
+    private var lastSavedSampleData: FitnessSample? = null
+
     // Throttled scan list updates (1 second)
     private val updateHandler = Handler(Looper.getMainLooper())
     private val scanListUpdateRunnable = object : Runnable {
@@ -114,6 +122,7 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         } else {
+            pendingScanAfterPermission = false
             Toast.makeText(this, getString(R.string.permissions_required), Toast.LENGTH_LONG).show()
         }
     }
@@ -257,6 +266,13 @@ class MainActivity : AppCompatActivity() {
         binding.txtScanStatus.visibility = View.VISIBLE
         binding.txtScanStatus.text = getString(R.string.scanning_active)
 
+        // Spin the scan button icon while scanning
+        scanButtonAnimator = ObjectAnimator.ofFloat(binding.btnScan, "rotation", 0f, 360f).apply {
+            duration = 1200
+            repeatCount = ObjectAnimator.INFINITE
+            start()
+        }
+
         bleScanner.startScan(object : BleScanner.ScanListener {
             override fun onDeviceFound(result: ScanResult) {
                 if (ActivityCompat.checkSelfPermission(
@@ -325,6 +341,10 @@ class MainActivity : AppCompatActivity() {
         addBondedDevicesToList()
         updateScanListUI() // final refresh
         binding.txtScanStatus.text = getString(R.string.devices_found, scanResultsMap.size)
+        // Stop spinning and reset rotation
+        scanButtonAnimator?.cancel()
+        scanButtonAnimator = null
+        binding.btnScan.rotation = 0f
     }
 
     private fun updateScanListUI() {
@@ -752,6 +772,8 @@ class MainActivity : AppCompatActivity() {
         sessionStartTime = System.currentTimeMillis()
         elapsedFallbackStartTime = 0L
         lastFallbackElapsedSec = 0
+        lastSavedSampleMs = 0
+        lastSavedSampleData = null
         binding.btnWorkoutStart.text = getString(R.string.stop_session)
         binding.recordingIndicator.visibility = View.VISIBLE
         binding.metricsSection.visibility = View.VISIBLE
@@ -789,6 +811,27 @@ class MainActivity : AppCompatActivity() {
 
     private fun saveSample(sample: FitnessSample) {
         val sessionId = currentSessionId ?: return
+        val nowMs = System.currentTimeMillis()
+        val msSinceLast = nowMs - lastSavedSampleMs
+
+        // Minimum recording interval: 2 seconds
+        if (msSinceLast < 2_000) return
+
+        // If all measured values are identical to the last saved sample, only save every 5 seconds
+        val prev = lastSavedSampleData
+        if (prev != null && msSinceLast < 5_000 &&
+            prev.speedKmh           == sample.speedKmh &&
+            prev.cadenceRpm         == sample.cadenceRpm &&
+            prev.instantaneousPowerW == sample.instantaneousPowerW &&
+            prev.heartRateBpm       == sample.heartRateBpm &&
+            prev.totalDistanceM     == sample.totalDistanceM &&
+            prev.resistanceLevel    == sample.resistanceLevel &&
+            prev.inclinationPercent == sample.inclinationPercent
+        ) return
+
+        lastSavedSampleMs = nowMs
+        lastSavedSampleData = sample
+
         // Use wall-clock elapsed time when device sends 0 (BH Fitness quirk).
         val elapsedSec = if (sample.elapsedTimeSec > 0) sample.elapsedTimeSec
         else if (elapsedFallbackStartTime > 0) {

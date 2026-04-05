@@ -16,7 +16,13 @@ class LineChartView @JvmOverloads constructor(
     context: Context, attrs: AttributeSet? = null
 ) : View(context, attrs) {
 
-    data class DataSeries(val label: String, val color: Int, val points: List<Float>)
+    data class DataSeries(
+        val label: String,
+        val color: Int,
+        val points: List<Float>,
+        val yMin: Float? = null,
+        val yMax: Float? = null
+    )
 
     private val series = mutableListOf<DataSeries>()
 
@@ -144,8 +150,12 @@ class LineChartView @JvmOverloads constructor(
         // --- Series lines ---
         series.forEachIndexed { idx, s ->
             if (s.points.isEmpty()) return@forEachIndexed
-            val min = s.points.min()
-            val max = s.points.max()
+            val dataMin = s.points.min()
+            val dataMax = s.points.max()
+            // Apply soft range hints: the visible axis always spans at least [yMin, yMax],
+            // but expands further if actual data falls outside that range.
+            val min = if (s.yMin != null) minOf(s.yMin, dataMin) else dataMin
+            val max = if (s.yMax != null) maxOf(s.yMax, dataMax) else dataMax
             val range = (max - min).takeIf { it > 0f } ?: 1f
             val lastIdx = (s.points.size - 1).coerceAtLeast(1)
 
@@ -154,13 +164,13 @@ class LineChartView @JvmOverloads constructor(
             s.points.forEachIndexed { i, v ->
                 val x = chartLeft + (i.toFloat() / lastIdx) * chartW
                 // When all values are identical (range == 0 fallback), center the line vertically
-                val y = if (max == min) chartTop + chartH / 2f
+                val y = if (dataMax == dataMin) chartTop + chartH / 2f
                         else chartBottom - ((v - min) / range) * chartH
                 if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
             }
             canvas.drawPath(path, linePaint)
 
-            // Y-axis labels (left for first series, right for second)
+            // Y-axis labels (left for first series, right for second+)
             labelPaint.color = s.color
             if (idx == 0) {
                 labelPaint.textAlign = Paint.Align.RIGHT
@@ -196,14 +206,16 @@ class LineChartView @JvmOverloads constructor(
         // Dots on each series
         series.forEach { s ->
             if (tipIdx < s.points.size) {
-                val min = s.points.min()
-                val max = s.points.max()
+                val dataMin = s.points.min()
+                val dataMax = s.points.max()
+                val min = if (s.yMin != null) minOf(s.yMin, dataMin) else dataMin
+                val max = if (s.yMax != null) maxOf(s.yMax, dataMax) else dataMax
                 val range = (max - min).takeIf { it > 0f } ?: 1f
                 val v = s.points[tipIdx]
                 val lastIdx = (s.points.size - 1).coerceAtLeast(1)
                 val dotX = chartLeft + (tipIdx.toFloat() / lastIdx) * chartW
                 // When all values are identical, center the dot vertically
-                val dotY = if (max == min) chartTop + chartH / 2f
+                val dotY = if (dataMax == dataMin) chartTop + chartH / 2f
                            else chartBottom - ((v - min) / range) * chartH
                 dotPaint.color = s.color
                 canvas.drawCircle(dotX, dotY, 8f, dotPaint)
