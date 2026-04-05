@@ -1,31 +1,159 @@
 package net.duhowpi.ftmsbridge.device
 
+import android.util.Log
 import net.duhowpi.ftmsbridge.ftms.FtmsConstants
 import net.duhowpi.ftmsbridge.model.FitnessSample
 
 class BhFitnessIndoorBike(deviceName: String) :
     FtmsDevice(deviceName, FtmsConstants.MachineType.INDOOR_BIKE) {
 
+    companion object {
+        private const val TAG = "BhFitnessIndoorBike"
+        private const val MAX_VALID_SPEED_KMH = 80.0
+        private const val MAX_VALID_CADENCE_RPM = 220.0
+        private const val MAX_SPEED_STEP_PER_SEC = 20.0
+        private const val MAX_CADENCE_STEP_PER_SEC = 80.0
+        // km/h → m/s conversion factor.
+        private const val METERS_PER_KMH_PER_SEC = 1.0 / 3.6
+        private const val JOULES_PER_KCAL = 4184.0
+        private const val STRIDES_ENCODING_FACTOR = 100.0
+        // Empirical movement thresholds from B01_17384 packet captures.
+        const val MIN_MOVING_POWER_W = 5
+        const val MIN_MOVING_CADENCE_RPM = 10.0
+        private const val MIN_LEVEL_TORQUE_NM = 2.0
+        private const val LEVEL_TORQUE_STEP_NM = 2.0
+        private const val MAX_LEVEL = 11
+        private const val TWO_PI_RADIANS = kotlin.math.PI * 2.0
+    }
+
+    private fun stridesFromEnergy(energyField: Int): Double {
+        return if (energyField > 0) energyField / STRIDES_ENCODING_FACTOR else 0.0
+    }
+
+    private var lastSampleTimestampMs: Long = 0L
+    private var cumulativeDistanceM: Double = 0.0
+    private var cumulativeEnergyKcal: Double = 0.0
+    private var hasAcceptedBaseline: Boolean = false
+    private var lastAcceptedSpeedKmh: Double = 0.0
+    private var lastAcceptedCadenceRpm: Double = 0.0
+    private var lastDerivedLevel: Int = 0
+
+    private fun deriveResistanceLevel(cadenceRpm: Double, powerW: Int): Int {
+        if (powerW < MIN_MOVING_POWER_W || cadenceRpm < MIN_MOVING_CADENCE_RPM) {
+            lastDerivedLevel = 0
+            return 0
+        }
+        val angularVelocityRadPerSec = cadenceRpm * TWO_PI_RADIANS / 60.0
+        if (angularVelocityRadPerSec <= 0.0) {
+            lastDerivedLevel = 0
+            return 0
+        }
+        val torqueNm = powerW.toDouble() / angularVelocityRadPerSec
+        // Empirical mapping for BH indoor-bike console levels:
+        // level ~= round((torqueNm - 2.0) / 2.0) + 1, clamped to 1..11 while moving.
+        val level = kotlin.math.round((torqueNm - MIN_LEVEL_TORQUE_NM) / LEVEL_TORQUE_STEP_NM).toInt() + 1
+        val clampedLevel = level.coerceIn(1, MAX_LEVEL)
+        lastDerivedLevel = clampedLevel
+        return clampedLevel
+    }
+
     // BH Fitness indoor bikes repurpose several standard FTMS fields:
     //
-    //  Speed field      — contains the same raw stride counter as Total Energy.
-    //                     NOT a real km/h speed; must be zeroed.
+    //  Speed field      — mirrors the same raw value as Total Energy.
+    //                     Used as a synthetic speed signal: raw / 100 = km/h.
     //  Total Energy     — stride counter encoded as strides/min × 100 (same raw
-    //                     value as speed field).  Convert and clear.
+    //                     value as speed field).  Convert to strides/min.
     //  Energy/hr        — always 0x5400 (21504 kcal/hr); garbage constant. Zero.
     //  Energy/min       — always 0; not meaningful.
     //  Metabolic Equiv  — always 0x7B (12.3 MET); constant, not a real reading. Zero.
-    //  Distance         — always 0; device does not report it. Left as-is.
+    //  Distance         — always 0; derive cumulatively from synthetic speed + time.
+    //  Total Energy     — derive cumulatively from power + time.
+    //  Resistance Level — FTMS resistance flag is absent in observed packets; derive
+    //                     bike level (1..11) from torque estimated via power+cadence.
     //
     //  Reliable fields: cadenceRpm, instantaneousPowerW, heartRateBpm.
+    //  Some sessions show occasional one-packet speed/cadence spikes. To avoid
+    //  false dashboard/export jumps we clamp physically impossible values and
+    //  reject abrupt single-step deltas relative to packet interval.
+    @Synchronized
     override fun onDataReceived(data: ByteArray): FitnessSample? {
         val sample = super.onDataReceived(data) ?: return null
-        val strides = if (sample.totalEnergyKcal > 0) sample.totalEnergyKcal / 100.0 else 0.0
+        val nowMs = sample.timestampMs
+        val dtSec = if (lastSampleTimestampMs > 0L) {
+            val rawDeltaMs = nowMs - lastSampleTimestampMs
+            if (rawDeltaMs < 0L) {
+                val absDeltaSec = kotlin.math.abs(rawDeltaMs) / 1000.0
+                Log.w(
+                    TAG,
+                    "Negative sample delta ${rawDeltaMs}ms (~${"%.3f".format(absDeltaSec)}s); treating as 0 (clock adjustment?)"
+                )
+            }
+            rawDeltaMs.coerceAtLeast(0L) / 1000.0
+        } else {
+            0.0
+        }
+        lastSampleTimestampMs = nowMs
+
+        val rawSpeedKmh = sample.speedKmh
+        val rawCadenceRpm = sample.cadenceRpm
+        if (!hasAcceptedBaseline) {
+            val baselineSpeed = rawSpeedKmh.coerceIn(0.0, MAX_VALID_SPEED_KMH)
+            val baselineCadence = rawCadenceRpm.coerceIn(0.0, MAX_VALID_CADENCE_RPM)
+            hasAcceptedBaseline = true
+            lastAcceptedSpeedKmh = baselineSpeed
+            lastAcceptedCadenceRpm = baselineCadence
+            val baselineStrides = stridesFromEnergy(sample.totalEnergyKcal)
+            val baselineLevel = deriveResistanceLevel(baselineCadence, sample.instantaneousPowerW)
+            return sample.copy(
+                speedKmh = 0.0,
+                averageSpeedKmh = 0.0,
+                cadenceRpm = baselineCadence,
+                totalDistanceM = 0,
+                stridesPerMin = baselineStrides,
+                totalEnergyKcal = 0,
+                resistanceLevel = baselineLevel,
+                energyPerHourKcal = 0,
+                energyPerMinuteKcal = 0,
+                metabolicEquivalent = 0.0
+            )
+        }
+
+        val speedStepLimit = MAX_SPEED_STEP_PER_SEC * dtSec
+        val speedDelta = kotlin.math.abs(rawSpeedKmh - lastAcceptedSpeedKmh)
+        val syntheticSpeedKmh = when {
+            rawSpeedKmh < 0.0 || rawSpeedKmh > MAX_VALID_SPEED_KMH -> lastAcceptedSpeedKmh
+            dtSec > 0.0 && speedDelta > speedStepLimit -> lastAcceptedSpeedKmh
+            else -> rawSpeedKmh
+        }
+        lastAcceptedSpeedKmh = syntheticSpeedKmh
+
+        val cadenceStepLimit = MAX_CADENCE_STEP_PER_SEC * dtSec
+        val cadenceDelta = kotlin.math.abs(rawCadenceRpm - lastAcceptedCadenceRpm)
+        val filteredCadenceRpm = when {
+            rawCadenceRpm < 0.0 || rawCadenceRpm > MAX_VALID_CADENCE_RPM -> lastAcceptedCadenceRpm
+            dtSec > 0.0 && cadenceDelta > cadenceStepLimit -> lastAcceptedCadenceRpm
+            else -> rawCadenceRpm
+        }
+        lastAcceptedCadenceRpm = filteredCadenceRpm
+
+        val strides = stridesFromEnergy(sample.totalEnergyKcal)
+        val derivedLevel = deriveResistanceLevel(filteredCadenceRpm, sample.instantaneousPowerW)
+
+        if (dtSec > 0.0) {
+            cumulativeDistanceM += syntheticSpeedKmh * dtSec * METERS_PER_KMH_PER_SEC
+            val nonNegativePowerW = sample.instantaneousPowerW.coerceAtLeast(0).toDouble()
+            val energyDeltaKcal = (nonNegativePowerW * dtSec) / JOULES_PER_KCAL
+            cumulativeEnergyKcal += energyDeltaKcal
+        }
+
         return sample.copy(
             speedKmh = 0.0,
             averageSpeedKmh = 0.0,
+            cadenceRpm = filteredCadenceRpm,
+            totalDistanceM = kotlin.math.round(cumulativeDistanceM).toInt(),
             stridesPerMin = strides,
-            totalEnergyKcal = 0,
+            totalEnergyKcal = kotlin.math.round(cumulativeEnergyKcal).toInt(),
+            resistanceLevel = derivedLevel,
             energyPerHourKcal = 0,
             energyPerMinuteKcal = 0,
             metabolicEquivalent = 0.0

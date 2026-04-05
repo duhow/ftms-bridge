@@ -94,14 +94,23 @@ and `total_kcal=0`.  It does **not** repeat during the workout.
 Consequence: elapsed time, distance, and energy appear to freeze at their initial
 values for the entire session.
 
-**Elapsed time fix:** `BhFitnessTreadmill` records the system clock at the moment C112
-arrives (`iConceptLastUpdateMs`) and adds the wall-clock delta to `iConceptBaseElapsedSec`
-on every subsequent `onDataReceived()` call.  This keeps the timer advancing correctly
-even when no further C112 packets are received.
+**Elapsed time fix (start-signal anchored):** `BhFitnessTreadmill` does **not** start the
+derived timer at BLE connect. It waits for a workout-start anchor:
+- C112 elapsed snapshot (typically `0:02`) when present, or
+- first non-zero FTMS elapsed value.
 
-**Distance and energy:** These remain at the device-reported value (0 at session start)
-because there is no way to estimate them reliably from the available data without
-the device sending updated C112 packets.
+Only after this anchor is seen does elapsed advance from packet timestamp deltas
+(`sample.timestampMs`) while FTMS elapsed remains zero. This prevents the timer from
+starting several seconds early due to connection/setup delay.
+
+**Distance and energy fallback:** Because C112 does not continue streaming, the app now
+derives:
+- `distance_m += speed_kmh * dt * (1/3.6)`
+- `energy_kcal` from ACSM treadmill metabolic equations (speed + grade), using a default
+  body mass assumption for a practical estimate.
+
+When an initial C112 snapshot is available, derived counters start from at least those
+values and continue increasing from live FTMS speed/incline.
 
 ### Observed 0x2ACD packet (steady state at 6.10 km/h)
 
@@ -166,9 +175,14 @@ the displayed "speed" and "strides/min" to be identical — the reported bug.
 ### Implementation
 
 `BhFitnessIndoorBike.onDataReceived()` now:
-- Zeroes `speedKmh` and `averageSpeedKmh` (not real speed)
+- Uses repurposed speed bytes only for internal distance integration; exported/displayed
+  indoor-bike `speedKmh` is forced to 0 to avoid duplicating stride value
 - Derives `stridesPerMin = totalEnergyKcal / 100.0`
-- Zeroes `totalEnergyKcal`, `energyPerHourKcal`, `energyPerMinuteKcal` (garbage/repurposed)
+- Derives cumulative `totalDistanceM` from synthetic speed over time
+- Derives cumulative `totalEnergyKcal` from power over time
+- Derives indoor-bike `resistanceLevel` (console level 1..11) from power+cadence torque
+- Filters one-packet cadence/speed spikes using absolute and time-scaled delta limits
+- Zeroes `energyPerHourKcal`, `energyPerMinuteKcal` (garbage/repurposed)
 - Zeroes `metabolicEquivalent` (constant 0x7B, not a real reading)
 
 See [bh-fitness-indoor-bike.md](bh-fitness-indoor-bike.md) for the full packet decode.

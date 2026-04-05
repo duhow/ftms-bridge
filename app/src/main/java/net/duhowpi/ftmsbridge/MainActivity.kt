@@ -35,6 +35,7 @@ import net.duhowpi.ftmsbridge.data.AppDatabase
 import net.duhowpi.ftmsbridge.data.WorkoutSample
 import net.duhowpi.ftmsbridge.data.WorkoutSession
 import net.duhowpi.ftmsbridge.databinding.ActivityMainBinding
+import net.duhowpi.ftmsbridge.device.BhFitnessIndoorBike
 import net.duhowpi.ftmsbridge.device.FtmsDevice
 import net.duhowpi.ftmsbridge.device.HeartRateSensor
 import net.duhowpi.ftmsbridge.ftms.FtmsCapabilities
@@ -396,9 +397,15 @@ class MainActivity : AppCompatActivity() {
                 val sample = fitnessDevice?.onDataReceived(data) ?: return
                 val mergedSample = if (sample.heartRateBpm == 0 && lastHeartRateBpm > 0)
                     sample.copy(heartRateBpm = lastHeartRateBpm) else sample
-                // Detect machine running state from speed as a fallback for devices that
-                // do not expose a machine-status characteristic (speed > 0 → machine running).
-                val nowRunning = mergedSample.speedKmh > 0.1
+                // Detect machine running state for devices without machine-status updates.
+                // BH indoor bikes do not provide a meaningful speed field, so use cadence/power.
+                val isBhIndoorBike = fitnessDevice is BhFitnessIndoorBike
+                val nowRunning = if (isBhIndoorBike) {
+                    mergedSample.cadenceRpm > BhFitnessIndoorBike.MIN_MOVING_CADENCE_RPM ||
+                            mergedSample.instantaneousPowerW > BhFitnessIndoorBike.MIN_MOVING_POWER_W
+                } else {
+                    mergedSample.speedKmh > 0.1
+                }
                 if (nowRunning != isMachineRunning) {
                     isMachineRunning = nowRunning
                     runOnUiThread { updateMachineRunningState() }
@@ -590,7 +597,8 @@ class MainActivity : AppCompatActivity() {
      * depending on the data received (see [updateDashboard]).
      *
      * Treadmill      → Speed, HR, Distance, Energy, Time, Inclination
-     * Indoor Bike    → Speed, HR, Cadence, Power, Distance, Energy, Time, Resistance
+     * Indoor Bike    → HR, Cadence, Power, Distance, Energy, Time, Resistance
+     *                  (BH indoor bike variant hides Speed because that field is repurposed)
      * Cross Trainer  → Speed, HR, Cadence, Power, Distance, Energy, Time, Resistance
      * Stair Climber  → HR, Cadence, Distance, Energy, Time
      * Unknown / disconnected → only the universal tiles (no device-specific tiles)
@@ -599,6 +607,9 @@ class MainActivity : AppCompatActivity() {
         val isTreadmill = machineType == FtmsConstants.MachineType.TREADMILL
         val isBike = machineType == FtmsConstants.MachineType.INDOOR_BIKE ||
                 machineType == FtmsConstants.MachineType.CROSS_TRAINER
+        val isBhIndoorBike = fitnessDevice is BhFitnessIndoorBike
+        val showSpeed = !isBhIndoorBike
+        binding.cardSpeed.visibility = if (showSpeed) View.VISIBLE else View.GONE
         binding.rowCadencePower.visibility = if (isBike) View.VISIBLE else View.GONE
         binding.cardInclination.visibility = if (isTreadmill) View.VISIBLE else View.GONE
         binding.cardResistance.visibility = if (isBike) View.VISIBLE else View.GONE
@@ -890,4 +901,3 @@ class MainActivity : AppCompatActivity() {
         )
     }
 }
-

@@ -2,3 +2,10 @@ Add user-facing changes for the next release here.
 - Fixed BH Fitness treadmill elapsed time stuck at 0:02 — timer now advances correctly
 - Inclination shown as whole number percent instead of one decimal place
 - Fixed negative (decline) incline showing as large positive value
+- Added BH treadmill fallback distance and energy estimation from speed/incline when counters are missing
+- Fixed BH treadmill elapsed time fallback so timer keeps increasing when device sends zero
+- Fixed BH treadmill timer offset by anchoring elapsed start to workout start signal (e.g. 0:02), not connection
+- Fixed BH indoor bike metrics by deriving distance and energy from live bike packets
+- Reduced occasional BH indoor bike cadence spikes by filtering outlier packets
+- Added BH indoor bike resistance level detection (level 1..11) from live packet data
+- Hidden BH indoor bike speed display because it duplicates stride-equivalent data

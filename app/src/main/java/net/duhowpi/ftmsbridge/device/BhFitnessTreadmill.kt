@@ -8,19 +8,24 @@ import net.duhowpi.ftmsbridge.model.FitnessSample
 class BhFitnessTreadmill(deviceName: String) :
     FtmsDevice(deviceName, FtmsConstants.MachineType.TREADMILL) {
 
+    companion object {
+        private const val METERS_PER_KMH_PER_SEC = 1.0 / 3.6
+        private const val DEFAULT_BODY_WEIGHT_KG = 75.0
+        private const val WALK_RUN_THRESHOLD_KMH = 8.0
+    }
+
     private val tag = "BhFitnessTreadmill"
 
     // Last values received from the iConcept 0xC112 workout-counter notification.
-    // These replace the zeros the device sends in the standard 0x2ACD FTMS packet.
-    //
-    // C112 fires only once at session start with the initial elapsed/distance/energy
-    // snapshot (typically elapsed=2, distance=0, calories=0). It does NOT update during
-    // the workout. Elapsed time is therefore advanced via wall-clock delta since the
-    // last C112 receipt; distance and energy remain as reported by the device.
-    @Volatile private var iConceptBaseElapsedSec: Int = 0
-    @Volatile private var iConceptLastUpdateMs: Long = 0L
+    // C112 fires only once at session start on this device model, so elapsed time,
+    // distance, and energy continue from derived packet-delta estimates.
     @Volatile private var iConceptDistanceM: Int = 0
     @Volatile private var iConceptCalories: Int = 0
+    @Volatile private var lastSampleTimestampMs: Long = 0L
+    @Volatile private var hasWorkoutStartAnchor: Boolean = false
+    @Volatile private var derivedElapsedSec: Double = 0.0
+    @Volatile private var derivedDistanceM: Double = 0.0
+    @Volatile private var derivedEnergyKcal: Double = 0.0
 
     // BH Fitness treadmills encode inclination with a non-standard scale relative to the
     // FTMS spec. The device sends 0–1000 for a physical range of 0%–16%, so the raw
@@ -42,15 +47,43 @@ class BhFitnessTreadmill(deviceName: String) :
     @Volatile private var hasSeenFlat: Boolean = false
     @Volatile private var declineMode: Boolean = false
 
+    private fun estimateEnergyDeltaKcal(speedKmh: Double, inclinePercent: Double, dtSec: Double): Double {
+        if (dtSec <= 0.0 || speedKmh <= 0.0) return 0.0
+        val speedMPerMin = speedKmh * 1000.0 / 60.0
+        val grade = inclinePercent / 100.0
+        val vo2MlKgMin = if (speedKmh < WALK_RUN_THRESHOLD_KMH) {
+            // ACSM walking equation
+            (0.1 * speedMPerMin) + (1.8 * speedMPerMin * grade) + 3.5
+        } else {
+            // ACSM running equation
+            (0.2 * speedMPerMin) + (0.9 * speedMPerMin * grade) + 3.5
+        }
+        val kcalPerMin = (vo2MlKgMin * DEFAULT_BODY_WEIGHT_KG) / 200.0
+        return kcalPerMin * (dtSec / 60.0)
+    }
+
     // Elapsed time, distance, and calories are always 0 in the FTMS packet; the real
     // values come from the iConcept 0xC112 notification and are merged here.
+    @Synchronized
     override fun onDataReceived(data: ByteArray): FitnessSample? {
         val sample = super.onDataReceived(data) ?: return null
-        val elapsedSec = if (iConceptLastUpdateMs > 0) {
-            iConceptBaseElapsedSec +
-                ((System.currentTimeMillis() - iConceptLastUpdateMs) / 1000).toInt()
+        val nowMs = sample.timestampMs
+        val dtSec = if (lastSampleTimestampMs > 0L) {
+            ((nowMs - lastSampleTimestampMs).coerceAtLeast(0L)) / 1000.0
         } else {
-            iConceptBaseElapsedSec
+            0.0
+        }
+        lastSampleTimestampMs = nowMs
+
+        if (dtSec > 0.0 && hasWorkoutStartAnchor) {
+            derivedElapsedSec += dtSec
+        }
+        val elapsedSec = if (sample.elapsedTimeSec > 0) {
+            derivedElapsedSec = kotlin.math.max(derivedElapsedSec, sample.elapsedTimeSec.toDouble())
+            hasWorkoutStartAnchor = true
+            sample.elapsedTimeSec
+        } else {
+            kotlin.math.round(derivedElapsedSec).toInt()
         }
 
         // sample.inclinationPercent = rawDevice * 0.1 (FTMS parse, before BH correction)
@@ -77,23 +110,38 @@ class BhFitnessTreadmill(deviceName: String) :
         } else {
             rawInclination / 62.5
         }
-        Log.d(tag, "treadmill: speed=%.2f km/h incl=%.1f%% (raw=$rawInclination decline=$declineMode) elapsed=${elapsedSec}s dist=${iConceptDistanceM}m kcal=${iConceptCalories}"
+
+        if (dtSec > 0.0) {
+            derivedDistanceM += sample.speedKmh * dtSec * METERS_PER_KMH_PER_SEC
+            derivedEnergyKcal += estimateEnergyDeltaKcal(sample.speedKmh, correctedIncline, dtSec)
+        }
+
+        val distanceM = kotlin.math.round(derivedDistanceM).toInt()
+        val energyKcal = kotlin.math.round(derivedEnergyKcal).toInt()
+
+        Log.d(tag, "treadmill: speed=%.2f km/h incl=%.1f%% (raw=$rawInclination decline=$declineMode) elapsed=${elapsedSec}s dist=${distanceM}m kcal=${energyKcal}"
             .format(sample.speedKmh, correctedIncline))
         return sample.copy(
             inclinationPercent = correctedIncline,
             rampAngleDeg = sample.rampAngleDeg / 6.25,
             elapsedTimeSec = elapsedSec,
-            totalDistanceM = iConceptDistanceM,
-            totalEnergyKcal = iConceptCalories
+            totalDistanceM = distanceM,
+            totalEnergyKcal = energyKcal
         )
     }
 
     override fun onIConceptData(data: ByteArray) {
         val parsed = FtmsDataParser.parseIConceptWorkoutData(data) ?: return
-        iConceptBaseElapsedSec = parsed.elapsedTimeSec
-        iConceptLastUpdateMs = System.currentTimeMillis()
         iConceptDistanceM = parsed.totalDistanceM
         iConceptCalories = parsed.totalEnergyKcal
+        if (parsed.elapsedTimeSec > 0) {
+            derivedElapsedSec = kotlin.math.max(derivedElapsedSec, parsed.elapsedTimeSec.toDouble())
+            hasWorkoutStartAnchor = true
+        }
+        // Use iConcept snapshot as lower-bound baseline if present, then continue
+        // with derived progression because this device does not keep streaming counters.
+        derivedDistanceM = kotlin.math.max(derivedDistanceM, parsed.totalDistanceM.toDouble())
+        derivedEnergyKcal = kotlin.math.max(derivedEnergyKcal, parsed.totalEnergyKcal.toDouble())
         Log.d(tag, "iconcept C112: elapsed=${parsed.elapsedTimeSec}s dist=${parsed.totalDistanceM}m kcal=${parsed.totalEnergyKcal}")
     }
 }
