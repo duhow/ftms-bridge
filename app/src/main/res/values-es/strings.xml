@@ -50,6 +50,7 @@
     <string name="metric_energy">Energía</string>
     <string name="metric_strides">Zancadas</string>
     <string name="metric_elapsed_time">Tiempo</string>
+    <string name="lap_km_header">Km</string>
     <string name="metric_inclination">Inclinación</string>
     <string name="metric_resistance">Resistencia</string>
 

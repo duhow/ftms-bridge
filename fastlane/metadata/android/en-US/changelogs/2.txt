@@ -22,3 +22,6 @@ Add user-facing changes for the next release here.
 - Added Heart Rate Control Point command on connect to start continuous HR streaming on devices that require it (e.g. some Mi Band variants)
 - Added support for Mi Band 3 and similar devices that expose heart rate via a proprietary BLE service (fee0); they now appear as HR sensors and connect automatically
 - Fixed Mi Band heart rate not received when connecting from the paired devices list: the app now auto-detects the device type from cached or live service discovery instead of requiring a manual dialog choice
+- History button moved to the toolbar; scan button is now a compact Bluetooth icon
+- App now auto-starts Bluetooth scan on launch when permissions are already granted
+- Laps table in workout detail now shows km distance column header and includes the final partial km lap

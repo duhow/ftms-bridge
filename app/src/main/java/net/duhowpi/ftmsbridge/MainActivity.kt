@@ -153,6 +153,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         return when (item.itemId) {
+            R.id.action_history -> { startActivity(Intent(this, WorkoutHistoryActivity::class.java)); true }
             R.id.action_debug -> { showDebugDialog(); true }
             R.id.action_about -> { showAboutDialog(); true }
             else -> super.onOptionsItemSelected(item)
@@ -187,10 +188,6 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        binding.btnHistory.setOnClickListener {
-            startActivity(Intent(this, WorkoutHistoryActivity::class.java))
-        }
-
         binding.btnWorkoutStart.setOnClickListener {
             if (isRecording) stopRecording() else startRecording()
         }
@@ -220,13 +217,21 @@ class MainActivity : AppCompatActivity() {
         ActivityCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_GRANTED
     }
 
-    /** Request permissions on startup — does NOT start scanning. */
+    /** Request permissions on startup — auto-starts scan if already granted. */
     private fun requestPermissionsIfNeeded() {
         val needed = getRequiredPermissions().filter {
             ActivityCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
         }
         if (needed.isNotEmpty()) {
+            pendingScanAfterPermission = true
             permissionLauncher.launch(needed.toTypedArray())
+        } else {
+            // All permissions already granted — auto-start scan
+            if (bleScanner.isBluetoothEnabled()) {
+                startScanning()
+            } else {
+                enableBtLauncher.launch(Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE))
+            }
         }
     }
 
@@ -251,7 +256,6 @@ class MainActivity : AppCompatActivity() {
         binding.rvScanResults.visibility = View.VISIBLE
         binding.txtScanStatus.visibility = View.VISIBLE
         binding.txtScanStatus.text = getString(R.string.scanning_active)
-        binding.btnScan.text = getString(R.string.stop_scan)
 
         bleScanner.startScan(object : BleScanner.ScanListener {
             override fun onDeviceFound(result: ScanResult) {
@@ -297,7 +301,6 @@ class MainActivity : AppCompatActivity() {
 
             override fun onScanFailed(errorCode: Int) {
                 runOnUiThread {
-                    binding.btnScan.text = getString(R.string.scan)
                     Toast.makeText(
                         this@MainActivity,
                         getString(R.string.scan_failed, errorCode),
@@ -321,7 +324,6 @@ class MainActivity : AppCompatActivity() {
         updateHandler.removeCallbacks(scanListUpdateRunnable)
         addBondedDevicesToList()
         updateScanListUI() // final refresh
-        binding.btnScan.text = getString(R.string.scan)
         binding.txtScanStatus.text = getString(R.string.devices_found, scanResultsMap.size)
     }
 

@@ -153,7 +153,7 @@ class WorkoutDetailActivity : AppCompatActivity() {
         val isIndoorBike = session.machineType == "INDOOR_BIKE"
         if (!isTreadmill && !isIndoorBike) return
 
-        data class LapData(val lapNum: Int, val startSec: Int, val endSec: Int, val avgValue1: Double, val avgValue2: Double)
+        data class LapData(val label: String, val startSec: Int, val endSec: Int, val avgValue1: Double, val avgValue2: Double)
 
         val laps = mutableListOf<LapData>()
         var lapNum = 1
@@ -168,11 +168,24 @@ class WorkoutDetailActivity : AppCompatActivity() {
                            else lapSamples.map { it.cadenceRpm }.average()
                 val avg2 = if (isTreadmill) lapSamples.map { it.inclinationPercent }.average()
                            else lapSamples.map { it.resistanceLevel.toDouble() }.average()
-                laps.add(LapData(lapNum, lapStartSec, sample.elapsedTimeSec, avg1, avg2))
+                laps.add(LapData(lapNum.toString(), lapStartSec, sample.elapsedTimeSec, avg1, avg2))
                 lapNum++
                 lapStartSec = sample.elapsedTimeSec
                 lapStartIdx = idx + 1
             }
+        }
+
+        // Add incomplete final lap if there are remaining samples after the last full km
+        if (lapStartIdx < samples.size) {
+            val lapSamples = samples.subList(lapStartIdx, samples.size)
+            val avg1 = if (isTreadmill) lapSamples.map { it.speedKmh }.average()
+                       else lapSamples.map { it.cadenceRpm }.average()
+            val avg2 = if (isTreadmill) lapSamples.map { it.inclinationPercent }.average()
+                       else lapSamples.map { it.resistanceLevel.toDouble() }.average()
+            val lastElapsed = samples.last().elapsedTimeSec
+            val partialLabel = if (session.totalDistanceM > 0)
+                "%.2f".format(session.totalDistanceM / 1000.0) else lapNum.toString()
+            laps.add(LapData(partialLabel, lapStartSec, lastElapsed, avg1, avg2))
         }
 
         if (laps.isEmpty()) return
@@ -185,7 +198,7 @@ class WorkoutDetailActivity : AppCompatActivity() {
         val header = layoutInflater.inflate(R.layout.item_lap_row, binding.layoutLapsTable, false)
         val headerLabel1 = if (isTreadmill) getString(R.string.metric_speed) else getString(R.string.metric_strides)
         val headerLabel2 = if (isTreadmill) getString(R.string.metric_inclination) else getString(R.string.metric_resistance)
-        header.findViewById<android.widget.TextView>(R.id.txtLapNum).apply { text = "#"; setTypeface(null, Typeface.BOLD) }
+        header.findViewById<android.widget.TextView>(R.id.txtLapNum).apply { text = getString(R.string.lap_km_header); setTypeface(null, Typeface.BOLD) }
         header.findViewById<android.widget.TextView>(R.id.txtLapTime).apply { text = getString(R.string.metric_elapsed_time); setTypeface(null, Typeface.BOLD) }
         header.findViewById<android.widget.TextView>(R.id.txtLapVal1).apply { text = headerLabel1; setTypeface(null, Typeface.BOLD) }
         header.findViewById<android.widget.TextView>(R.id.txtLapVal2).apply { text = headerLabel2; setTypeface(null, Typeface.BOLD) }
@@ -197,7 +210,7 @@ class WorkoutDetailActivity : AppCompatActivity() {
             val lapDurationSec = lap.endSec - lap.startSec
             val mm = lapDurationSec / 60
             val ss = lapDurationSec % 60
-            row.findViewById<android.widget.TextView>(R.id.txtLapNum).text = "${lap.lapNum}"
+            row.findViewById<android.widget.TextView>(R.id.txtLapNum).text = lap.label
             row.findViewById<android.widget.TextView>(R.id.txtLapTime).text = "%d:%02d".format(mm, ss)
             row.findViewById<android.widget.TextView>(R.id.txtLapVal1).text = String.format("%.1f", lap.avgValue1)
             row.findViewById<android.widget.TextView>(R.id.txtLapVal2).text = String.format("%.1f", lap.avgValue2)

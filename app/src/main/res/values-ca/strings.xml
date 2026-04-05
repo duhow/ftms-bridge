@@ -50,6 +50,7 @@
     <string name="metric_energy">Energia</string>
     <string name="metric_strides">Gambades</string>
     <string name="metric_elapsed_time">Temps</string>
+    <string name="lap_km_header">Km</string>
     <string name="metric_inclination">Inclinació</string>
     <string name="metric_resistance">Resistència</string>
 

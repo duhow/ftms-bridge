@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
@@ -23,97 +24,104 @@
         android:orientation="vertical"
         android:padding="16dp">
 
-        <!-- Connection Status -->
+        <!-- Combined device info + scan button row -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
             android:gravity="center_vertical"
-            android:paddingBottom="2dp">
-
-            <View
-                android:id="@+id/indicatorFtms"
-                android:layout_width="12dp"
-                android:layout_height="12dp"
-                android:background="@color/status_disconnected" />
-
-            <TextView
-                android:id="@+id/txtFtmsDevice"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="@string/not_connected"
-                android:paddingStart="8dp"
-                android:textSize="14sp" />
-
-            <TextView
-                android:id="@+id/txtMachineType"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:textSize="12sp"
-                android:visibility="gone" />
-        </LinearLayout>
-
-        <TextView
-            android:id="@+id/txtFtmsDeviceInfo"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:paddingStart="20dp"
-            android:paddingBottom="6dp"
-            android:textSize="11sp"
-            android:textColor="?android:attr/textColorSecondary"
-            android:visibility="gone" />
-
-        <LinearLayout
-            android:id="@+id/hrStatusRow"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:paddingBottom="12dp"
-            android:visibility="gone">
-
-            <View
-                android:id="@+id/indicatorHr"
-                android:layout_width="12dp"
-                android:layout_height="12dp"
-                android:background="@color/status_disconnected" />
-
-            <TextView
-                android:id="@+id/txtHrDevice"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="@string/not_connected"
-                android:paddingStart="8dp"
-                android:textSize="14sp" />
-        </LinearLayout>
-
-        <!-- Buttons -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center"
-            android:paddingTop="8dp"
             android:paddingBottom="4dp">
 
+            <!-- Device info column -->
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <!-- FTMS device row -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:paddingBottom="2dp">
+
+                    <View
+                        android:id="@+id/indicatorFtms"
+                        android:layout_width="12dp"
+                        android:layout_height="12dp"
+                        android:background="@color/status_disconnected" />
+
+                    <TextView
+                        android:id="@+id/txtFtmsDevice"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/not_connected"
+                        android:paddingStart="8dp"
+                        android:textSize="14sp" />
+
+                    <TextView
+                        android:id="@+id/txtMachineType"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textSize="12sp"
+                        android:visibility="gone" />
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/txtFtmsDeviceInfo"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingStart="20dp"
+                    android:paddingBottom="6dp"
+                    android:textSize="11sp"
+                    android:textColor="?android:attr/textColorSecondary"
+                    android:visibility="gone" />
+
+                <!-- HR device row -->
+                <LinearLayout
+                    android:id="@+id/hrStatusRow"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:paddingBottom="4dp"
+                    android:visibility="gone">
+
+                    <View
+                        android:id="@+id/indicatorHr"
+                        android:layout_width="12dp"
+                        android:layout_height="12dp"
+                        android:background="@color/status_disconnected" />
+
+                    <TextView
+                        android:id="@+id/txtHrDevice"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/not_connected"
+                        android:paddingStart="8dp"
+                        android:textSize="14sp" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- Scan icon button -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnScan"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="@string/scan"
-                android:layout_marginEnd="4dp" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnHistory"
-                style="@style/Widget.Material3.Button.TonalButton"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="@string/history"
-                android:layout_marginStart="4dp" />
+                style="@style/Widget.Material3.Button.IconButton"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:layout_gravity="center_vertical"
+                android:layout_marginStart="8dp"
+                android:minWidth="0dp"
+                android:minHeight="0dp"
+                android:padding="0dp"
+                android:text=""
+                app:icon="@drawable/ic_bluetooth"
+                app:iconSize="24dp"
+                app:iconGravity="textStart" />
         </LinearLayout>
 
         <!-- Workout control buttons (shown when a device is connected) -->
