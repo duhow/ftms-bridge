@@ -371,7 +371,7 @@ class MainActivity : AppCompatActivity() {
      * If [hasHeartRate] is true, ensures the [ScannedDeviceInfo] entry for [address] is
      * marked with [ScannedDeviceInfo.isHr] = true so the scan list label updates from
      * "BLE" / "Paired" to "HR" (or "FTMS+HR") once the actual service is confirmed at
-     * connection time.  Must be called on any thread; UI refresh is done on the main thread.
+     * connection time.  Must be called on the main thread.
      */
     private fun markScanEntryHr(address: String, hasHeartRate: Boolean) {
         if (!hasHeartRate) return
@@ -409,8 +409,8 @@ class MainActivity : AppCompatActivity() {
                 if (ActivityCompat.checkSelfPermission(this@MainActivity, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) return
                 val name = device.name ?: "Unknown"
                 fitnessDevice = FtmsDevice.createFromCharacteristics(name, ftmsCharacteristics)
-                markScanEntryHr(device.address, hasHeartRate)
                 runOnUiThread {
+                    markScanEntryHr(device.address, hasHeartRate)
                     updateConnectionStatus()
                     updateScanListUI()
                     binding.txtMachineType.text = fitnessDevice?.machineType?.name ?: "?"
@@ -505,8 +505,8 @@ class MainActivity : AppCompatActivity() {
             }
 
             override fun onServicesReady(ftmsCharacteristics: List<UUID>, hasHeartRate: Boolean) {
-                markScanEntryHr(device.address, hasHeartRate)
                 runOnUiThread {
+                    markScanEntryHr(device.address, hasHeartRate)
                     updateConnectionStatus()
                     updateScanListUI()
                 }
