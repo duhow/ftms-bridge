@@ -106,6 +106,9 @@ class MainActivity : AppCompatActivity() {
     // Workout view state: false = LAP view, true = CHART view
     private var isChartViewActive = false
 
+    private val isActiveTreadmill: Boolean
+        get() = dummyTreadmill != null || fitnessDevice?.machineType == FtmsConstants.MachineType.TREADMILL
+
     // DummyTreadmill (debug only)
     private var dummyTreadmill: DummyTreadmill? = null
     private val dummyTreadmillHandler = Handler(Looper.getMainLooper())
@@ -257,8 +260,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun updateLiveChart() {
         if (liveSpeedPoints.isEmpty()) return
-        val isTreadmill = dummyTreadmill != null ||
-                fitnessDevice?.machineType == FtmsConstants.MachineType.TREADMILL
+        val isTreadmill = isActiveTreadmill
         val durationSec = liveChartElapsedSec.coerceAtLeast(60)
         val speedLabel = if (isTreadmill) getString(R.string.metric_speed) else getString(R.string.metric_cadence)
         val secondaryLabel = if (isTreadmill) getString(R.string.metric_inclination) else getString(R.string.metric_resistance)
@@ -284,12 +286,12 @@ class MainActivity : AppCompatActivity() {
     private fun updateLapView(sample: FitnessSample) {
         val distM = sample.totalDistanceM
         val lapProgressM = (distM - lapStartDistanceM).coerceAtLeast(0)
-        if (lapProgressM >= 1000) {
+        if (lapProgressM >= LAP_DISTANCE_METERS) {
             lapCount++
-            lapStartDistanceM = distM - (lapProgressM % 1000)
+            lapStartDistanceM = distM - (lapProgressM % LAP_DISTANCE_METERS)
             lapStartTimeMs = System.currentTimeMillis()
         }
-        val currentLapM = (distM - lapStartDistanceM).coerceAtLeast(0).coerceAtMost(1000)
+        val currentLapM = (distM - lapStartDistanceM).coerceAtLeast(0).coerceAtMost(LAP_DISTANCE_METERS)
         val lapElapsedMs = System.currentTimeMillis() - lapStartTimeMs
         val lapSec = (lapElapsedMs / 1000).toInt()
         binding.txtLapNumber.text = getString(R.string.lap_view_label, lapCount + 1)
@@ -309,7 +311,6 @@ class MainActivity : AppCompatActivity() {
         binding.debugVirtualDeviceRow.visibility = View.GONE
         updateConnectionStatus()
         updateMetricVisibility(dummy.machineType)
-        binding.metricsSection.visibility = View.GONE
         dummyTreadmillHandler.removeCallbacks(dummyTreadmillRunnable)
         dummyTreadmillHandler.post(dummyTreadmillRunnable)
     }
@@ -831,8 +832,7 @@ class MainActivity : AppCompatActivity() {
         // Accumulate live chart data while recording
         if (isRecording) {
             liveChartElapsedSec = elapsedSec
-            val isTreadmill = dummyTreadmill != null ||
-                    fitnessDevice?.machineType == FtmsConstants.MachineType.TREADMILL
+            val isTreadmill = isActiveTreadmill
             liveSpeedPoints.add(if (isTreadmill) sample.speedKmh.toFloat() else sample.cadenceRpm.toFloat())
             livePaceSecondaryPoints.add(
                 if (isTreadmill) sample.inclinationPercent.toFloat() else sample.resistanceLevel.toFloat()
@@ -1454,6 +1454,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     companion object {
+        private const val LAP_DISTANCE_METERS = 1000
         private const val SPEED_MIN_KMH = 0.5
         private const val SPEED_MAX_KMH = 30.0
         private const val INCLINE_MIN_PERCENT = -3.0
