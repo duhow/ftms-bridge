@@ -99,9 +99,14 @@ arrives (`iConceptLastUpdateMs`) and adds the wall-clock delta to `iConceptBaseE
 on every subsequent `onDataReceived()` call.  This keeps the timer advancing correctly
 even when no further C112 packets are received.
 
-**Distance and energy:** These remain at the device-reported value (0 at session start)
-because there is no way to estimate them reliably from the available data without
-the device sending updated C112 packets.
+**Distance and energy fallback:** Because C112 does not continue streaming, the app now
+derives:
+- `distance_m += speed_kmh * dt * (1/3.6)`
+- `energy_kcal` from ACSM treadmill metabolic equations (speed + grade), using a default
+  body mass assumption for a practical estimate.
+
+When an initial C112 snapshot is available, derived counters start from at least those
+values and continue increasing from live FTMS speed/incline.
 
 ### Observed 0x2ACD packet (steady state at 6.10 km/h)
 
