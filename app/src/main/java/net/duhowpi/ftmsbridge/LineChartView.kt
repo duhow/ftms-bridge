@@ -153,7 +153,9 @@ class LineChartView @JvmOverloads constructor(
             val path = Path()
             s.points.forEachIndexed { i, v ->
                 val x = chartLeft + (i.toFloat() / lastIdx) * chartW
-                val y = chartBottom - ((v - min) / range) * chartH
+                // When all values are identical (range == 0 fallback), center the line vertically
+                val y = if (max == min) chartTop + chartH / 2f
+                        else chartBottom - ((v - min) / range) * chartH
                 if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
             }
             canvas.drawPath(path, linePaint)
@@ -200,7 +202,9 @@ class LineChartView @JvmOverloads constructor(
                 val v = s.points[tipIdx]
                 val lastIdx = (s.points.size - 1).coerceAtLeast(1)
                 val dotX = chartLeft + (tipIdx.toFloat() / lastIdx) * chartW
-                val dotY = chartBottom - ((v - min) / range) * chartH
+                // When all values are identical, center the dot vertically
+                val dotY = if (max == min) chartTop + chartH / 2f
+                           else chartBottom - ((v - min) / range) * chartH
                 dotPaint.color = s.color
                 canvas.drawCircle(dotX, dotY, 8f, dotPaint)
             }

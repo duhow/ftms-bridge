@@ -1207,18 +1207,21 @@ class MainActivity : AppCompatActivity() {
                 deviceAddress = "AA:BB:CC:DD:EE:01"
             )
             val treadmillId = db.sessionDao().insert(treadmillSession)
+            var treadmillDistanceM = 0
             val treadmillSamples = (0 until 60).map { i ->
                 val elapsed = i * 30
                 val phase = i.toDouble() / 60.0
                 val speed = 6.0 + 4.0 * Math.sin(phase * Math.PI * 2) + 0.5 * (Math.random() - 0.5)
                 val incline = 2.5 + 2.5 * Math.sin(phase * Math.PI)
+                // Accumulate distance over 30-second interval at current speed
+                treadmillDistanceM += (speed * 30.0 / 3.6).toInt()
                 WorkoutSample(
                     sessionId = treadmillId,
                     timestampMs = treadmillStart + elapsed * 1000L,
                     elapsedTimeSec = elapsed,
                     speedKmh = speed.coerceIn(0.0, 20.0),
                     inclinationPercent = incline.coerceIn(-3.0, 15.0),
-                    totalDistanceM = (elapsed * speed / 3.6).toInt(),
+                    totalDistanceM = treadmillDistanceM,
                     totalEnergyKcal = (elapsed * 10 / 60)
                 )
             }
@@ -1242,18 +1245,21 @@ class MainActivity : AppCompatActivity() {
                 hrDeviceAddress = "AA:BB:CC:DD:EE:03"
             )
             val bikeId = db.sessionDao().insert(bikeSession)
+            var bikeDistanceM = 0
             val bikeSamples = (0 until 40).map { i ->
                 val elapsed = i * 30
                 val phase = i.toDouble() / 40.0
                 val cadence = 60.0 + 30.0 * Math.abs(Math.sin(phase * Math.PI * 3)) + 2.0 * (Math.random() - 0.5)
                 val resistance = (3 + (5 * Math.abs(Math.sin(phase * Math.PI * 2))).toInt()).coerceIn(1, 11)
+                // Accumulate distance over 30-second interval (cadence × wheel factor)
+                bikeDistanceM += (cadence * 2 * 30 / 60).toInt()
                 WorkoutSample(
                     sessionId = bikeId,
                     timestampMs = bikeStart + elapsed * 1000L,
                     elapsedTimeSec = elapsed,
                     cadenceRpm = cadence.coerceIn(0.0, 120.0),
                     resistanceLevel = resistance,
-                    totalDistanceM = (elapsed * cadence * 2 / 60).toInt(),
+                    totalDistanceM = bikeDistanceM,
                     totalEnergyKcal = (elapsed * 8 / 60)
                 )
             }
