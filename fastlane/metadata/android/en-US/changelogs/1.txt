@@ -44,3 +44,5 @@ Initial release.
 - Second device (HR sensor) connection status is hidden until a second device is connected
 - Added support for BH Fitness vertical bike (C01_XXXXX models)
 - Fixed: BH Fitness devices with iConcept naming (B01_, C01_, etc.) are now correctly detected
+- OpenTracks integration: when a workout starts, a recording is automatically started in OpenTracks (if installed) with the matching activity type; Gadgetbridge then shows live stats on the connected band
+- OpenTracks recording is stopped automatically when the workout ends

@@ -642,6 +642,7 @@ class MainActivity : AppCompatActivity() {
             currentSessionId = db.sessionDao().insert(session)
             Log.i(tag, "Session started: $currentSessionId")
         }
+        OpenTracksHelper.startWorkout(this, device.machineType)
     }
 
     private fun stopRecording() {
@@ -655,6 +656,7 @@ class MainActivity : AppCompatActivity() {
             Log.i(tag, "Session stopped: $sessionId")
         }
         currentSessionId = null
+        OpenTracksHelper.stopWorkout(this)
     }
 
     private fun saveSample(sample: FitnessSample) {
