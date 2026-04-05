@@ -32,7 +32,7 @@ class DummyTreadmill : FitnessDevice {
     fun generateSample(): FitnessSample {
         elapsedSec += intervalSec
         distanceM += speedKmh / 3.6 * intervalSec
-        energyKcal += speedKmh / 3.6 * intervalSec * 70.0 * 0.001
+        energyKcal += speedKmh / 3.6 * intervalSec * assumedBodyWeightKg * energyConversionFactor
         return FitnessSample(
             timestampMs = System.currentTimeMillis(),
             elapsedTimeSec = elapsedSec,
@@ -43,7 +43,11 @@ class DummyTreadmill : FitnessDevice {
         )
     }
 
-    /** Resets elapsed time, distance and energy to zero. */
+    /** Assumed user body weight (kg) for energy estimation. */
+    private val assumedBodyWeightKg: Double = 70.0
+
+    /** MET-based energy conversion factor (kcal per kg per meter). */
+    private val energyConversionFactor: Double = 0.001
     fun reset() {
         elapsedSec = 0
         distanceM = 0.0

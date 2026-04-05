@@ -747,7 +747,7 @@ class MainActivity : AppCompatActivity() {
             ContextCompat.getColor(this, if (hrConnected) R.color.status_connected else R.color.status_disconnected)
         )
         binding.txtFtmsDevice.text = when {
-            dummyTreadmill != null -> dummyTreadmill!!.deviceName
+            dummyTreadmill != null -> dummyTreadmill?.deviceName ?: getString(R.string.connected)
             ftmsConnected -> ftmsConnectionManager?.connectedDeviceName ?: getString(R.string.connected)
             else -> getString(R.string.not_connected)
         }
