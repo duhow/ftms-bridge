@@ -36,8 +36,19 @@ workout-counter data on `0xC112`.
 
 ```
 # Treadmill at rest, ~2 s after workout start  (speed = 6.10 km/h, inclination raw = 180)
+# Device: BH Fitness (generic model)
+F1 0D  02 00  00 00 00  00 00  00 00  FF FF  00 00  02  FE F0  00 00
+
+# Treadmill starting, ~2 s after GATT connect  (speed ramping from 0, inclination raw = 0)
+# Device: T01_07D57 (CC:79:88:30:7D:57), captured 2026-04-05
 F1 0D  02 00  00 00 00  00 00  00 00  FF FF  00 00  02  FE F0  00 00
 ```
+
+> **Note:** On the T01 model this packet was observed **only once per session**,
+> sent approximately 2 s after the GATT connection was established.  It was not
+> repeated during the active workout phase.  Elapsed time advances via a wall-clock
+> delta in the app; distance and energy remain at the device-reported value (0) for
+> the duration of the session.
 
 ### Byte map
 

@@ -38,14 +38,41 @@ The same factor applies to the Ramp Angle Grade field (also INT16, units 0.1°).
 
 ### Implementation
 
-`BhFitnessTreadmill.onDataReceived()` divides both `inclinationPercent` and
-`rampAngleDeg` by `6.25` after the standard FTMS parse.
+`BhFitnessTreadmill.onDataReceived()` applies the correct formula based on whether the
+device is currently in decline mode (see below).
 
-### Negative inclination
+The UI displays inclination as a **rounded integer** (e.g. `3` instead of `2.88`),
+matching the whole-number percent labels shown on the machine console.
 
-Because the field is signed INT16, negative raw values (downhill) work correctly
-once the standard Kotlin `buf.short.toInt()` signed-extend is applied.
-Example: raw `−62` → −62 × 0.1 / 6.25 = **−0.99 %** (slightly downhill).
+### Negative inclination (T01 model)
+
+The T01 model **does not** use negative INT16 values for decline.  Instead it sends
+**positive** raw values in the range [300, 550] that are decoded with a different
+formula:
+
+```
+actual_percent = (raw - 500) / 62.5
+```
+
+Confirmed observations (session 2026-04-05, CC:79:88:30:7D:57):
+
+| Console display | Raw INT16 | Standard formula (raw/62.5) | Decline formula ((raw-500)/62.5) |
+|-----------------|-----------|-----------------------------|----------------------------------|
+| −1 %            | 450       | +7.2 % (wrong)              | **−0.8 % → rounds to −1 %**     |
+| −2 %            | 380       | +6.1 % (wrong)              | **−1.9 % → rounds to −2 %**     |
+| −3 %            | 320       | +5.1 % (wrong)              | **−2.9 % → rounds to −3 %**     |
+
+Because the decline raw range [300, 550] overlaps with the positive incline range
+(e.g. raw=450 = +7.2% when inclining), the two modes are distinguished by the
+**transition behaviour**: when the user presses the decline button the raw value
+**jumps in a single step** from flat (raw=0) to ~450, whereas positive incline
+increases **gradually** in ~60-unit steps.
+
+`BhFitnessTreadmill` tracks this transition with a `declineMode` flag:
+- Enter decline mode: raw jumps from <50 to >270 in one packet.
+- Exit decline mode: raw drops back below 50 (machine returns to flat).
+- A `hasSeenFlat` guard prevents false triggers when connecting to a machine that is
+  already at high positive incline (the machine must pass through flat first).
 
 ---
 
@@ -57,6 +84,24 @@ devices, but the device always sends **0** for all three fields throughout the w
 
 The actual counters are streamed via the proprietary **0xC112** iConcept channel.
 See [bh-fitness-iconcept.md](bh-fitness-iconcept.md).
+
+### C112 fires only once at session start
+
+From captures on the T01 model (CC:79:88:30:7D:57), the 0xC112 notification is sent
+**exactly once**, about 2 s after GATT connection, with `elapsed_time=2`, `distance=0`,
+and `total_kcal=0`.  It does **not** repeat during the workout.
+
+Consequence: elapsed time, distance, and energy appear to freeze at their initial
+values for the entire session.
+
+**Elapsed time fix:** `BhFitnessTreadmill` records the system clock at the moment C112
+arrives (`iConceptLastUpdateMs`) and adds the wall-clock delta to `iConceptBaseElapsedSec`
+on every subsequent `onDataReceived()` call.  This keeps the timer advancing correctly
+even when no further C112 packets are received.
+
+**Distance and energy:** These remain at the device-reported value (0 at session start)
+because there is no way to estimate them reliably from the available data without
+the device sending updated C112 packets.
 
 ### Observed 0x2ACD packet (steady state at 6.10 km/h)
 
