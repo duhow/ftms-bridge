@@ -219,7 +219,7 @@
                                 android:text="@string/metric_inclination" android:textSize="10sp"
                                 android:textColor="?android:attr/textColorSecondary" android:layout_marginTop="2dp" />
                             <LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content"
-                                android:orientation="horizontal" android:gravity="baseline">
+                                android:orientation="horizontal" android:gravity="center_vertical">
                                 <TextView android:id="@+id/lapValueInclination"
                                     android:layout_width="wrap_content" android:layout_height="wrap_content"
                                     android:text="--" android:textSize="22sp" android:textStyle="bold" />
@@ -241,7 +241,7 @@
                                 android:text="@string/metric_energy" android:textSize="10sp"
                                 android:textColor="?android:attr/textColorSecondary" android:layout_marginTop="2dp" />
                             <LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content"
-                                android:orientation="horizontal" android:gravity="baseline">
+                                android:orientation="horizontal" android:gravity="center_vertical">
                                 <TextView android:id="@+id/lapValueEnergy"
                                     android:layout_width="wrap_content" android:layout_height="wrap_content"
                                     android:text="--" android:textSize="22sp" android:textStyle="bold" />
@@ -264,7 +264,7 @@
                                 android:text="@string/metric_heart_rate" android:textSize="10sp"
                                 android:textColor="?android:attr/textColorSecondary" android:layout_marginTop="2dp" />
                             <LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content"
-                                android:orientation="horizontal" android:gravity="baseline">
+                                android:orientation="horizontal" android:gravity="center_vertical">
                                 <TextView android:id="@+id/lapValueHr"
                                     android:layout_width="wrap_content" android:layout_height="wrap_content"
                                     android:text="--" android:textSize="22sp" android:textStyle="bold" />
@@ -289,7 +289,7 @@
                                 android:text="@string/metric_speed" android:textSize="10sp"
                                 android:textColor="?android:attr/textColorSecondary" android:layout_marginTop="2dp" />
                             <LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content"
-                                android:orientation="horizontal" android:gravity="baseline">
+                                android:orientation="horizontal" android:gravity="center_vertical">
                                 <TextView android:id="@+id/lapValueSpeed"
                                     android:layout_width="wrap_content" android:layout_height="wrap_content"
                                     android:text="--" android:textSize="22sp" android:textStyle="bold" />
