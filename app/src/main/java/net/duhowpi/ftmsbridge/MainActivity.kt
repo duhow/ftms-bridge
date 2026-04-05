@@ -274,10 +274,10 @@ class MainActivity : AppCompatActivity() {
         val seriesList = mutableListOf(
             LineChartView.DataSeries(speedLabel, speedColor, liveSpeedPoints.toList(), 0f)
         )
-        if (livePaceSecondaryPoints.any { it != 0f }) {
+        if (hasNonZeroValues(livePaceSecondaryPoints)) {
             seriesList.add(LineChartView.DataSeries(secondaryLabel, secondaryColor, livePaceSecondaryPoints.toList()))
         }
-        if (liveHrPoints.any { it != 0f }) {
+        if (hasNonZeroValues(liveHrPoints)) {
             seriesList.add(LineChartView.DataSeries(getString(R.string.metric_heart_rate), hrColor, liveHrPoints.toList(), 40f, 200f))
         }
         binding.liveChart.setData(*seriesList.toTypedArray(), durationSec = durationSec)
@@ -302,6 +302,9 @@ class MainActivity : AppCompatActivity() {
         binding.txtLapTime.text = String.format("%d:%02d", lm, ls)
         binding.txtLapCount.text = "$lapCount"
     }
+
+    /** Returns true if [points] contains at least one non-zero value. */
+    private fun hasNonZeroValues(points: List<Float>) = points.any { it != 0f }
 
     private fun connectDummyTreadmill() {
         val dummy = DummyTreadmill()

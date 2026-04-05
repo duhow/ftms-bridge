@@ -48,6 +48,11 @@ class DummyTreadmill : FitnessDevice {
 
     /** MET-based energy conversion factor (kcal per kg per meter). */
     private val energyConversionFactor: Double = 0.001
+
+    /**
+     * Resets accumulated state (elapsed time, distance, energy) to zero.
+     * Useful when the virtual treadmill session is restarted without creating a new instance.
+     */
     fun reset() {
         elapsedSec = 0
         distanceM = 0.0
