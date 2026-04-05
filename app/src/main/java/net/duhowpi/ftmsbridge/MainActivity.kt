@@ -1,7 +1,7 @@
 package net.duhowpi.ftmsbridge
 
 import android.Manifest
-import android.animation.ObjectAnimator
+import android.graphics.drawable.Animatable
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothClass
 import android.bluetooth.BluetoothDevice
@@ -89,9 +89,6 @@ class MainActivity : AppCompatActivity() {
 
     // Whether permissions were requested from scan button (so we auto-start scan)
     private var pendingScanAfterPermission = false
-
-    // Spin animation for the scan button
-    private var scanButtonAnimator: ObjectAnimator? = null
 
     // Recording throttle: minimum 2s between saves; identical data saved at most every 5s
     private var lastSavedSampleMs: Long = 0
@@ -266,12 +263,9 @@ class MainActivity : AppCompatActivity() {
         binding.txtScanStatus.visibility = View.VISIBLE
         binding.txtScanStatus.text = getString(R.string.scanning_active)
 
-        // Spin the scan button icon while scanning
-        scanButtonAnimator = ObjectAnimator.ofFloat(binding.btnScan, "rotation", 0f, 360f).apply {
-            duration = 1200
-            repeatCount = ObjectAnimator.INFINITE
-            start()
-        }
+        // Spin the scan button icon while scanning (animated vector rotates only the icon)
+        binding.btnScan.setIconResource(R.drawable.ic_refresh_anim)
+        (binding.btnScan.icon as? Animatable)?.start()
 
         bleScanner.startScan(object : BleScanner.ScanListener {
             override fun onDeviceFound(result: ScanResult) {
@@ -341,10 +335,9 @@ class MainActivity : AppCompatActivity() {
         addBondedDevicesToList()
         updateScanListUI() // final refresh
         binding.txtScanStatus.text = getString(R.string.devices_found, scanResultsMap.size)
-        // Stop spinning and reset rotation
-        scanButtonAnimator?.cancel()
-        scanButtonAnimator = null
-        binding.btnScan.rotation = 0f
+        // Stop spinning and restore static icon
+        (binding.btnScan.icon as? Animatable)?.stop()
+        binding.btnScan.setIconResource(R.drawable.ic_refresh)
     }
 
     private fun updateScanListUI() {
