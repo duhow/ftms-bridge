@@ -114,4 +114,18 @@
     <!-- Workout detail -->
     <string name="detail_devices_label">Dispositivos</string>
     <string name="detail_laps_label">Vueltas</string>
+
+    <!-- Workout view toggle -->
+    <string name="view_lap">Vuelta</string>
+    <string name="view_chart">Gráfica</string>
+    <string name="lap_view_label">Vuelta %d</string>
+    <string name="lap_progress_label">%.2f km</string>
+    <string name="lap_time_label">Tiempo vuelta</string>
+    <string name="lap_count_label">Vueltas</string>
+
+    <!-- Debug virtual device -->
+    <string name="debug_virtual_treadmill">Cinta virtual</string>
+    <string name="debug_virtual_treadmill_speed">Velocidad (km/h)</string>
+    <string name="debug_virtual_treadmill_incline">Inclinación (%)</string>
+    <string name="debug_virtual_treadmill_control">Control de cinta</string>
 </resources>

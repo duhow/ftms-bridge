@@ -1,4 +1,9 @@
 Add user-facing changes for the next release here.
+- Colorful metric cards with icons for speed, heart rate, distance, energy, cadence, power, time, inclination, and resistance
+- LAP/CHART workout view toggle shown during active recording
+- LAP view with progress bar showing 1km circuit progress, lap time, and lap count
+- Live line chart view for speed, inclination/resistance, and heart rate during workout
+- Virtual FTMS treadmill available in debug builds for UI testing without a real device (DummyTreadmill)
 - Bluetooth scan list now hides automatically when a workout starts (including when triggered by the treadmill or other device)
 - Tapping a workout in History now opens a detailed view with line charts (speed + inclination for treadmill, cadence + resistance for indoor bike) plus time, distance, and calories summary
 - Export and delete workout buttons moved to the detail view toolbar

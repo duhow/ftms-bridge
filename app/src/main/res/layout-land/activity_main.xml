@@ -14,63 +14,34 @@
         android:elevation="4dp" />
 
     <ScrollView
-    android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:background="?android:colorBackground">
-
-    <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="12dp">
+        android:layout_height="match_parent"
+        android:background="?android:colorBackground">
 
-        <!-- Compact header row -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:paddingBottom="8dp">
+            android:orientation="vertical"
+            android:padding="12dp">
 
-            <View
-                android:id="@+id/indicatorFtms"
-                android:layout_width="10dp"
-                android:layout_height="10dp"
-                android:background="@color/status_disconnected" />
-
-            <TextView
-                android:id="@+id/txtFtmsDevice"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/not_connected"
-                android:paddingStart="4dp"
-                android:paddingEnd="12dp"
-                android:textSize="12sp" />
-
-            <TextView
-                android:id="@+id/txtMachineType"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:textSize="11sp"
-                android:paddingEnd="12dp"
-                android:visibility="gone" />
-
+            <!-- Compact header row -->
             <LinearLayout
-                android:id="@+id/hrStatusRow"
-                android:layout_width="wrap_content"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
                 android:gravity="center_vertical"
-                android:visibility="gone">
+                android:paddingBottom="8dp">
 
-                <View
-                    android:id="@+id/indicatorHr"
-                    android:layout_width="10dp"
-                    android:layout_height="10dp"
-                    android:background="@color/status_disconnected" />
+                <ImageView
+                    android:id="@+id/indicatorFtms"
+                    android:layout_width="16dp"
+                    android:layout_height="16dp"
+                    android:src="@drawable/ic_bluetooth"
+                    app:tint="@color/status_disconnected"
+                    android:contentDescription="@null" />
 
                 <TextView
-                    android:id="@+id/txtHrDevice"
+                    android:id="@+id/txtFtmsDevice"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="@string/not_connected"
@@ -78,342 +49,475 @@
                     android:paddingEnd="12dp"
                     android:textSize="12sp" />
 
+                <TextView
+                    android:id="@+id/txtMachineType"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textSize="11sp"
+                    android:paddingEnd="12dp"
+                    android:visibility="gone" />
+
+                <LinearLayout
+                    android:id="@+id/hrStatusRow"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:visibility="gone">
+
+                    <ImageView
+                        android:id="@+id/indicatorHr"
+                        android:layout_width="16dp"
+                        android:layout_height="16dp"
+                        android:src="@drawable/ic_heart"
+                        app:tint="@color/status_disconnected"
+                        android:contentDescription="@null" />
+
+                    <TextView
+                        android:id="@+id/txtHrDevice"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/not_connected"
+                        android:paddingStart="4dp"
+                        android:paddingEnd="12dp"
+                        android:textSize="12sp" />
+                </LinearLayout>
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnScan"
+                    style="@style/Widget.Material3.Button.TonalButton.Icon"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:minWidth="0dp"
+                    android:minHeight="0dp"
+                    android:padding="0dp"
+                    android:text=""
+                    app:icon="@drawable/ic_refresh"
+                    app:iconSize="24dp"
+                    app:iconGravity="textStart" />
             </LinearLayout>
 
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnScan"
-                style="@style/Widget.Material3.Button.TonalButton.Icon"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:minWidth="0dp"
-                android:minHeight="0dp"
-                android:padding="0dp"
-                android:text=""
-                app:icon="@drawable/ic_refresh"
-                app:iconSize="24dp"
-                app:iconGravity="textStart" />
-        </LinearLayout>
-
-        <TextView
-            android:id="@+id/txtFtmsDeviceInfo"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:paddingBottom="2dp"
-            android:textSize="10sp"
-            android:textColor="?android:attr/textColorSecondary"
-            android:visibility="gone" />
-
-        <!-- Workout control buttons (shown when a device is connected) -->
-        <LinearLayout
-            android:id="@+id/workoutButtonRow"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center"
-            android:paddingBottom="4dp"
-            android:visibility="gone">
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnWorkoutStart"
-                android:layout_width="0dp"
-                android:layout_height="32dp"
-                android:layout_weight="1"
-                android:text="@string/workout_start"
-                android:textSize="11sp"
-                android:layout_marginEnd="4dp" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnWorkoutPause"
-                style="@style/Widget.Material3.Button.TonalButton"
-                android:layout_width="0dp"
-                android:layout_height="32dp"
-                android:layout_weight="1"
-                android:text="@string/workout_pause"
-                android:textSize="11sp"
-                android:layout_marginStart="4dp"
-                android:layout_marginEnd="4dp"
-                android:visibility="gone" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnWorkoutStop"
-                style="@style/Widget.Material3.Button.OutlinedButton"
-                android:layout_width="0dp"
-                android:layout_height="32dp"
-                android:layout_weight="1"
-                android:text="@string/workout_stop"
-                android:textSize="11sp"
-                android:layout_marginStart="4dp"
-                android:visibility="gone" />
-        </LinearLayout>
-
-        <!-- Scan status + list -->
-        <TextView
-            android:id="@+id/txtScanStatus"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:textSize="11sp"
-            android:paddingBottom="2dp"
-            android:paddingStart="2dp"
-            android:visibility="gone" />
-
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/rvScanResults"
-            android:layout_width="match_parent"
-            android:layout_height="160dp"
-            android:background="?attr/colorSurface"
-            android:paddingBottom="4dp"
-            android:visibility="gone" />
-
-        <!-- Recording indicator -->
-        <TextView
-            android:id="@+id/recordingIndicator"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/recording"
-            android:textColor="@android:color/holo_red_dark"
-            android:textStyle="bold"
-            android:layout_gravity="center_horizontal"
-            android:paddingBottom="8dp"
-            android:visibility="gone" />
-
-        <!-- Metrics: 2 cards per row. Device-specific rows/tiles are shown/hidden at runtime. -->
-        <LinearLayout
-            android:id="@+id/metricsSection"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:visibility="gone">
-
-            <!-- Speed | Heart Rate (always shown) -->
-            <LinearLayout
+            <TextView
+                android:id="@+id/txtFtmsDeviceInfo"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal">
+                android:paddingBottom="2dp"
+                android:textSize="10sp"
+                android:textColor="?android:attr/textColorSecondary"
+                android:visibility="gone" />
 
-                <com.google.android.material.card.MaterialCardView
-                    android:id="@+id/cardSpeed"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:layout_margin="3dp">
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="vertical"
-                        android:padding="10dp"
-                        android:gravity="center">
-                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-                            android:text="@string/metric_speed" android:textSize="11sp" />
-                        <TextView android:id="@+id/valueSpeed"
-                            android:layout_width="wrap_content" android:layout_height="wrap_content"
-                            android:text="--" android:textSize="24sp" android:textStyle="bold" />
-                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-                            android:text="@string/unit_kmh" android:textSize="9sp" />
-                    </LinearLayout>
-                </com.google.android.material.card.MaterialCardView>
-
-                <com.google.android.material.card.MaterialCardView
-                    android:id="@+id/cardHeartRate"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:layout_margin="3dp">
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="vertical"
-                        android:padding="10dp"
-                        android:gravity="center">
-                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-                            android:text="@string/metric_heart_rate" android:textSize="11sp" />
-                        <TextView android:id="@+id/valueHeartRate"
-                            android:layout_width="wrap_content" android:layout_height="wrap_content"
-                            android:text="--" android:textSize="24sp" android:textStyle="bold" />
-                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-                            android:text="@string/unit_bpm" android:textSize="9sp" />
-                    </LinearLayout>
-                </com.google.android.material.card.MaterialCardView>
-
-            </LinearLayout>
-
-            <!-- Cadence | Power (indoor bike only) -->
             <LinearLayout
-                android:id="@+id/rowCadencePower"
+                android:id="@+id/workoutButtonRow"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
+                android:gravity="center"
+                android:paddingBottom="4dp"
                 android:visibility="gone">
 
-                <com.google.android.material.card.MaterialCardView
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnWorkoutStart"
                     android:layout_width="0dp"
-                    android:layout_height="wrap_content"
+                    android:layout_height="32dp"
                     android:layout_weight="1"
-                    android:layout_margin="3dp">
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="vertical"
-                        android:padding="10dp"
-                        android:gravity="center">
-                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-                            android:text="@string/metric_cadence" android:textSize="11sp" />
-                        <TextView android:id="@+id/valueCadence"
-                            android:layout_width="wrap_content" android:layout_height="wrap_content"
-                            android:text="--" android:textSize="24sp" android:textStyle="bold" />
-                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-                            android:text="@string/unit_rpm" android:textSize="9sp" />
-                    </LinearLayout>
-                </com.google.android.material.card.MaterialCardView>
+                    android:text="@string/workout_start"
+                    android:textSize="11sp"
+                    android:layout_marginEnd="4dp" />
 
-                <com.google.android.material.card.MaterialCardView
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnWorkoutPause"
+                    style="@style/Widget.Material3.Button.TonalButton"
                     android:layout_width="0dp"
-                    android:layout_height="wrap_content"
+                    android:layout_height="32dp"
                     android:layout_weight="1"
-                    android:layout_margin="3dp">
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="vertical"
-                        android:padding="10dp"
-                        android:gravity="center">
-                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-                            android:text="@string/metric_power" android:textSize="11sp" />
-                        <TextView android:id="@+id/valuePower"
-                            android:layout_width="wrap_content" android:layout_height="wrap_content"
-                            android:text="--" android:textSize="24sp" android:textStyle="bold" />
-                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-                            android:text="@string/unit_watts" android:textSize="9sp" />
-                    </LinearLayout>
-                </com.google.android.material.card.MaterialCardView>
+                    android:text="@string/workout_pause"
+                    android:textSize="11sp"
+                    android:layout_marginStart="4dp"
+                    android:layout_marginEnd="4dp"
+                    android:visibility="gone" />
 
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnWorkoutStop"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_width="0dp"
+                    android:layout_height="32dp"
+                    android:layout_weight="1"
+                    android:text="@string/workout_stop"
+                    android:textSize="11sp"
+                    android:layout_marginStart="4dp"
+                    android:visibility="gone" />
             </LinearLayout>
 
-            <!-- Distance | Energy (always shown) -->
-            <LinearLayout
+            <TextView
+                android:id="@+id/txtScanStatus"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal">
+                android:textSize="11sp"
+                android:paddingBottom="2dp"
+                android:paddingStart="2dp"
+                android:visibility="gone" />
 
-                <com.google.android.material.card.MaterialCardView
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:layout_margin="3dp">
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="vertical"
-                        android:padding="10dp"
-                        android:gravity="center">
-                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-                            android:text="@string/metric_distance" android:textSize="11sp" />
-                        <TextView android:id="@+id/valueDistance"
-                            android:layout_width="wrap_content" android:layout_height="wrap_content"
-                            android:text="--" android:textSize="24sp" android:textStyle="bold" />
-                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-                            android:text="@string/unit_km" android:textSize="9sp" />
-                    </LinearLayout>
-                </com.google.android.material.card.MaterialCardView>
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/rvScanResults"
+                android:layout_width="match_parent"
+                android:layout_height="160dp"
+                android:background="?attr/colorSurface"
+                android:paddingBottom="4dp"
+                android:visibility="gone" />
 
-                <com.google.android.material.card.MaterialCardView
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:layout_margin="3dp">
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="vertical"
-                        android:padding="10dp"
-                        android:gravity="center">
-                        <TextView android:id="@+id/labelEnergy"
-                            android:layout_width="wrap_content" android:layout_height="wrap_content"
-                            android:text="@string/metric_energy" android:textSize="11sp" />
-                        <TextView android:id="@+id/valueEnergy"
-                            android:layout_width="wrap_content" android:layout_height="wrap_content"
-                            android:text="--" android:textSize="24sp" android:textStyle="bold" />
-                        <TextView android:id="@+id/unitEnergy"
-                            android:layout_width="wrap_content" android:layout_height="wrap_content"
-                            android:text="@string/unit_kcal" android:textSize="9sp" />
-                    </LinearLayout>
-                </com.google.android.material.card.MaterialCardView>
-
-            </LinearLayout>
-
-            <!-- Time | Inclination (treadmill) | Resistance (bike) -->
             <LinearLayout
+                android:id="@+id/debugVirtualDeviceRow"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal">
+                android:orientation="horizontal"
+                android:paddingTop="4dp"
+                android:paddingBottom="4dp"
+                android:visibility="gone">
 
-                <com.google.android.material.card.MaterialCardView
-                    android:layout_width="0dp"
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnConnectVirtual"
+                    style="@style/Widget.Material3.Button.TonalButton"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:layout_margin="3dp">
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="vertical"
-                        android:padding="10dp"
-                        android:gravity="center">
-                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-                            android:text="@string/metric_elapsed_time" android:textSize="11sp" />
-                        <TextView android:id="@+id/valueElapsedTime"
-                            android:layout_width="wrap_content" android:layout_height="wrap_content"
-                            android:text="0:00" android:textSize="24sp" android:textStyle="bold" />
-                    </LinearLayout>
-                </com.google.android.material.card.MaterialCardView>
+                    android:text="@string/debug_virtual_treadmill"
+                    app:icon="@drawable/ic_time" />
+            </LinearLayout>
 
-                <com.google.android.material.card.MaterialCardView
-                    android:id="@+id/cardInclination"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:layout_margin="3dp"
-                    android:visibility="gone">
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="vertical"
-                        android:padding="10dp"
-                        android:gravity="center">
-                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-                            android:text="@string/metric_inclination" android:textSize="11sp" />
-                        <TextView android:id="@+id/valueInclination"
-                            android:layout_width="wrap_content" android:layout_height="wrap_content"
-                            android:text="--" android:textSize="24sp" android:textStyle="bold" />
-                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-                            android:text="@string/unit_percent" android:textSize="9sp" />
-                    </LinearLayout>
-                </com.google.android.material.card.MaterialCardView>
+            <TextView
+                android:id="@+id/recordingIndicator"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/recording"
+                android:textColor="@android:color/holo_red_dark"
+                android:textStyle="bold"
+                android:layout_gravity="center_horizontal"
+                android:paddingBottom="4dp"
+                android:visibility="gone" />
 
-                <com.google.android.material.card.MaterialCardView
-                    android:id="@+id/cardResistance"
+            <LinearLayout
+                android:id="@+id/viewToggleRow"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center"
+                android:paddingBottom="4dp"
+                android:visibility="gone">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnViewLap"
+                    style="@style/Widget.Material3.Button.TonalButton"
                     android:layout_width="0dp"
-                    android:layout_height="wrap_content"
+                    android:layout_height="32dp"
                     android:layout_weight="1"
-                    android:layout_margin="3dp"
-                    android:visibility="gone">
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="vertical"
-                        android:padding="10dp"
-                        android:gravity="center">
-                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-                            android:text="@string/metric_resistance" android:textSize="11sp" />
-                        <TextView android:id="@+id/valueResistance"
-                            android:layout_width="wrap_content" android:layout_height="wrap_content"
-                            android:text="--" android:textSize="24sp" android:textStyle="bold" />
-                    </LinearLayout>
-                </com.google.android.material.card.MaterialCardView>
+                    android:text="@string/view_lap"
+                    android:textSize="11sp"
+                    android:layout_marginEnd="4dp"
+                    app:icon="@drawable/ic_lap"
+                    app:iconSize="16dp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnViewChart"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_width="0dp"
+                    android:layout_height="32dp"
+                    android:layout_weight="1"
+                    android:text="@string/view_chart"
+                    android:textSize="11sp"
+                    android:layout_marginStart="4dp"
+                    app:icon="@drawable/ic_chart"
+                    app:iconSize="16dp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/metricsSection"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+
+                    <com.google.android.material.card.MaterialCardView
+                        android:id="@+id/cardSpeed"
+                        android:layout_width="0dp" android:layout_height="wrap_content"
+                        android:layout_weight="1" android:layout_margin="3dp"
+                        app:cardBackgroundColor="@color/metric_speed_bg">
+                        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                            android:orientation="vertical" android:padding="10dp" android:gravity="center">
+                            <ImageView android:layout_width="16dp" android:layout_height="16dp"
+                                android:src="@drawable/ic_speed" app:tint="@color/metric_speed"
+                                android:contentDescription="@null" />
+                            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                                android:text="@string/metric_speed" android:textSize="10sp"
+                                android:textColor="@color/metric_speed" />
+                            <TextView android:id="@+id/valueSpeed"
+                                android:layout_width="wrap_content" android:layout_height="wrap_content"
+                                android:text="--" android:textSize="24sp" android:textStyle="bold"
+                                android:textColor="@color/metric_speed" />
+                            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                                android:text="@string/unit_kmh" android:textSize="9sp"
+                                android:textColor="@color/metric_speed" />
+                        </LinearLayout>
+                    </com.google.android.material.card.MaterialCardView>
+
+                    <com.google.android.material.card.MaterialCardView
+                        android:id="@+id/cardHeartRate"
+                        android:layout_width="0dp" android:layout_height="wrap_content"
+                        android:layout_weight="1" android:layout_margin="3dp"
+                        app:cardBackgroundColor="@color/metric_heart_bg">
+                        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                            android:orientation="vertical" android:padding="10dp" android:gravity="center">
+                            <ImageView android:layout_width="16dp" android:layout_height="16dp"
+                                android:src="@drawable/ic_heart" app:tint="@color/metric_heart"
+                                android:contentDescription="@null" />
+                            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                                android:text="@string/metric_heart_rate" android:textSize="10sp"
+                                android:textColor="@color/metric_heart" />
+                            <TextView android:id="@+id/valueHeartRate"
+                                android:layout_width="wrap_content" android:layout_height="wrap_content"
+                                android:text="--" android:textSize="24sp" android:textStyle="bold"
+                                android:textColor="@color/metric_heart" />
+                            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                                android:text="@string/unit_bpm" android:textSize="9sp"
+                                android:textColor="@color/metric_heart" />
+                        </LinearLayout>
+                    </com.google.android.material.card.MaterialCardView>
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/rowCadencePower"
+                    android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:orientation="horizontal" android:visibility="gone">
+
+                    <com.google.android.material.card.MaterialCardView
+                        android:layout_width="0dp" android:layout_height="wrap_content"
+                        android:layout_weight="1" android:layout_margin="3dp"
+                        app:cardBackgroundColor="@color/metric_cadence_bg">
+                        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                            android:orientation="vertical" android:padding="10dp" android:gravity="center">
+                            <ImageView android:layout_width="16dp" android:layout_height="16dp"
+                                android:src="@drawable/ic_cadence" app:tint="@color/metric_cadence"
+                                android:contentDescription="@null" />
+                            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                                android:text="@string/metric_cadence" android:textSize="10sp"
+                                android:textColor="@color/metric_cadence" />
+                            <TextView android:id="@+id/valueCadence"
+                                android:layout_width="wrap_content" android:layout_height="wrap_content"
+                                android:text="--" android:textSize="24sp" android:textStyle="bold"
+                                android:textColor="@color/metric_cadence" />
+                            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                                android:text="@string/unit_rpm" android:textSize="9sp"
+                                android:textColor="@color/metric_cadence" />
+                        </LinearLayout>
+                    </com.google.android.material.card.MaterialCardView>
+
+                    <com.google.android.material.card.MaterialCardView
+                        android:layout_width="0dp" android:layout_height="wrap_content"
+                        android:layout_weight="1" android:layout_margin="3dp"
+                        app:cardBackgroundColor="@color/metric_power_bg">
+                        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                            android:orientation="vertical" android:padding="10dp" android:gravity="center">
+                            <ImageView android:layout_width="16dp" android:layout_height="16dp"
+                                android:src="@drawable/ic_power" app:tint="@color/metric_power"
+                                android:contentDescription="@null" />
+                            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                                android:text="@string/metric_power" android:textSize="10sp"
+                                android:textColor="@color/metric_power" />
+                            <TextView android:id="@+id/valuePower"
+                                android:layout_width="wrap_content" android:layout_height="wrap_content"
+                                android:text="--" android:textSize="24sp" android:textStyle="bold"
+                                android:textColor="@color/metric_power" />
+                            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                                android:text="@string/unit_watts" android:textSize="9sp"
+                                android:textColor="@color/metric_power" />
+                        </LinearLayout>
+                    </com.google.android.material.card.MaterialCardView>
+                </LinearLayout>
+
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+
+                    <com.google.android.material.card.MaterialCardView
+                        android:layout_width="0dp" android:layout_height="wrap_content"
+                        android:layout_weight="1" android:layout_margin="3dp"
+                        app:cardBackgroundColor="@color/metric_distance_bg">
+                        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                            android:orientation="vertical" android:padding="10dp" android:gravity="center">
+                            <ImageView android:layout_width="16dp" android:layout_height="16dp"
+                                android:src="@drawable/ic_distance" app:tint="@color/metric_distance"
+                                android:contentDescription="@null" />
+                            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                                android:text="@string/metric_distance" android:textSize="10sp"
+                                android:textColor="@color/metric_distance" />
+                            <TextView android:id="@+id/valueDistance"
+                                android:layout_width="wrap_content" android:layout_height="wrap_content"
+                                android:text="--" android:textSize="24sp" android:textStyle="bold"
+                                android:textColor="@color/metric_distance" />
+                            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                                android:text="@string/unit_km" android:textSize="9sp"
+                                android:textColor="@color/metric_distance" />
+                        </LinearLayout>
+                    </com.google.android.material.card.MaterialCardView>
+
+                    <com.google.android.material.card.MaterialCardView
+                        android:layout_width="0dp" android:layout_height="wrap_content"
+                        android:layout_weight="1" android:layout_margin="3dp"
+                        app:cardBackgroundColor="@color/metric_energy_bg">
+                        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                            android:orientation="vertical" android:padding="10dp" android:gravity="center">
+                            <ImageView android:layout_width="16dp" android:layout_height="16dp"
+                                android:src="@drawable/ic_energy" app:tint="@color/metric_energy"
+                                android:contentDescription="@null" />
+                            <TextView android:id="@+id/labelEnergy"
+                                android:layout_width="wrap_content" android:layout_height="wrap_content"
+                                android:text="@string/metric_energy" android:textSize="10sp"
+                                android:textColor="@color/metric_energy" />
+                            <TextView android:id="@+id/valueEnergy"
+                                android:layout_width="wrap_content" android:layout_height="wrap_content"
+                                android:text="--" android:textSize="24sp" android:textStyle="bold"
+                                android:textColor="@color/metric_energy" />
+                            <TextView android:id="@+id/unitEnergy"
+                                android:layout_width="wrap_content" android:layout_height="wrap_content"
+                                android:text="@string/unit_kcal" android:textSize="9sp"
+                                android:textColor="@color/metric_energy" />
+                        </LinearLayout>
+                    </com.google.android.material.card.MaterialCardView>
+                </LinearLayout>
+
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+
+                    <com.google.android.material.card.MaterialCardView
+                        android:layout_width="0dp" android:layout_height="wrap_content"
+                        android:layout_weight="1" android:layout_margin="3dp"
+                        app:cardBackgroundColor="@color/metric_time_bg">
+                        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                            android:orientation="vertical" android:padding="10dp" android:gravity="center">
+                            <ImageView android:layout_width="16dp" android:layout_height="16dp"
+                                android:src="@drawable/ic_time" app:tint="@color/metric_time"
+                                android:contentDescription="@null" />
+                            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                                android:text="@string/metric_elapsed_time" android:textSize="10sp"
+                                android:textColor="@color/metric_time" />
+                            <TextView android:id="@+id/valueElapsedTime"
+                                android:layout_width="wrap_content" android:layout_height="wrap_content"
+                                android:text="0:00" android:textSize="24sp" android:textStyle="bold"
+                                android:textColor="@color/metric_time" />
+                        </LinearLayout>
+                    </com.google.android.material.card.MaterialCardView>
+
+                    <com.google.android.material.card.MaterialCardView
+                        android:id="@+id/cardInclination"
+                        android:layout_width="0dp" android:layout_height="wrap_content"
+                        android:layout_weight="1" android:layout_margin="3dp"
+                        android:visibility="gone"
+                        app:cardBackgroundColor="@color/metric_inclination_bg">
+                        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                            android:orientation="vertical" android:padding="10dp" android:gravity="center">
+                            <ImageView android:layout_width="16dp" android:layout_height="16dp"
+                                android:src="@drawable/ic_inclination" app:tint="@color/metric_inclination"
+                                android:contentDescription="@null" />
+                            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                                android:text="@string/metric_inclination" android:textSize="10sp"
+                                android:textColor="@color/metric_inclination" />
+                            <TextView android:id="@+id/valueInclination"
+                                android:layout_width="wrap_content" android:layout_height="wrap_content"
+                                android:text="--" android:textSize="24sp" android:textStyle="bold"
+                                android:textColor="@color/metric_inclination" />
+                            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                                android:text="@string/unit_percent" android:textSize="9sp"
+                                android:textColor="@color/metric_inclination" />
+                        </LinearLayout>
+                    </com.google.android.material.card.MaterialCardView>
+
+                    <com.google.android.material.card.MaterialCardView
+                        android:id="@+id/cardResistance"
+                        android:layout_width="0dp" android:layout_height="wrap_content"
+                        android:layout_weight="1" android:layout_margin="3dp"
+                        android:visibility="gone"
+                        app:cardBackgroundColor="@color/metric_resistance_bg">
+                        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                            android:orientation="vertical" android:padding="10dp" android:gravity="center">
+                            <ImageView android:layout_width="16dp" android:layout_height="16dp"
+                                android:src="@drawable/ic_resistance" app:tint="@color/metric_resistance"
+                                android:contentDescription="@null" />
+                            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                                android:text="@string/metric_resistance" android:textSize="10sp"
+                                android:textColor="@color/metric_resistance" />
+                            <TextView android:id="@+id/valueResistance"
+                                android:layout_width="wrap_content" android:layout_height="wrap_content"
+                                android:text="--" android:textSize="24sp" android:textStyle="bold"
+                                android:textColor="@color/metric_resistance" />
+                        </LinearLayout>
+                    </com.google.android.material.card.MaterialCardView>
+                </LinearLayout>
 
             </LinearLayout>
+
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/lapSection"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:layout_marginTop="4dp" android:visibility="gone"
+                app:cardElevation="2dp">
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:orientation="vertical" android:padding="12dp" android:gravity="center">
+
+                    <TextView android:id="@+id/txtLapNumber"
+                        android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="Lap 1" android:textSize="18sp" android:textStyle="bold"
+                        android:textColor="?attr/colorPrimary" />
+
+                    <ProgressBar android:id="@+id/progressBarLap"
+                        style="?android:attr/progressBarStyleHorizontal"
+                        android:layout_width="match_parent" android:layout_height="8dp"
+                        android:layout_marginTop="6dp" android:layout_marginBottom="6dp"
+                        android:max="1000" android:progress="0" />
+
+                    <TextView android:id="@+id/txtLapProgress"
+                        android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="0.00 km" android:textSize="24sp" android:textStyle="bold" />
+
+                    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:orientation="horizontal" android:gravity="center"
+                        android:layout_marginTop="6dp">
+
+                        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content"
+                            android:layout_weight="1" android:orientation="vertical" android:gravity="center">
+                            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                                android:text="@string/lap_time_label" android:textSize="11sp"
+                                android:textColor="?android:attr/textColorSecondary" />
+                            <TextView android:id="@+id/txtLapTime"
+                                android:layout_width="wrap_content" android:layout_height="wrap_content"
+                                android:text="0:00" android:textSize="16sp" android:textStyle="bold" />
+                        </LinearLayout>
+
+                        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content"
+                            android:layout_weight="1" android:orientation="vertical" android:gravity="center">
+                            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                                android:text="@string/lap_count_label" android:textSize="11sp"
+                                android:textColor="?android:attr/textColorSecondary" />
+                            <TextView android:id="@+id/txtLapCount"
+                                android:layout_width="wrap_content" android:layout_height="wrap_content"
+                                android:text="0" android:textSize="16sp" android:textStyle="bold" />
+                        </LinearLayout>
+                    </LinearLayout>
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/chartSection"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:layout_marginTop="4dp" android:visibility="gone"
+                app:cardElevation="2dp">
+                <net.duhowpi.ftmsbridge.LineChartView
+                    android:id="@+id/liveChart"
+                    android:layout_width="match_parent"
+                    android:layout_height="160dp" />
+            </com.google.android.material.card.MaterialCardView>
 
         </LinearLayout>
-
-    </LinearLayout>
-
     </ScrollView>
 </LinearLayout>
