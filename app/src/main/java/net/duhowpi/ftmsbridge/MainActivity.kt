@@ -577,7 +577,11 @@ class MainActivity : AppCompatActivity() {
         val elapsedSec = if (sample.elapsedTimeSec > 0) {
             sample.elapsedTimeSec
         } else if (isRecording && elapsedFallbackStartTime > 0) {
-            ((sample.timestampMs - elapsedFallbackStartTime).coerceAtLeast(0L) / 1000).toInt()
+            val deltaMs = sample.timestampMs - elapsedFallbackStartTime
+            if (deltaMs < 0L) {
+                Log.w(tag, "Elapsed fallback delta was negative: sampleTs=${sample.timestampMs}, anchor=$elapsedFallbackStartTime")
+            }
+            (deltaMs.coerceAtLeast(0L) / 1000).toInt()
         } else 0
 
         binding.valueSpeed.text = String.format("%.1f", sample.speedKmh)
@@ -690,7 +694,11 @@ class MainActivity : AppCompatActivity() {
         // Use wall-clock elapsed time when device sends 0 (BH Fitness quirk).
         val elapsedSec = if (sample.elapsedTimeSec > 0) sample.elapsedTimeSec
         else if (elapsedFallbackStartTime > 0) {
-            ((sample.timestampMs - elapsedFallbackStartTime).coerceAtLeast(0L) / 1000).toInt()
+            val deltaMs = sample.timestampMs - elapsedFallbackStartTime
+            if (deltaMs < 0L) {
+                Log.w(tag, "Persist elapsed fallback delta was negative: sampleTs=${sample.timestampMs}, anchor=$elapsedFallbackStartTime")
+            }
+            (deltaMs.coerceAtLeast(0L) / 1000).toInt()
         } else 0
         lifecycleScope.launch(Dispatchers.IO) {
             db.sampleDao().insert(
@@ -882,6 +890,10 @@ class MainActivity : AppCompatActivity() {
         decSmall.text = smallDecLabel
         incSmall.text = smallIncLabel
         incLarge.text = largeIncLabel
+        decLarge.contentDescription = getString(R.string.control_cd_adjust, largeDecLabel)
+        decSmall.contentDescription = getString(R.string.control_cd_adjust, smallDecLabel)
+        incSmall.contentDescription = getString(R.string.control_cd_adjust, smallIncLabel)
+        incLarge.contentDescription = getString(R.string.control_cd_adjust, largeIncLabel)
 
         val maxProgress = ((max - min) / step).roundToInt().coerceAtLeast(1)
         seek.max = maxProgress
@@ -933,6 +945,10 @@ class MainActivity : AppCompatActivity() {
     private fun sendTargetSpeedKmh(speedKmh: Double): Boolean {
         val clamped = speedKmh.coerceIn(SPEED_MIN_KMH, SPEED_MAX_KMH)
         val encoded = (clamped * 100.0).roundToInt()
+        if (encoded !in Short.MIN_VALUE..Short.MAX_VALUE) {
+            Log.w(tag, "Encoded speed out of range: $encoded")
+            return false
+        }
         val payload = ByteBuffer.allocate(3)
             .order(ByteOrder.LITTLE_ENDIAN)
             .put(FtmsConstants.CONTROL_SET_TARGET_SPEED)
@@ -944,6 +960,10 @@ class MainActivity : AppCompatActivity() {
     private fun sendTargetInclinePercent(inclinePercent: Double): Boolean {
         val clamped = inclinePercent.coerceIn(INCLINE_MIN_PERCENT, INCLINE_MAX_PERCENT)
         val encoded = (clamped * 10.0).roundToInt()
+        if (encoded !in Short.MIN_VALUE..Short.MAX_VALUE) {
+            Log.w(tag, "Encoded incline out of range: $encoded")
+            return false
+        }
         val payload = ByteBuffer.allocate(3)
             .order(ByteOrder.LITTLE_ENDIAN)
             .put(FtmsConstants.CONTROL_SET_TARGET_INCLINATION)
