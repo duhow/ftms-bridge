@@ -6,7 +6,7 @@ on:
       - 'v*'
 
 env:
-  APP_NAME: app-release
+  APP_NAME: ftms-bridge
 
 jobs:
   release:
