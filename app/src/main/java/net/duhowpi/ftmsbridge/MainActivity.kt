@@ -283,7 +283,7 @@ class MainActivity : AppCompatActivity() {
         binding.liveChart.setData(*seriesList.toTypedArray(), durationSec = durationSec)
     }
 
-    private fun updateLapView(sample: FitnessSample) {
+    private fun updateLapView(sample: FitnessSample, elapsedSec: Int) {
         val distM = sample.totalDistanceM
         val lapProgressM = (distM - lapStartDistanceM).coerceAtLeast(0)
         if (lapProgressM >= LAP_DISTANCE_METERS) {
@@ -294,13 +294,14 @@ class MainActivity : AppCompatActivity() {
         val currentLapM = (distM - lapStartDistanceM).coerceAtLeast(0).coerceAtMost(LAP_DISTANCE_METERS)
         val lapElapsedMs = System.currentTimeMillis() - lapStartTimeMs
         val lapSec = (lapElapsedMs / 1000).toInt()
-        binding.txtLapNumber.text = getString(R.string.lap_view_label, lapCount + 1)
         binding.progressBarLap.progress = currentLapM
         binding.txtLapProgress.text = getString(R.string.lap_progress_label, currentLapM / 1000.0)
         val lm = lapSec / 60
         val ls = lapSec % 60
         binding.txtLapTime.text = String.format("%d:%02d", lm, ls)
-        binding.txtLapCount.text = "$lapCount"
+        val tm = elapsedSec / 60
+        val ts = elapsedSec % 60
+        binding.txtLapCount.text = String.format("%d:%02d", tm, ts)
     }
 
     /** Returns true if [points] contains at least one non-zero value. */
@@ -744,12 +745,18 @@ class MainActivity : AppCompatActivity() {
         val hrConnected = hrConnectionManager?.isConnected == true
         val hasHrDevice = hrConnectionManager != null
 
-        binding.indicatorFtms.setColorFilter(
-            ContextCompat.getColor(this, if (ftmsConnected) R.color.status_connected else R.color.status_disconnected)
-        )
-        binding.indicatorHr.setColorFilter(
-            ContextCompat.getColor(this, if (hrConnected) R.color.status_connected else R.color.status_disconnected)
-        )
+        val ftmsColor = ContextCompat.getColor(this, if (ftmsConnected) R.color.status_connected else R.color.status_disconnected)
+        val hrColor = ContextCompat.getColor(this, if (hrConnected) R.color.status_connected else R.color.status_disconnected)
+
+        binding.indicatorFtms.setColorFilter(ftmsColor)
+        binding.indicatorHr.setColorFilter(hrColor)
+        // Keep toolbar indicators in sync
+        binding.toolbarIndicatorFtms.setColorFilter(ftmsColor)
+        binding.toolbarIndicatorHr.setColorFilter(hrColor)
+        if (isRecording) {
+            binding.toolbarIndicatorHr.visibility = if (hasHrDevice) View.VISIBLE else View.GONE
+        }
+
         binding.txtFtmsDevice.text = when {
             dummyTreadmill != null -> dummyTreadmill?.deviceName ?: getString(R.string.connected)
             ftmsConnected -> ftmsConnectionManager?.connectedDeviceName ?: getString(R.string.connected)
@@ -842,7 +849,7 @@ class MainActivity : AppCompatActivity() {
             )
             liveHrPoints.add(sample.heartRateBpm.toFloat())
             if (isChartViewActive) updateLiveChart()
-            updateLapView(sample)
+            updateLapView(sample, elapsedSec)
         }
     }
 
@@ -899,7 +906,20 @@ class MainActivity : AppCompatActivity() {
         lastSavedSampleMs = 0
         lastSavedSampleData = null
         binding.btnWorkoutStart.text = getString(R.string.stop_session)
-        binding.recordingIndicator.visibility = View.VISIBLE
+        // Hide device header and REC indicator; show compact status icons in toolbar instead
+        binding.deviceHeaderRow.visibility = View.GONE
+        binding.recordingIndicator.visibility = View.GONE
+        val ftmsConnected = ftmsConnectionManager?.isConnected == true || dummyTreadmill != null
+        val hrConnected = hrConnectionManager?.isConnected == true
+        val hasHrDevice = hrConnectionManager != null
+        binding.toolbarIndicatorFtms.setColorFilter(
+            ContextCompat.getColor(this, if (ftmsConnected) R.color.status_connected else R.color.status_disconnected)
+        )
+        binding.toolbarIndicatorHr.setColorFilter(
+            ContextCompat.getColor(this, if (hrConnected) R.color.status_connected else R.color.status_disconnected)
+        )
+        binding.toolbarIndicatorHr.visibility = if (hasHrDevice) View.VISIBLE else View.GONE
+        binding.toolbarStatusIcons.visibility = View.VISIBLE
         binding.metricsSection.visibility = View.VISIBLE
         // Hide scan results list during workout to reduce clutter
         binding.rvScanResults.visibility = View.GONE
@@ -938,6 +958,8 @@ class MainActivity : AppCompatActivity() {
         lastFallbackElapsedSec = 0
         binding.btnWorkoutStart.text = getString(R.string.start_session)
         binding.recordingIndicator.visibility = View.GONE
+        binding.toolbarStatusIcons.visibility = View.GONE
+        binding.deviceHeaderRow.visibility = View.VISIBLE
         binding.viewToggleRow.visibility = View.GONE
         binding.lapSection.visibility = View.GONE
         binding.chartSection.visibility = View.GONE

@@ -122,6 +122,7 @@
     <string name="lap_progress_label">%.2f km</string>
     <string name="lap_time_label">Temps volta</string>
     <string name="lap_count_label">Voltes</string>
+    <string name="workout_total_time_label">Total</string>
 
     <!-- Debug virtual device -->
     <string name="debug_virtual_treadmill">Cinta virtual</string>

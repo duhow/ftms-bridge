@@ -11,7 +11,37 @@
         android:layout_width="match_parent"
         android:layout_height="?attr/actionBarSize"
         android:background="?attr/colorSurface"
-        android:elevation="4dp" />
+        android:elevation="4dp">
+
+        <!-- Status icons shown in toolbar during an active workout -->
+        <LinearLayout
+            android:id="@+id/toolbarStatusIcons"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="end|center_vertical"
+            android:orientation="horizontal"
+            android:paddingEnd="8dp"
+            android:visibility="gone">
+
+            <ImageView
+                android:id="@+id/toolbarIndicatorFtms"
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:src="@drawable/ic_bluetooth"
+                app:tint="@color/status_disconnected"
+                android:contentDescription="@null" />
+
+            <ImageView
+                android:id="@+id/toolbarIndicatorHr"
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:src="@drawable/ic_heart"
+                app:tint="@color/status_disconnected"
+                android:layout_marginStart="6dp"
+                android:contentDescription="@null"
+                android:visibility="gone" />
+        </LinearLayout>
+    </androidx.appcompat.widget.Toolbar>
 
     <ScrollView
         android:layout_width="match_parent"
@@ -25,6 +55,7 @@
             android:padding="16dp">
 
             <LinearLayout
+                android:id="@+id/deviceHeaderRow"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
@@ -493,20 +524,15 @@
                 <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
                     android:orientation="vertical" android:padding="16dp" android:gravity="center">
 
-                    <TextView android:id="@+id/txtLapNumber"
+                    <TextView android:id="@+id/txtLapProgress"
                         android:layout_width="wrap_content" android:layout_height="wrap_content"
-                        android:text="@string/view_lap" android:textSize="22sp" android:textStyle="bold"
-                        android:textColor="?attr/colorPrimary" />
+                        android:text="0.00 km" android:textSize="32sp" android:textStyle="bold" />
 
                     <ProgressBar android:id="@+id/progressBarLap"
                         style="?android:attr/progressBarStyleHorizontal"
                         android:layout_width="match_parent" android:layout_height="12dp"
                         android:layout_marginTop="8dp" android:layout_marginBottom="8dp"
                         android:max="1000" android:progress="0" />
-
-                    <TextView android:id="@+id/txtLapProgress"
-                        android:layout_width="wrap_content" android:layout_height="wrap_content"
-                        android:text="0.00 km" android:textSize="32sp" android:textStyle="bold" />
 
                     <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
                         android:orientation="horizontal" android:gravity="center"
@@ -525,11 +551,11 @@
                         <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content"
                             android:layout_weight="1" android:orientation="vertical" android:gravity="center">
                             <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-                                android:text="@string/lap_count_label" android:textSize="12sp"
+                                android:text="@string/workout_total_time_label" android:textSize="12sp"
                                 android:textColor="?android:attr/textColorSecondary" />
                             <TextView android:id="@+id/txtLapCount"
                                 android:layout_width="wrap_content" android:layout_height="wrap_content"
-                                android:text="0" android:textSize="20sp" android:textStyle="bold" />
+                                android:text="0:00" android:textSize="20sp" android:textStyle="bold" />
                         </LinearLayout>
                     </LinearLayout>
                 </LinearLayout>
