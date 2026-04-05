@@ -94,10 +94,10 @@ and `total_kcal=0`.  It does **not** repeat during the workout.
 Consequence: elapsed time, distance, and energy appear to freeze at their initial
 values for the entire session.
 
-**Elapsed time fix:** `BhFitnessTreadmill` records the system clock at the moment C112
-arrives (`iConceptLastUpdateMs`) and adds the wall-clock delta to `iConceptBaseElapsedSec`
-on every subsequent `onDataReceived()` call.  This keeps the timer advancing correctly
-even when no further C112 packets are received.
+**Elapsed time fix:** `BhFitnessTreadmill` advances elapsed time monotonically from packet
+timestamp deltas (`sample.timestampMs`) whenever FTMS elapsed remains zero. If a non-zero
+elapsed value is ever reported, it is used as a lower-bound sync point and the derived
+timer continues from there.
 
 **Distance and energy fallback:** Because C112 does not continue streaming, the app now
 derives:

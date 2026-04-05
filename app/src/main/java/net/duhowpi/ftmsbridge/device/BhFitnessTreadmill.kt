@@ -17,12 +17,8 @@ class BhFitnessTreadmill(deviceName: String) :
     private val tag = "BhFitnessTreadmill"
 
     // Last values received from the iConcept 0xC112 workout-counter notification.
-    // These replace the zeros the device sends in the standard 0x2ACD FTMS packet.
-    //
-    // C112 fires only once at session start with the initial elapsed/distance/energy
-    // snapshot (typically elapsed=2, distance=0, calories=0). It does NOT update during
-    // the workout. Elapsed time is therefore advanced via wall-clock delta since the
-    // last C112 receipt; distance and energy remain as reported by the device.
+    // C112 fires only once at session start on this device model, so elapsed time,
+    // distance, and energy continue from derived packet-delta estimates.
     @Volatile private var iConceptDistanceM: Int = 0
     @Volatile private var iConceptCalories: Int = 0
     @Volatile private var lastSampleTimestampMs: Long = 0L
@@ -78,7 +74,11 @@ class BhFitnessTreadmill(deviceName: String) :
         }
         lastSampleTimestampMs = nowMs
 
+        if (dtSec > 0.0) {
+            derivedElapsedSec += dtSec
+        }
         val elapsedSec = if (sample.elapsedTimeSec > 0) {
+            derivedElapsedSec = kotlin.math.max(derivedElapsedSec, sample.elapsedTimeSec.toDouble())
             sample.elapsedTimeSec
         } else {
             kotlin.math.round(derivedElapsedSec).toInt()
@@ -110,7 +110,6 @@ class BhFitnessTreadmill(deviceName: String) :
         }
 
         if (dtSec > 0.0) {
-            derivedElapsedSec += dtSec
             derivedDistanceM += sample.speedKmh * dtSec * METERS_PER_KMH_PER_SEC
             derivedEnergyKcal += estimateEnergyDeltaKcal(sample.speedKmh, correctedIncline, dtSec)
         }

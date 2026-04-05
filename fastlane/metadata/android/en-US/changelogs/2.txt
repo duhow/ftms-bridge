@@ -3,6 +3,7 @@ Add user-facing changes for the next release here.
 - Inclination shown as whole number percent instead of one decimal place
 - Fixed negative (decline) incline showing as large positive value
 - Added BH treadmill fallback distance and energy estimation from speed/incline when counters are missing
+- Fixed BH treadmill elapsed time fallback so timer keeps increasing when device sends zero
 - Fixed BH indoor bike metrics by deriving distance and energy from live bike packets
 - Reduced occasional BH indoor bike cadence spikes by filtering outlier packets
 - Added BH indoor bike resistance level detection (level 1..11) from live packet data
