@@ -5,3 +5,5 @@ Add user-facing changes for the next release here.
 - Fixed BH indoor bike showing invalid speed by using derived value from bike packets
 - Added BH indoor bike derived distance and energy during workouts
 - Reduced occasional BH indoor bike speed/cadence spikes by filtering outlier packets
+- Added BH indoor bike resistance level detection (level 1..11) from live packet data
+- Removed BH indoor bike speed display to avoid duplicated stride-equivalent value

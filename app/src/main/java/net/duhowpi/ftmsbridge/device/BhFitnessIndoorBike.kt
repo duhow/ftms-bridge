@@ -19,6 +19,12 @@ class BhFitnessIndoorBike(deviceName: String) :
         private const val METERS_PER_KMH_PER_SEC = METERS_PER_KM / SECONDS_PER_HOUR
         private const val JOULES_PER_KCAL = 4184.0
         private const val STRIDES_ENCODING_FACTOR = 100.0
+        private const val MIN_MOVING_POWER_W = 5
+        private const val MIN_MOVING_CADENCE_RPM = 10.0
+        private const val MIN_LEVEL_TORQUE_NM = 2.0
+        private const val LEVEL_TORQUE_STEP_NM = 2.0
+        private const val MAX_LEVEL = 11
+        private const val TWO_PI = Math.PI * 2.0
     }
 
     private fun stridesFromEnergy(energyField: Int): Double {
@@ -31,6 +37,24 @@ class BhFitnessIndoorBike(deviceName: String) :
     private var hasAcceptedBaseline: Boolean = false
     private var lastAcceptedSpeedKmh: Double = 0.0
     private var lastAcceptedCadenceRpm: Double = 0.0
+    private var lastDerivedLevel: Int = 0
+
+    private fun deriveResistanceLevel(cadenceRpm: Double, powerW: Int): Int {
+        if (powerW < MIN_MOVING_POWER_W || cadenceRpm < MIN_MOVING_CADENCE_RPM) {
+            lastDerivedLevel = 0
+            return 0
+        }
+        val angularVelocityRadPerSec = cadenceRpm * TWO_PI / 60.0
+        if (angularVelocityRadPerSec <= 0.0) {
+            lastDerivedLevel = 0
+            return 0
+        }
+        val torqueNm = powerW.toDouble() / angularVelocityRadPerSec
+        val level = kotlin.math.round((torqueNm - MIN_LEVEL_TORQUE_NM) / LEVEL_TORQUE_STEP_NM).toInt() + 1
+        val clampedLevel = level.coerceIn(1, MAX_LEVEL)
+        lastDerivedLevel = clampedLevel
+        return clampedLevel
+    }
 
     // BH Fitness indoor bikes repurpose several standard FTMS fields:
     //
@@ -43,6 +67,8 @@ class BhFitnessIndoorBike(deviceName: String) :
     //  Metabolic Equiv  — always 0x7B (12.3 MET); constant, not a real reading. Zero.
     //  Distance         — always 0; derive cumulatively from synthetic speed + time.
     //  Total Energy     — derive cumulatively from power + time.
+    //  Resistance Level — FTMS resistance flag is absent in observed packets; derive
+    //                     bike level (1..11) from torque estimated via power+cadence.
     //
     //  Reliable fields: cadenceRpm, instantaneousPowerW, heartRateBpm.
     //  Some sessions show occasional one-packet speed/cadence spikes. To avoid
@@ -75,13 +101,15 @@ class BhFitnessIndoorBike(deviceName: String) :
             lastAcceptedSpeedKmh = baselineSpeed
             lastAcceptedCadenceRpm = baselineCadence
             val baselineStrides = stridesFromEnergy(sample.totalEnergyKcal)
+            val baselineLevel = deriveResistanceLevel(baselineCadence, sample.instantaneousPowerW)
             return sample.copy(
-                speedKmh = baselineSpeed,
+                speedKmh = 0.0,
                 averageSpeedKmh = 0.0,
                 cadenceRpm = baselineCadence,
                 totalDistanceM = 0,
                 stridesPerMin = baselineStrides,
                 totalEnergyKcal = 0,
+                resistanceLevel = baselineLevel,
                 energyPerHourKcal = 0,
                 energyPerMinuteKcal = 0,
                 metabolicEquivalent = 0.0
@@ -107,6 +135,7 @@ class BhFitnessIndoorBike(deviceName: String) :
         lastAcceptedCadenceRpm = filteredCadenceRpm
 
         val strides = stridesFromEnergy(sample.totalEnergyKcal)
+        val derivedLevel = deriveResistanceLevel(filteredCadenceRpm, sample.instantaneousPowerW)
 
         if (dtSec > 0.0) {
             cumulativeDistanceM += syntheticSpeedKmh * dtSec * METERS_PER_KMH_PER_SEC
@@ -116,12 +145,13 @@ class BhFitnessIndoorBike(deviceName: String) :
         }
 
         return sample.copy(
-            speedKmh = syntheticSpeedKmh,
+            speedKmh = 0.0,
             averageSpeedKmh = 0.0,
             cadenceRpm = filteredCadenceRpm,
             totalDistanceM = kotlin.math.round(cumulativeDistanceM).toInt(),
             stridesPerMin = strides,
             totalEnergyKcal = kotlin.math.round(cumulativeEnergyKcal).toInt(),
+            resistanceLevel = derivedLevel,
             energyPerHourKcal = 0,
             energyPerMinuteKcal = 0,
             metabolicEquivalent = 0.0

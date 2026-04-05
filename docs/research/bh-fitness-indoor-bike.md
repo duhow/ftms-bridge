@@ -76,6 +76,7 @@ Bit  9 = 1  → Heart Rate present
 Bit 10 = 1  → Metabolic Equivalent present
 Bit 11 = 1  → Elapsed Time present
 Bit 12 = 0  → Remaining Time absent
+Bit 13 = 0  → Reserved / future use (observed byte pair tracks console "level")
 ```
 
 ### Byte map (20-byte packet)
@@ -175,14 +176,31 @@ immediately return on the next packet). To reduce dashboard/export artifacts:
 - Single-step deltas above a time-scaled limit are treated as outliers and ignored.
 - The last accepted value is kept for that packet.
 
+### Resistance level derivation (console level 1..11)
+
+This bike does not set FTMS bit 5 (Resistance Level). In all observed `0x0F54` packets,
+bytes at offsets `18–19` are non-zero and vary with workout load despite FTMS elapsed
+time not being reported by this device.
+
+For the B01_17384 capture, these bytes tracked the console “level” changes. The app now
+derives a resistance level `1..11` from estimated crank torque:
+
+- `torqueNm = powerW / angularVelocityRadPerSec`
+- `angularVelocityRadPerSec = cadenceRpm * 2π / 60`
+- map torque bands to integer levels and clamp to `1..11` while pedaling
+
+When cadence/power indicate idle, level is `0` and the tile shows `--`.
+
 ---
 
 ## Implementation summary
 
 `BhFitnessIndoorBike.onDataReceived()` corrects:
 - `speedKmh` from repurposed speed bytes (`raw / 100`) with outlier filtering
+- `speedKmh = 0.0` in UI/output for indoor bike to avoid duplicating stride-derived value
 - `averageSpeedKmh = 0.0` — not present but zeroed for safety
 - `cadenceRpm` with outlier filtering
+- `resistanceLevel` derived as bike level (1..11) from power+cadence torque estimate
 - `totalDistanceM` by integrating filtered speed over packet interval
 - `stridesPerMin = totalEnergyKcal / 100.0` — stride counter
 - `totalEnergyKcal` by integrating power over packet interval

@@ -396,9 +396,14 @@ class MainActivity : AppCompatActivity() {
                 val sample = fitnessDevice?.onDataReceived(data) ?: return
                 val mergedSample = if (sample.heartRateBpm == 0 && lastHeartRateBpm > 0)
                     sample.copy(heartRateBpm = lastHeartRateBpm) else sample
-                // Detect machine running state from speed as a fallback for devices that
-                // do not expose a machine-status characteristic (speed > 0 → machine running).
-                val nowRunning = mergedSample.speedKmh > 0.1
+                // Detect machine running state for devices without machine-status updates.
+                // BH indoor bikes do not provide a meaningful speed field, so use cadence/power.
+                val machineType = fitnessDevice?.machineType
+                val nowRunning = if (machineType == FtmsConstants.MachineType.INDOOR_BIKE) {
+                    mergedSample.cadenceRpm > 10.0 || mergedSample.instantaneousPowerW > 5
+                } else {
+                    mergedSample.speedKmh > 0.1
+                }
                 if (nowRunning != isMachineRunning) {
                     isMachineRunning = nowRunning
                     runOnUiThread { updateMachineRunningState() }
@@ -590,18 +595,25 @@ class MainActivity : AppCompatActivity() {
      * depending on the data received (see [updateDashboard]).
      *
      * Treadmill      → Speed, HR, Distance, Energy, Time, Inclination
-     * Indoor Bike    → Speed, HR, Cadence, Power, Distance, Energy, Time, Resistance
+     * Indoor Bike    → HR, Cadence, Power, Distance, Energy, Time, Resistance
      * Cross Trainer  → Speed, HR, Cadence, Power, Distance, Energy, Time, Resistance
      * Stair Climber  → HR, Cadence, Distance, Energy, Time
      * Unknown / disconnected → only the universal tiles (no device-specific tiles)
      */
     private fun updateMetricVisibility(machineType: FtmsConstants.MachineType) {
         val isTreadmill = machineType == FtmsConstants.MachineType.TREADMILL
+        val isIndoorBike = machineType == FtmsConstants.MachineType.INDOOR_BIKE
         val isBike = machineType == FtmsConstants.MachineType.INDOOR_BIKE ||
                 machineType == FtmsConstants.MachineType.CROSS_TRAINER
+        val showSpeed = machineType != FtmsConstants.MachineType.INDOOR_BIKE
+        binding.cardSpeed.visibility = if (showSpeed) View.VISIBLE else View.GONE
         binding.rowCadencePower.visibility = if (isBike) View.VISIBLE else View.GONE
         binding.cardInclination.visibility = if (isTreadmill) View.VISIBLE else View.GONE
         binding.cardResistance.visibility = if (isBike) View.VISIBLE else View.GONE
+        // When speed is hidden on indoor bike, keep HR tile as the only first-row metric.
+        binding.cardHeartRate.layoutParams = (binding.cardHeartRate.layoutParams as LinearLayout.LayoutParams).apply {
+            weight = if (isIndoorBike) 2f else 1f
+        }
     }
 
     private fun resetMetrics() {
@@ -890,4 +902,3 @@ class MainActivity : AppCompatActivity() {
         )
     }
 }
-
