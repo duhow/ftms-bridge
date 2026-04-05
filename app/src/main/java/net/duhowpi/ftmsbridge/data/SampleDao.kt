@@ -9,6 +9,9 @@ interface SampleDao {
     @Insert
     suspend fun insert(sample: WorkoutSample)
 
+    @Insert
+    suspend fun insertAll(samples: List<WorkoutSample>)
+
     @Query("SELECT * FROM workout_samples WHERE sessionId = :sessionId ORDER BY timestampMs ASC")
     suspend fun getAllBySession(sessionId: Long): List<WorkoutSample>
 }

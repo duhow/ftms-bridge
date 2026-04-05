@@ -137,6 +137,8 @@ class MainActivity : AppCompatActivity() {
         hrDebugLogger = BtDebugLogger(BuildConfig.BT_DEBUG_LOG, this)
         bleScanner = BleScanner(this)
 
+        createDebugSampleDataIfNeeded()
+
         setupScanList()
         setupUI()
 
@@ -151,6 +153,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         return when (item.itemId) {
+            R.id.action_debug -> { showDebugDialog(); true }
             R.id.action_about -> { showAboutDialog(); true }
             else -> super.onOptionsItemSelected(item)
         }
@@ -192,7 +195,6 @@ class MainActivity : AppCompatActivity() {
             if (isRecording) stopRecording() else startRecording()
         }
 
-        binding.btnDebug.setOnClickListener { showDebugDialog() }
         binding.cardSpeed.setOnClickListener { showSpeedControlDialog() }
         binding.cardInclination.setOnClickListener { showInclineControlDialog() }
 
@@ -324,6 +326,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updateScanListUI() {
+        if (isRecording) return
         // Merge current scan results with known devices (previously connected) that
         // are not present in the current scan — so the user can always reconnect.
         val combined = scanResultsMap.toMutableMap()
@@ -402,6 +405,16 @@ class MainActivity : AppCompatActivity() {
                 val name = device.name ?: getString(R.string.unknown_device)
                 fitnessDevice = FtmsDevice.createFromCharacteristics(name, ftmsCharacteristics)
                 runOnUiThread {
+                    // Update scan entry with detected machine type
+                    val mt = fitnessDevice?.machineType?.name
+                    if (mt != null) {
+                        scanResultsMap[device.address]?.let { existing ->
+                            scanResultsMap[device.address] = existing.copy(machineType = mt)
+                        }
+                        knownDevicesMap[device.address]?.let { existing ->
+                            knownDevicesMap[device.address] = existing.copy(machineType = mt)
+                        }
+                    }
                     markScanEntryHr(device.address, hasHeartRate)
                     updateConnectionStatus()
                     updateScanListUI()
@@ -1068,26 +1081,16 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun exportDebugLogs() {
-        val logFiles = BtDebugLogger.getAllLogFiles(this)
-        if (logFiles.isEmpty()) {
+        val logFile = debugLogger.getAppLogFile()
+        if (logFile == null) {
             Toast.makeText(this, getString(R.string.no_log_files), Toast.LENGTH_SHORT).show()
             return
         }
-        val uris = logFiles.map { file ->
-            FileProvider.getUriForFile(this, "${packageName}.fileprovider", file)
-        }
-        val intent = if (uris.size == 1) {
-            Intent(Intent.ACTION_SEND).apply {
-                type = "text/plain"
-                putExtra(Intent.EXTRA_STREAM, uris[0])
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            }
-        } else {
-            Intent(Intent.ACTION_SEND_MULTIPLE).apply {
-                type = "text/plain"
-                putParcelableArrayListExtra(Intent.EXTRA_STREAM, ArrayList(uris))
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            }
+        val uri = FileProvider.getUriForFile(this, "${packageName}.fileprovider", logFile)
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_STREAM, uri)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
         startActivity(Intent.createChooser(intent, getString(R.string.export_logs)))
     }
@@ -1172,6 +1175,78 @@ class MainActivity : AppCompatActivity() {
             if (name.contains(fragment, ignoreCase = true)) return true
         }
         return false
+    }
+
+    private fun createDebugSampleDataIfNeeded() {
+        if (!BuildConfig.BT_DEBUG_LOG) return
+        lifecycleScope.launch(Dispatchers.IO) {
+            if (db.sessionDao().getAll().isNotEmpty()) return@launch
+            val now = System.currentTimeMillis()
+            // Fake treadmill session: 90 minutes ago
+            val treadmillStart = now - 90 * 60 * 1000L
+            val treadmillEnd = treadmillStart + 30 * 60 * 1000L
+            val treadmillSession = WorkoutSession(
+                startTimeMs = treadmillStart,
+                endTimeMs = treadmillEnd,
+                machineType = "TREADMILL",
+                deviceName = "Debug Treadmill",
+                totalElapsedTimeSec = 30 * 60,
+                totalDistanceM = 5200,
+                totalEnergyKcal = 320,
+                avgSpeedKmh = 10.4,
+                maxSpeedKmh = 12.0
+            )
+            val treadmillId = db.sessionDao().insert(treadmillSession)
+            val treadmillSamples = (0 until 60).map { i ->
+                val elapsed = i * 30
+                val phase = i.toDouble() / 60.0
+                val speed = 6.0 + 4.0 * Math.sin(phase * Math.PI * 2) + 0.5 * (Math.random() - 0.5)
+                val incline = 2.5 + 2.5 * Math.sin(phase * Math.PI)
+                WorkoutSample(
+                    sessionId = treadmillId,
+                    timestampMs = treadmillStart + elapsed * 1000L,
+                    elapsedTimeSec = elapsed,
+                    speedKmh = speed.coerceIn(0.0, 20.0),
+                    inclinationPercent = incline.coerceIn(-3.0, 15.0),
+                    totalDistanceM = (elapsed * speed / 3.6).toInt(),
+                    totalEnergyKcal = (elapsed * 10 / 60)
+                )
+            }
+            db.sampleDao().insertAll(treadmillSamples)
+
+            // Fake indoor bike session: 60 minutes ago
+            val bikeStart = now - 60 * 60 * 1000L
+            val bikeEnd = bikeStart + 20 * 60 * 1000L
+            val bikeSession = WorkoutSession(
+                startTimeMs = bikeStart,
+                endTimeMs = bikeEnd,
+                machineType = "INDOOR_BIKE",
+                deviceName = "Debug Indoor Bike",
+                totalElapsedTimeSec = 20 * 60,
+                totalDistanceM = 7800,
+                totalEnergyKcal = 210,
+                avgCadenceRpm = 75.0,
+                maxPowerW = 180
+            )
+            val bikeId = db.sessionDao().insert(bikeSession)
+            val bikeSamples = (0 until 40).map { i ->
+                val elapsed = i * 30
+                val phase = i.toDouble() / 40.0
+                val cadence = 60.0 + 30.0 * Math.abs(Math.sin(phase * Math.PI * 3)) + 2.0 * (Math.random() - 0.5)
+                val resistance = (3 + (5 * Math.abs(Math.sin(phase * Math.PI * 2))).toInt()).coerceIn(1, 11)
+                WorkoutSample(
+                    sessionId = bikeId,
+                    timestampMs = bikeStart + elapsed * 1000L,
+                    elapsedTimeSec = elapsed,
+                    cadenceRpm = cadence.coerceIn(0.0, 120.0),
+                    resistanceLevel = resistance,
+                    totalDistanceM = (elapsed * cadence * 2 / 60).toInt(),
+                    totalEnergyKcal = (elapsed * 8 / 60)
+                )
+            }
+            db.sampleDao().insertAll(bikeSamples)
+            Log.i(tag, "Debug sample data created")
+        }
     }
 
     companion object {

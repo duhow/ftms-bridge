@@ -96,14 +96,6 @@
                 android:text="@string/history"
                 android:textSize="11sp"
                 android:layout_marginEnd="2dp" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnDebug"
-                style="@style/Widget.Material3.Button.TonalButton"
-                android:layout_width="wrap_content"
-                android:layout_height="36dp"
-                android:text="@string/debug_info"
-                android:textSize="11sp" />
         </LinearLayout>
 
         <TextView

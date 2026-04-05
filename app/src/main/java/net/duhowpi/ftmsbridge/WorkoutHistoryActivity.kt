@@ -45,7 +45,6 @@ class WorkoutHistoryActivity : AppCompatActivity() {
         db = AppDatabase.getInstance(this)
 
         adapter = SessionAdapter(
-            onExport = { session -> showExportDialog(session) },
             onDelete = { session -> confirmDelete(session) }
         )
 
@@ -146,7 +145,6 @@ class WorkoutHistoryActivity : AppCompatActivity() {
     // ---- Adapter ------------------------------------------------------------
 
     inner class SessionAdapter(
-        private val onExport: (WorkoutSession) -> Unit,
         private val onDelete: (WorkoutSession) -> Unit
     ) : RecyclerView.Adapter<SessionAdapter.VH>() {
 
@@ -201,7 +199,11 @@ class WorkoutHistoryActivity : AppCompatActivity() {
                 txtHr.text = if (session.avgHeartRateBpm > 0)
                     "♥ ${session.avgHeartRateBpm} bpm" else ""
 
-                itemView.setOnClickListener { onExport(session) }
+                itemView.setOnClickListener {
+                    val intent = Intent(itemView.context, WorkoutDetailActivity::class.java)
+                    intent.putExtra(WorkoutDetailActivity.EXTRA_SESSION_ID, session.id)
+                    itemView.context.startActivity(intent)
+                }
                 itemView.setOnLongClickListener { onDelete(session); true }
             }
         }
