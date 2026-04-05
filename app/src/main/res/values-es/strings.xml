@@ -109,4 +109,8 @@
     <string name="about">Acerca de</string>
     <string name="about_title">Acerca de FTMS Bridge</string>
     <string name="about_version">Versión: %s</string>
+
+    <!-- Workout detail -->
+    <string name="detail_devices_label">Dispositivos</string>
+    <string name="detail_laps_label">Vueltas</string>
 </resources>

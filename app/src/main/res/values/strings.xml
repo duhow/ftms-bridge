@@ -109,4 +109,8 @@
     <string name="about">About</string>
     <string name="about_title">About FTMS Bridge</string>
     <string name="about_version">Version: %s</string>
+
+    <!-- Workout detail -->
+    <string name="detail_devices_label">Devices</string>
+    <string name="detail_laps_label">Laps</string>
 </resources>

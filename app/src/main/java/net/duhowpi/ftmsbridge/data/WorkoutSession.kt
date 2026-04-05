@@ -20,5 +20,8 @@ data class WorkoutSession(
     var avgHeartRateBpm: Int = 0,
     var maxSpeedKmh: Double = 0.0,
     var maxHeartRateBpm: Int = 0,
-    var maxPowerW: Int = 0
+    var maxPowerW: Int = 0,
+    val deviceAddress: String = "",
+    val hrDeviceName: String = "",
+    val hrDeviceAddress: String = ""
 )

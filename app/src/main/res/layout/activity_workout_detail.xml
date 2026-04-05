@@ -22,15 +22,6 @@
             android:orientation="vertical"
             android:padding="16dp">
 
-            <!-- Session title -->
-            <TextView
-                android:id="@+id/txtDetailTitle"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:textSize="18sp"
-                android:textStyle="bold"
-                android:paddingBottom="4dp" />
-
             <TextView
                 android:id="@+id/txtDetailDate"
                 android:layout_width="match_parent"
@@ -123,6 +114,51 @@
                 android:layout_width="match_parent"
                 android:layout_height="200dp"
                 android:background="?attr/colorSurface" />
+
+            <!-- Device details -->
+            <TextView
+                android:id="@+id/txtDetailDevicesLabel"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/detail_devices_label"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:paddingTop="16dp"
+                android:paddingBottom="4dp" />
+
+            <TextView
+                android:id="@+id/txtDetailFtmsDevice"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textSize="12sp"
+                android:fontFamily="monospace" />
+
+            <TextView
+                android:id="@+id/txtDetailHrDevice"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textSize="12sp"
+                android:fontFamily="monospace"
+                android:visibility="gone" />
+
+            <!-- Laps table -->
+            <TextView
+                android:id="@+id/txtLapsLabel"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/detail_laps_label"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:paddingTop="16dp"
+                android:paddingBottom="4dp"
+                android:visibility="gone" />
+
+            <LinearLayout
+                android:id="@+id/layoutLapsTable"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone" />
 
         </LinearLayout>
     </ScrollView>

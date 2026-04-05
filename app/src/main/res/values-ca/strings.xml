@@ -109,4 +109,8 @@
     <string name="about">Sobre</string>
     <string name="about_title">Sobre FTMS Bridge</string>
     <string name="about_version">Versió: %s</string>
+
+    <!-- Workout detail -->
+    <string name="detail_devices_label">Dispositius</string>
+    <string name="detail_laps_label">Voltes</string>
 </resources>

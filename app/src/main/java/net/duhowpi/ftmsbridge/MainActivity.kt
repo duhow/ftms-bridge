@@ -760,7 +760,10 @@ class MainActivity : AppCompatActivity() {
             val session = WorkoutSession(
                 startTimeMs = sessionStartTime,
                 machineType = device.machineType.name,
-                deviceName = device.deviceName
+                deviceName = device.deviceName,
+                deviceAddress = ftmsConnectionManager?.connectedDeviceAddress ?: "",
+                hrDeviceName = hrConnectionManager?.connectedDeviceName ?: "",
+                hrDeviceAddress = hrConnectionManager?.connectedDeviceAddress ?: ""
             )
             currentSessionId = db.sessionDao().insert(session)
             Log.i(tag, "Session started: $currentSessionId")
@@ -1200,7 +1203,8 @@ class MainActivity : AppCompatActivity() {
                 totalDistanceM = 5200,
                 totalEnergyKcal = 320,
                 avgSpeedKmh = 10.4,
-                maxSpeedKmh = 12.0
+                maxSpeedKmh = 12.0,
+                deviceAddress = "AA:BB:CC:DD:EE:01"
             )
             val treadmillId = db.sessionDao().insert(treadmillSession)
             val treadmillSamples = (0 until 60).map { i ->
@@ -1232,7 +1236,10 @@ class MainActivity : AppCompatActivity() {
                 totalDistanceM = 7800,
                 totalEnergyKcal = 210,
                 avgCadenceRpm = 75.0,
-                maxPowerW = 180
+                maxPowerW = 180,
+                deviceAddress = "AA:BB:CC:DD:EE:02",
+                hrDeviceName = "Mi Band 3",
+                hrDeviceAddress = "AA:BB:CC:DD:EE:03"
             )
             val bikeId = db.sessionDao().insert(bikeSession)
             val bikeSamples = (0 until 40).map { i ->

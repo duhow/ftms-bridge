@@ -1,5 +1,6 @@
 package net.duhowpi.ftmsbridge
 
+import android.graphics.Typeface
 import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
@@ -81,7 +82,6 @@ class WorkoutDetailActivity : AppCompatActivity() {
             else -> session.deviceName.ifEmpty { session.machineType }
         }
         supportActionBar?.title = typeName
-        binding.txtDetailTitle.text = typeName
         binding.txtDetailDate.text = displayDateFormat.format(Date(session.startTimeMs))
 
         val durationSec = session.totalElapsedTimeSec.takeIf { it > 0 }
@@ -101,6 +101,19 @@ class WorkoutDetailActivity : AppCompatActivity() {
             binding.txtChartLabel.visibility = View.GONE
             binding.lineChart.visibility = View.GONE
         }
+
+        // Device details
+        if (session.deviceAddress.isNotEmpty()) {
+            binding.txtDetailFtmsDevice.text = "${session.deviceName}  (${session.deviceAddress})"
+        } else {
+            binding.txtDetailFtmsDevice.text = session.deviceName.ifEmpty { getString(R.string.unknown_device) }
+        }
+        if (session.hrDeviceName.isNotEmpty() || session.hrDeviceAddress.isNotEmpty()) {
+            binding.txtDetailHrDevice.text = "♥ ${session.hrDeviceName}  (${session.hrDeviceAddress})"
+            binding.txtDetailHrDevice.visibility = View.VISIBLE
+        }
+
+        setupLapsTable(session, samples, durationSec)
     }
 
     private fun setupChart(session: WorkoutSession, samples: List<WorkoutSample>, durationSec: Int) {
@@ -131,6 +144,64 @@ class WorkoutDetailActivity : AppCompatActivity() {
                 LineChartView.DataSeries(getString(R.string.metric_resistance), Color.parseColor("#9C27B0"), resistancePoints),
                 durationSec = durationSec
             )
+        }
+    }
+
+    private fun setupLapsTable(session: WorkoutSession, samples: List<WorkoutSample>, durationSec: Int) {
+        if (samples.isEmpty()) return
+        val isTreadmill = session.machineType == "TREADMILL"
+        val isIndoorBike = session.machineType == "INDOOR_BIKE"
+        if (!isTreadmill && !isIndoorBike) return
+
+        data class LapData(val lapNum: Int, val startSec: Int, val endSec: Int, val avgValue1: Double, val avgValue2: Double)
+
+        val laps = mutableListOf<LapData>()
+        var lapNum = 1
+        var lapStartSec = 0
+        var lapStartIdx = 0
+        val lapDistanceM = 1000
+
+        samples.forEachIndexed { idx, sample ->
+            if (sample.totalDistanceM >= lapNum * lapDistanceM) {
+                val lapSamples = samples.subList(lapStartIdx, idx + 1)
+                val avg1 = if (isTreadmill) lapSamples.map { it.speedKmh }.average()
+                           else lapSamples.map { it.cadenceRpm }.average()
+                val avg2 = if (isTreadmill) lapSamples.map { it.inclinationPercent }.average()
+                           else lapSamples.map { it.resistanceLevel.toDouble() }.average()
+                laps.add(LapData(lapNum, lapStartSec, sample.elapsedTimeSec, avg1, avg2))
+                lapNum++
+                lapStartSec = sample.elapsedTimeSec
+                lapStartIdx = idx + 1
+            }
+        }
+
+        if (laps.isEmpty()) return
+
+        binding.txtLapsLabel.visibility = View.VISIBLE
+        binding.layoutLapsTable.visibility = View.VISIBLE
+        binding.layoutLapsTable.removeAllViews()
+
+        // Header row
+        val header = layoutInflater.inflate(R.layout.item_lap_row, binding.layoutLapsTable, false)
+        val headerLabel1 = if (isTreadmill) getString(R.string.metric_speed) else getString(R.string.metric_strides)
+        val headerLabel2 = if (isTreadmill) getString(R.string.metric_inclination) else getString(R.string.metric_resistance)
+        header.findViewById<android.widget.TextView>(R.id.txtLapNum).apply { text = "#"; setTypeface(null, Typeface.BOLD) }
+        header.findViewById<android.widget.TextView>(R.id.txtLapTime).apply { text = getString(R.string.metric_elapsed_time); setTypeface(null, Typeface.BOLD) }
+        header.findViewById<android.widget.TextView>(R.id.txtLapVal1).apply { text = headerLabel1; setTypeface(null, Typeface.BOLD) }
+        header.findViewById<android.widget.TextView>(R.id.txtLapVal2).apply { text = headerLabel2; setTypeface(null, Typeface.BOLD) }
+        binding.layoutLapsTable.addView(header)
+
+        // Data rows
+        laps.forEach { lap ->
+            val row = layoutInflater.inflate(R.layout.item_lap_row, binding.layoutLapsTable, false)
+            val lapDurationSec = lap.endSec - lap.startSec
+            val mm = lapDurationSec / 60
+            val ss = lapDurationSec % 60
+            row.findViewById<android.widget.TextView>(R.id.txtLapNum).text = "${lap.lapNum}"
+            row.findViewById<android.widget.TextView>(R.id.txtLapTime).text = "%d:%02d".format(mm, ss)
+            row.findViewById<android.widget.TextView>(R.id.txtLapVal1).text = String.format("%.1f", lap.avgValue1)
+            row.findViewById<android.widget.TextView>(R.id.txtLapVal2).text = String.format("%.1f", lap.avgValue2)
+            binding.layoutLapsTable.addView(row)
         }
     }
 
