@@ -71,7 +71,7 @@
     <string name="scanning_active">Escanejant…</string>
     <string name="device_disconnected">Dispositiu desconnectat</string>
     <string name="control_not_available">El control no està disponible per a aquesta màquina</string>
-    <string name="control_send_failed">No s'ha pogut enviar l'ordre a la màquina</string>
+    <string name="control_send_failed">No s\'ha pogut enviar l\'ordre a la màquina</string>
     <string name="control_set_speed_title">Ajustar velocitat</string>
     <string name="control_set_incline_title">Ajustar inclinació</string>
     <string name="control_speed_label">Velocitat objectiu</string>
@@ -95,7 +95,7 @@
     <!-- Debug -->
     <string name="debug_info">Info Debug</string>
     <string name="export_logs">Exportar logs</string>
-    <string name="no_log_files">No s'han trobat arxius de log</string>
+    <string name="no_log_files">No s\'han trobat arxius de log</string>
     <string name="debug_log_location">Logs: emmagatzematge extern app/debug/</string>
     <string name="capabilities">Capacitats</string>
     <string name="recent_bt_events">Esdeveniments BT recents</string>
