@@ -322,6 +322,18 @@ class BleConnectionManager(
                 }
             }
 
+            // Mi Band and similar devices expose 0x2A37 under the proprietary fee0 service
+            // instead of (or in addition to) the standard 0x180D HR service.
+            val miBandHrService = gatt.getService(FtmsConstants.MIBAND_HR_SERVICE_UUID)
+            if (miBandHrService != null) {
+                val hrChar = miBandHrService.getCharacteristic(FtmsConstants.HR_MEASUREMENT_UUID)
+                if (hrChar != null && !hasHeartRate) {
+                    hasHeartRate = true
+                    debugLogger.logMessage("Mi Band HR service (fee0) found – subscribing to 0x2A37")
+                    enableNotification(hrChar)
+                }
+            }
+
             // iConcept 3.0 / BH Fitness proprietary service — subscribe to notify chars
             val iConceptService = gatt.getService(FtmsConstants.ICONCEPT_SERVICE_UUID)
             if (iConceptService != null) {

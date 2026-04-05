@@ -25,6 +25,11 @@ object FtmsConstants {
     val HR_MEASUREMENT_UUID: UUID = uuidFrom16Bit(0x2A37)
     val HR_CONTROL_POINT_UUID: UUID = uuidFrom16Bit(0x2A39)
 
+    // Mi Band proprietary service (fee0): used by Mi Band 3 and similar devices that
+    // advertise this UUID instead of 0x180D.  The HR measurement characteristic
+    // (0x2A37) lives under this service on those devices.
+    val MIBAND_HR_SERVICE_UUID: UUID = UUID.fromString("0000fee0-0000-1000-8000-00805f9b34fb")
+
     // Device Information Service
     val DEVICE_INFO_SERVICE_UUID: UUID = uuidFrom16Bit(0x180A)
     val SERIAL_NUMBER_UUID: UUID = uuidFrom16Bit(0x2A25)

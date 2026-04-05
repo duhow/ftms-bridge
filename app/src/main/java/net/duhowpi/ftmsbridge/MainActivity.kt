@@ -261,7 +261,8 @@ class MainActivity : AppCompatActivity() {
                 val name = device.name ?: return
                 val serviceUuids = result.scanRecord?.serviceUuids?.map { it.uuid } ?: emptyList()
                 val isFtms = serviceUuids.contains(FtmsConstants.FTMS_SERVICE_UUID)
-                val isHr = serviceUuids.contains(FtmsConstants.HR_SERVICE_UUID)
+                val isHr = serviceUuids.contains(FtmsConstants.HR_SERVICE_UUID) ||
+                        serviceUuids.contains(FtmsConstants.MIBAND_HR_SERVICE_UUID)
 
                 // Skip devices that advertise service UUIDs but none of them are fitness-related
                 // (e.g. audio headphones, earbuds). Devices with no service UUIDs in their
