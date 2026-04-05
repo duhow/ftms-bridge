@@ -5,4 +5,4 @@ Add user-facing changes for the next release here.
 - Fixed BH indoor bike metrics by deriving distance and energy from live bike packets
 - Reduced occasional BH indoor bike cadence spikes by filtering outlier packets
 - Added BH indoor bike resistance level detection (level 1..11) from live packet data
-- Hid BH indoor bike speed display because it duplicates stride-equivalent data
+- Hidden BH indoor bike speed display because it duplicates stride-equivalent data

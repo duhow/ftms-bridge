@@ -399,8 +399,8 @@ class MainActivity : AppCompatActivity() {
                     sample.copy(heartRateBpm = lastHeartRateBpm) else sample
                 // Detect machine running state for devices without machine-status updates.
                 // BH indoor bikes do not provide a meaningful speed field, so use cadence/power.
-                val machineType = fitnessDevice?.machineType
-                val nowRunning = if (machineType == FtmsConstants.MachineType.INDOOR_BIKE) {
+                val isBhIndoorBike = fitnessDevice is BhFitnessIndoorBike
+                val nowRunning = if (isBhIndoorBike) {
                     mergedSample.cadenceRpm > BhFitnessIndoorBike.MIN_MOVING_CADENCE_RPM ||
                             mergedSample.instantaneousPowerW > BhFitnessIndoorBike.MIN_MOVING_POWER_W
                 } else {
@@ -598,6 +598,7 @@ class MainActivity : AppCompatActivity() {
      *
      * Treadmill      → Speed, HR, Distance, Energy, Time, Inclination
      * Indoor Bike    → HR, Cadence, Power, Distance, Energy, Time, Resistance
+     *                  (BH indoor bike variant hides Speed because that field is repurposed)
      * Cross Trainer  → Speed, HR, Cadence, Power, Distance, Energy, Time, Resistance
      * Stair Climber  → HR, Cadence, Distance, Energy, Time
      * Unknown / disconnected → only the universal tiles (no device-specific tiles)
@@ -606,7 +607,8 @@ class MainActivity : AppCompatActivity() {
         val isTreadmill = machineType == FtmsConstants.MachineType.TREADMILL
         val isBike = machineType == FtmsConstants.MachineType.INDOOR_BIKE ||
                 machineType == FtmsConstants.MachineType.CROSS_TRAINER
-        val showSpeed = machineType != FtmsConstants.MachineType.INDOOR_BIKE
+        val isBhIndoorBike = fitnessDevice is BhFitnessIndoorBike
+        val showSpeed = !isBhIndoorBike
         binding.cardSpeed.visibility = if (showSpeed) View.VISIBLE else View.GONE
         binding.rowCadencePower.visibility = if (isBike) View.VISIBLE else View.GONE
         binding.cardInclination.visibility = if (isTreadmill) View.VISIBLE else View.GONE

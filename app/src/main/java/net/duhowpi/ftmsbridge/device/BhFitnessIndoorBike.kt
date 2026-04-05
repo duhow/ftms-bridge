@@ -13,12 +13,11 @@ class BhFitnessIndoorBike(deviceName: String) :
         private const val MAX_VALID_CADENCE_RPM = 220.0
         private const val MAX_SPEED_STEP_PER_SEC = 20.0
         private const val MAX_CADENCE_STEP_PER_SEC = 80.0
-        private const val SECONDS_PER_HOUR = 3600.0
-        private const val METERS_PER_KM = 1000.0
-        // Compile-time conversion from km/h to m/s.
-        private const val METERS_PER_KMH_PER_SEC = METERS_PER_KM / SECONDS_PER_HOUR
+        // km/h → m/s conversion factor.
+        private const val METERS_PER_KMH_PER_SEC = 1.0 / 3.6
         private const val JOULES_PER_KCAL = 4184.0
         private const val STRIDES_ENCODING_FACTOR = 100.0
+        // Empirical movement thresholds from B01_17384 packet captures.
         const val MIN_MOVING_POWER_W = 5
         const val MIN_MOVING_CADENCE_RPM = 10.0
         private const val MIN_LEVEL_TORQUE_NM = 2.0
@@ -83,10 +82,10 @@ class BhFitnessIndoorBike(deviceName: String) :
         val dtSec = if (lastSampleTimestampMs > 0L) {
             val rawDeltaMs = nowMs - lastSampleTimestampMs
             if (rawDeltaMs < 0L) {
-                val deltaSec = kotlin.math.abs(rawDeltaMs) / 1000.0
+                val absDeltaSec = kotlin.math.abs(rawDeltaMs) / 1000.0
                 Log.w(
                     TAG,
-                    "Negative sample delta ${rawDeltaMs}ms (~${"%.3f".format(deltaSec)}s); treating as 0 (clock adjustment?)"
+                    "Negative sample delta ${rawDeltaMs}ms (~${"%.3f".format(absDeltaSec)}s); treating as 0 (clock adjustment?)"
                 )
             }
             rawDeltaMs.coerceAtLeast(0L) / 1000.0
