@@ -323,10 +323,9 @@ class BleConnectionManager(
             }
 
             // Mi Band and similar devices expose 0x2A37 under the proprietary fee0 service
-            // instead of (or in addition to) the standard 0x180D HR service.
-            // The !hasHeartRate guard avoids double-subscription on devices that expose
-            // 0x2A37 under both services; 0x180D is checked first (above) so standard-
-            // compliant devices always take the preferred path.
+            // instead of (or in addition to) the standard 0x180D HR service. The !hasHeartRate
+            // guard avoids double-subscription; 0x180D is checked first so standard-compliant
+            // devices always take the preferred path.
             val miBandHrService = gatt.getService(FtmsConstants.MIBAND_HR_SERVICE_UUID)
             if (miBandHrService != null) {
                 val hrChar = miBandHrService.getCharacteristic(FtmsConstants.HR_MEASUREMENT_UUID)

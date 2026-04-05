@@ -399,7 +399,7 @@ class MainActivity : AppCompatActivity() {
 
             override fun onServicesReady(ftmsCharacteristics: List<UUID>, hasHeartRate: Boolean) {
                 if (ActivityCompat.checkSelfPermission(this@MainActivity, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) return
-                val name = device.name ?: "Unknown"
+                val name = device.name ?: getString(R.string.unknown_device)
                 fitnessDevice = FtmsDevice.createFromCharacteristics(name, ftmsCharacteristics)
                 runOnUiThread {
                     markScanEntryHr(device.address, hasHeartRate)
