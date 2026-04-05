@@ -43,6 +43,7 @@ import net.duhowpi.ftmsbridge.ftms.FtmsDataParser
 import net.duhowpi.ftmsbridge.model.FitnessSample
 import net.duhowpi.ftmsbridge.model.ScannedDeviceInfo
 import java.util.UUID
+import kotlin.math.roundToInt
 
 class MainActivity : AppCompatActivity() {
     private val tag = "MainActivity"
@@ -576,7 +577,7 @@ class MainActivity : AppCompatActivity() {
             binding.valueEnergy.text = "${sample.totalEnergyKcal}"
         }
 
-        binding.valueInclination.text = String.format("%.1f", sample.inclinationPercent)
+        binding.valueInclination.text = "${sample.inclinationPercent.roundToInt()}"
         binding.valueResistance.text = if (sample.resistanceLevel > 0) "${sample.resistanceLevel}" else "--"
         val minutes = elapsedSec / 60
         val seconds = elapsedSec % 60

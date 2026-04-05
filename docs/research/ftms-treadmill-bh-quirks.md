@@ -41,11 +41,21 @@ The same factor applies to the Ramp Angle Grade field (also INT16, units 0.1°).
 `BhFitnessTreadmill.onDataReceived()` divides both `inclinationPercent` and
 `rampAngleDeg` by `6.25` after the standard FTMS parse.
 
+The UI displays inclination as a **rounded integer** (e.g. `3` instead of `2.88`),
+matching the whole-number percent labels shown on the machine console.
+
 ### Negative inclination
 
 Because the field is signed INT16, negative raw values (downhill) work correctly
 once the standard Kotlin `buf.short.toInt()` signed-extend is applied.
-Example: raw `−62` → −62 × 0.1 / 6.25 = **−0.99 %** (slightly downhill).
+Example: raw `−62` → −62 × 0.1 / 6.25 = **−0.99 %** (rounds to −1 % in the UI).
+
+> ⚠️ **Open question:** a capture on the T01 model (session log 2026-04-05) shows
+> raw inclination = **450** (→ 7.2 % after correction) at a time when the machine
+> console reportedly displayed **−1 %** decline.  It is not yet known whether the
+> T01 encodes decline as a positive offset (e.g. a different physical range), or
+> whether the console reading was misread.  Future captures with confirmed
+> console-vs-BLE comparison are needed before adding a decline correction.
 
 ---
 
@@ -57,6 +67,24 @@ devices, but the device always sends **0** for all three fields throughout the w
 
 The actual counters are streamed via the proprietary **0xC112** iConcept channel.
 See [bh-fitness-iconcept.md](bh-fitness-iconcept.md).
+
+### C112 fires only once at session start
+
+From captures on the T01 model (CC:79:88:30:7D:57), the 0xC112 notification is sent
+**exactly once**, about 2 s after GATT connection, with `elapsed_time=2`, `distance=0`,
+and `total_kcal=0`.  It does **not** repeat during the workout.
+
+Consequence: elapsed time, distance, and energy appear to freeze at their initial
+values for the entire session.
+
+**Elapsed time fix:** `BhFitnessTreadmill` records the system clock at the moment C112
+arrives (`iConceptLastUpdateMs`) and adds the wall-clock delta to `iConceptBaseElapsedSec`
+on every subsequent `onDataReceived()` call.  This keeps the timer advancing correctly
+even when no further C112 packets are received.
+
+**Distance and energy:** These remain at the device-reported value (0 at session start)
+because there is no way to estimate them reliably from the available data without
+the device sending updated C112 packets.
 
 ### Observed 0x2ACD packet (steady state at 6.10 km/h)
 

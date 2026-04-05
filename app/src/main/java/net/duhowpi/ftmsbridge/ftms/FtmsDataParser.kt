@@ -1,10 +1,13 @@
 package net.duhowpi.ftmsbridge.ftms
 
+import android.util.Log
 import net.duhowpi.ftmsbridge.model.FitnessSample
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
 object FtmsDataParser {
+
+    private val tag = "FtmsDataParser"
 
     fun parseTreadmillData(data: ByteArray): FitnessSample {
         val buf = ByteBuffer.wrap(data).order(ByteOrder.LITTLE_ENDIAN)
@@ -97,6 +100,8 @@ object FtmsDataParser {
             buf.short // skip percentage (sint16)
         }
 
+        Log.d(tag, "treadmill raw: speed=%.2f km/h incl=%.1f%% dist=${totalDistanceM}m kcal=${totalEnergyKcal} hr=${heartRateBpm} t=${elapsedTimeSec}s"
+            .format(speedKmh, inclinationPercent))
         return FitnessSample(
             speedKmh = speedKmh,
             averageSpeedKmh = averageSpeedKmh,
@@ -467,6 +472,7 @@ object FtmsDataParser {
         val distanceM = b0 or (b1 shl 8) or (b2 shl 16)
         val rawCalories = buf.short.toInt() and 0xFFFF
         val calories = if (rawCalories == FtmsConstants.INVALID_UINT16) 0 else rawCalories
+        Log.d(tag, "iConcept C112: elapsed=${elapsedTimeSec}s dist=${distanceM}m kcal=${calories}")
         return FitnessSample(elapsedTimeSec = elapsedTimeSec, totalDistanceM = distanceM, totalEnergyKcal = calories)
     }
 
