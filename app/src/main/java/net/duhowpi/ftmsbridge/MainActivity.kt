@@ -70,6 +70,7 @@ class MainActivity : AppCompatActivity() {
     private var currentSessionId: Long? = null
     private var sessionStartTime: Long = 0
     private var elapsedFallbackStartTime: Long = 0
+    private var lastFallbackElapsedSec: Int = 0
     private var isRecording = false
     private var isMachineRunning = false
 
@@ -577,11 +578,7 @@ class MainActivity : AppCompatActivity() {
         val elapsedSec = if (sample.elapsedTimeSec > 0) {
             sample.elapsedTimeSec
         } else if (isRecording && elapsedFallbackStartTime > 0) {
-            val deltaMs = sample.timestampMs - elapsedFallbackStartTime
-            if (deltaMs < 0L) {
-                Log.w(tag, "Elapsed fallback delta was negative: sampleTs=${sample.timestampMs}, anchor=$elapsedFallbackStartTime")
-            }
-            (deltaMs.coerceAtLeast(0L) / 1000).toInt()
+            calculateFallbackElapsedSec(sample.timestampMs)
         } else 0
 
         binding.valueSpeed.text = String.format("%.1f", sample.speedKmh)
@@ -658,6 +655,7 @@ class MainActivity : AppCompatActivity() {
         isRecording = true
         sessionStartTime = System.currentTimeMillis()
         elapsedFallbackStartTime = 0L
+        lastFallbackElapsedSec = 0
         binding.btnWorkoutStart.text = getString(R.string.stop_session)
         binding.recordingIndicator.visibility = View.VISIBLE
         binding.metricsSection.visibility = View.VISIBLE
@@ -678,6 +676,7 @@ class MainActivity : AppCompatActivity() {
     private fun stopRecording() {
         isRecording = false
         elapsedFallbackStartTime = 0L
+        lastFallbackElapsedSec = 0
         binding.btnWorkoutStart.text = getString(R.string.start_session)
         binding.recordingIndicator.visibility = View.GONE
         val sessionId = currentSessionId ?: return
@@ -694,11 +693,7 @@ class MainActivity : AppCompatActivity() {
         // Use wall-clock elapsed time when device sends 0 (BH Fitness quirk).
         val elapsedSec = if (sample.elapsedTimeSec > 0) sample.elapsedTimeSec
         else if (elapsedFallbackStartTime > 0) {
-            val deltaMs = sample.timestampMs - elapsedFallbackStartTime
-            if (deltaMs < 0L) {
-                Log.w(tag, "Persist elapsed fallback delta was negative: sampleTs=${sample.timestampMs}, anchor=$elapsedFallbackStartTime")
-            }
-            (deltaMs.coerceAtLeast(0L) / 1000).toInt()
+            calculateFallbackElapsedSec(sample.timestampMs)
         } else 0
         lifecycleScope.launch(Dispatchers.IO) {
             db.sampleDao().insert(
@@ -897,7 +892,7 @@ class MainActivity : AppCompatActivity() {
 
         val maxProgress = ((max - min) / step).roundToInt().coerceAtLeast(1)
         seek.max = maxProgress
-        var selected = ((initial - min) / step).roundToInt().coerceIn(0, maxProgress) * step + min
+        var selected = initial.coerceIn(min, max)
 
         fun updateViews() {
             val clamped = selected.coerceIn(min, max)
@@ -970,6 +965,17 @@ class MainActivity : AppCompatActivity() {
             .putShort(encoded.toShort())
             .array()
         return ftmsConnectionManager?.sendControlPoint(payload) == true
+    }
+
+    private fun calculateFallbackElapsedSec(sampleTimestampMs: Long): Int {
+        val deltaMs = sampleTimestampMs - elapsedFallbackStartTime
+        if (deltaMs < 0L) {
+            Log.w(tag, "Fallback elapsed delta was negative: sampleTs=$sampleTimestampMs, anchor=$elapsedFallbackStartTime")
+            return lastFallbackElapsedSec
+        }
+        val elapsed = (deltaMs / 1000).toInt()
+        lastFallbackElapsedSec = elapsed
+        return elapsed
     }
 
     companion object {
