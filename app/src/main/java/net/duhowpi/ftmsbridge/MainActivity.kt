@@ -295,13 +295,24 @@ class MainActivity : AppCompatActivity() {
         val lapElapsedMs = System.currentTimeMillis() - lapStartTimeMs
         val lapSec = (lapElapsedMs / 1000).toInt()
         binding.progressBarLap.progress = currentLapM
-        binding.txtLapProgress.text = getString(R.string.lap_progress_label, currentLapM / 1000.0)
+        // Show total distance covered, not just within-lap distance
+        binding.txtLapProgress.text = getString(R.string.lap_progress_label, distM / 1000.0)
         val lm = lapSec / 60
         val ls = lapSec % 60
         binding.txtLapTime.text = String.format("%d:%02d", lm, ls)
         val tm = elapsedSec / 60
         val ts = elapsedSec % 60
         binding.txtLapCount.text = String.format("%d:%02d", tm, ts)
+        // Inline metrics row inside the lap card
+        binding.lapValueSpeed.text = String.format("%.1f", sample.speedKmh)
+        if (sample.stridesPerMin > 0) {
+            binding.lapValueEnergy.text = String.format("%.1f", sample.stridesPerMin)
+            binding.lapUnitEnergy.setText(R.string.unit_per_min)
+        } else {
+            binding.lapValueEnergy.text = "${sample.totalEnergyKcal}"
+            binding.lapUnitEnergy.setText(R.string.unit_kcal)
+        }
+        binding.lapValueHr.text = if (sample.heartRateBpm > 0) "${sample.heartRateBpm}" else "--"
     }
 
     /** Returns true if [points] contains at least one non-zero value. */
@@ -577,7 +588,11 @@ class MainActivity : AppCompatActivity() {
                 if (shouldAnchorFallbackTimer(mergedSample, nowRunning)) {
                     elapsedFallbackStartTime = mergedSample.timestampMs
                 }
-                runOnUiThread { updateDashboard(mergedSample) }
+                runOnUiThread {
+                    updateDashboard(mergedSample)
+                    animateBeat(binding.indicatorFtms)
+                    animateBeat(binding.toolbarIndicatorFtms)
+                }
                 if (isRecording && currentSessionId != null) saveSample(mergedSample)
             }
 
@@ -585,6 +600,8 @@ class MainActivity : AppCompatActivity() {
                 lastHeartRateBpm = FtmsDataParser.parseHeartRate(data)
                 runOnUiThread {
                     binding.valueHeartRate.text = if (lastHeartRateBpm > 0) "$lastHeartRateBpm" else "--"
+                    animateBeat(binding.indicatorHr)
+                    animateBeat(binding.toolbarIndicatorHr)
                 }
             }
 
@@ -656,6 +673,8 @@ class MainActivity : AppCompatActivity() {
                 lastHeartRateBpm = hr
                 runOnUiThread {
                     binding.valueHeartRate.text = if (hr > 0) "$hr" else "--"
+                    animateBeat(binding.indicatorHr)
+                    animateBeat(binding.toolbarIndicatorHr)
                 }
             }
 
@@ -853,6 +872,20 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    /** Scale up by 15 % then back to 1× in 200 ms total to indicate a BLE data beat. */
+    private fun animateBeat(view: View) {
+        view.animate()
+            .scaleX(1.15f).scaleY(1.15f)
+            .setDuration(100)
+            .withEndAction {
+                view.animate()
+                    .scaleX(1f).scaleY(1f)
+                    .setDuration(100)
+                    .start()
+            }
+            .start()
+    }
+
     /**
      * Show only the metric tiles that are relevant to [machineType].
      * The Energy tile always shows; its label/unit switches between kcal and strides/min
@@ -889,6 +922,10 @@ class MainActivity : AppCompatActivity() {
         binding.valueElapsedTime.text = "0:00"
         binding.valueInclination.text = "--"
         binding.valueResistance.text = "--"
+        binding.lapValueSpeed.text = "--"
+        binding.lapValueEnergy.text = "--"
+        binding.lapUnitEnergy.setText(R.string.unit_kcal)
+        binding.lapValueHr.text = "--"
         binding.txtMachineType.visibility = View.GONE
         binding.txtFtmsDeviceInfo.visibility = View.GONE
         binding.metricsSection.visibility = View.GONE
@@ -921,6 +958,10 @@ class MainActivity : AppCompatActivity() {
         binding.toolbarIndicatorHr.visibility = if (hasHrDevice) View.VISIBLE else View.GONE
         binding.toolbarStatusIcons.visibility = View.VISIBLE
         binding.metricsSection.visibility = View.VISIBLE
+        // During recording keep only the interactive cards (speed + inclination/resistance)
+        binding.cardHeartRate.visibility = View.GONE
+        binding.rowDistanceEnergy.visibility = View.GONE
+        binding.cardElapsedTime.visibility = View.GONE
         // Hide scan results list during workout to reduce clutter
         binding.rvScanResults.visibility = View.GONE
         binding.txtScanStatus.visibility = View.GONE
@@ -963,6 +1004,13 @@ class MainActivity : AppCompatActivity() {
         binding.viewToggleRow.visibility = View.GONE
         binding.lapSection.visibility = View.GONE
         binding.chartSection.visibility = View.GONE
+        // Restore metric cards hidden during recording
+        binding.cardHeartRate.visibility = View.VISIBLE
+        binding.rowDistanceEnergy.visibility = View.VISIBLE
+        binding.cardElapsedTime.visibility = View.VISIBLE
+        val machineType = fitnessDevice?.machineType ?: dummyTreadmill?.machineType
+            ?: FtmsConstants.MachineType.UNKNOWN
+        updateMetricVisibility(machineType)
         val sessionId = currentSessionId ?: return
         lifecycleScope.launch(Dispatchers.IO) {
             val session = db.sessionDao().getById(sessionId)

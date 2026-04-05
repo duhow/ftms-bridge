@@ -154,45 +154,144 @@
                     app:iconGravity="textStart" />
             </LinearLayout>
 
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/lapSection"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:visibility="gone"
+                app:cardElevation="2dp">
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:orientation="vertical" android:padding="16dp" android:gravity="center">
+
+                    <TextView android:id="@+id/txtLapProgress"
+                        android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="0.00 km" android:textSize="32sp" android:textStyle="bold" />
+
+                    <ProgressBar android:id="@+id/progressBarLap"
+                        style="?android:attr/progressBarStyleHorizontal"
+                        android:layout_width="match_parent" android:layout_height="12dp"
+                        android:layout_marginTop="8dp" android:layout_marginBottom="8dp"
+                        android:max="1000" android:progress="0" />
+
+                    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:orientation="horizontal" android:gravity="center"
+                        android:layout_marginTop="8dp">
+
+                        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content"
+                            android:layout_weight="1" android:orientation="vertical" android:gravity="center">
+                            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                                android:text="@string/lap_time_label" android:textSize="12sp"
+                                android:textColor="?android:attr/textColorSecondary" />
+                            <TextView android:id="@+id/txtLapTime"
+                                android:layout_width="wrap_content" android:layout_height="wrap_content"
+                                android:text="0:00" android:textSize="20sp" android:textStyle="bold" />
+                        </LinearLayout>
+
+                        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content"
+                            android:layout_weight="1" android:orientation="vertical" android:gravity="center">
+                            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                                android:text="@string/workout_total_time_label" android:textSize="12sp"
+                                android:textColor="?android:attr/textColorSecondary" />
+                            <TextView android:id="@+id/txtLapCount"
+                                android:layout_width="wrap_content" android:layout_height="wrap_content"
+                                android:text="0:00" android:textSize="20sp" android:textStyle="bold" />
+                        </LinearLayout>
+                    </LinearLayout>
+
+                    <LinearLayout android:id="@+id/lapMetricsRow"
+                        android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:orientation="horizontal" android:gravity="center"
+                        android:layout_marginTop="12dp">
+
+                        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content"
+                            android:layout_weight="1" android:orientation="vertical" android:gravity="center">
+                            <ImageView android:layout_width="20dp" android:layout_height="20dp"
+                                android:src="@drawable/ic_speed" app:tint="@color/metric_speed"
+                                android:contentDescription="@null" />
+                            <TextView android:id="@+id/lapValueSpeed"
+                                android:layout_width="wrap_content" android:layout_height="wrap_content"
+                                android:text="--" android:textSize="18sp" android:textStyle="bold" />
+                            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                                android:text="@string/unit_kmh" android:textSize="10sp"
+                                android:textColor="?android:attr/textColorSecondary" />
+                        </LinearLayout>
+
+                        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content"
+                            android:layout_weight="1" android:orientation="vertical" android:gravity="center">
+                            <ImageView android:layout_width="20dp" android:layout_height="20dp"
+                                android:src="@drawable/ic_energy" app:tint="@color/metric_energy"
+                                android:contentDescription="@null" />
+                            <TextView android:id="@+id/lapValueEnergy"
+                                android:layout_width="wrap_content" android:layout_height="wrap_content"
+                                android:text="--" android:textSize="18sp" android:textStyle="bold" />
+                            <TextView android:id="@+id/lapUnitEnergy"
+                                android:layout_width="wrap_content" android:layout_height="wrap_content"
+                                android:text="@string/unit_kcal" android:textSize="10sp"
+                                android:textColor="?android:attr/textColorSecondary" />
+                        </LinearLayout>
+
+                        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content"
+                            android:layout_weight="1" android:orientation="vertical" android:gravity="center">
+                            <ImageView android:layout_width="20dp" android:layout_height="20dp"
+                                android:src="@drawable/ic_heart" app:tint="@color/metric_heart"
+                                android:contentDescription="@null" />
+                            <TextView android:id="@+id/lapValueHr"
+                                android:layout_width="wrap_content" android:layout_height="wrap_content"
+                                android:text="--" android:textSize="18sp" android:textStyle="bold" />
+                            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                                android:text="@string/unit_bpm" android:textSize="10sp"
+                                android:textColor="?android:attr/textColorSecondary" />
+                        </LinearLayout>
+                    </LinearLayout>
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/chartSection"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:visibility="gone"
+                app:cardElevation="2dp">
+                <net.duhowpi.ftmsbridge.LineChartView
+                    android:id="@+id/liveChart"
+                    android:layout_width="match_parent"
+                    android:layout_height="220dp" />
+            </com.google.android.material.card.MaterialCardView>
+
             <LinearLayout
-                android:id="@+id/workoutButtonRow"
+                android:id="@+id/viewToggleRow"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
                 android:gravity="center"
-                android:paddingTop="4dp"
                 android:paddingBottom="8dp"
                 android:visibility="gone">
 
                 <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnWorkoutStart"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="@string/workout_start"
-                    android:layout_marginEnd="4dp"
-                    app:icon="@drawable/ic_time" />
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnWorkoutPause"
+                    android:id="@+id/btnViewLap"
                     style="@style/Widget.Material3.Button.TonalButton"
                     android:layout_width="0dp"
-                    android:layout_height="wrap_content"
+                    android:layout_height="36dp"
                     android:layout_weight="1"
-                    android:text="@string/workout_pause"
-                    android:layout_marginStart="4dp"
+                    android:text="@string/view_lap"
+                    android:textSize="13sp"
                     android:layout_marginEnd="4dp"
-                    android:visibility="gone" />
+                    app:icon="@drawable/ic_lap"
+                    app:iconSize="18dp" />
 
                 <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnWorkoutStop"
+                    android:id="@+id/btnViewChart"
                     style="@style/Widget.Material3.Button.OutlinedButton"
                     android:layout_width="0dp"
-                    android:layout_height="wrap_content"
+                    android:layout_height="36dp"
                     android:layout_weight="1"
-                    android:text="@string/workout_stop"
+                    android:text="@string/view_chart"
+                    android:textSize="13sp"
                     android:layout_marginStart="4dp"
-                    android:visibility="gone" />
+                    app:icon="@drawable/ic_chart"
+                    app:iconSize="18dp" />
             </LinearLayout>
 
             <TextView
@@ -242,40 +341,6 @@
                 android:visibility="gone" />
 
             <LinearLayout
-                android:id="@+id/viewToggleRow"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center"
-                android:paddingBottom="8dp"
-                android:visibility="gone">
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnViewLap"
-                    style="@style/Widget.Material3.Button.TonalButton"
-                    android:layout_width="0dp"
-                    android:layout_height="36dp"
-                    android:layout_weight="1"
-                    android:text="@string/view_lap"
-                    android:textSize="13sp"
-                    android:layout_marginEnd="4dp"
-                    app:icon="@drawable/ic_lap"
-                    app:iconSize="18dp" />
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnViewChart"
-                    style="@style/Widget.Material3.Button.OutlinedButton"
-                    android:layout_width="0dp"
-                    android:layout_height="36dp"
-                    android:layout_weight="1"
-                    android:text="@string/view_chart"
-                    android:textSize="13sp"
-                    android:layout_marginStart="4dp"
-                    app:icon="@drawable/ic_chart"
-                    app:iconSize="18dp" />
-            </LinearLayout>
-
-            <LinearLayout
                 android:id="@+id/metricsSection"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -283,6 +348,7 @@
                 android:visibility="gone">
 
                 <LinearLayout
+                    android:id="@+id/rowSpeedHr"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="horizontal">
@@ -391,6 +457,7 @@
                 </LinearLayout>
 
                 <LinearLayout
+                    android:id="@+id/rowDistanceEnergy"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="horizontal">
@@ -448,6 +515,7 @@
                     android:orientation="horizontal">
 
                     <com.google.android.material.card.MaterialCardView
+                        android:id="@+id/cardElapsedTime"
                         android:layout_width="0dp" android:layout_height="wrap_content"
                         android:layout_weight="1" android:layout_margin="4dp"
                         app:cardBackgroundColor="@color/metric_time_bg">
@@ -514,65 +582,46 @@
 
             </LinearLayout>
 
-            <com.google.android.material.card.MaterialCardView
-                android:id="@+id/lapSection"
+            <LinearLayout
+                android:id="@+id/workoutButtonRow"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:visibility="gone"
-                app:cardElevation="2dp">
-                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
-                    android:orientation="vertical" android:padding="16dp" android:gravity="center">
+                android:orientation="horizontal"
+                android:gravity="center"
+                android:paddingTop="4dp"
+                android:paddingBottom="8dp"
+                android:visibility="gone">
 
-                    <TextView android:id="@+id/txtLapProgress"
-                        android:layout_width="wrap_content" android:layout_height="wrap_content"
-                        android:text="0.00 km" android:textSize="32sp" android:textStyle="bold" />
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnWorkoutStart"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/workout_start"
+                    android:layout_marginEnd="4dp"
+                    app:icon="@drawable/ic_time" />
 
-                    <ProgressBar android:id="@+id/progressBarLap"
-                        style="?android:attr/progressBarStyleHorizontal"
-                        android:layout_width="match_parent" android:layout_height="12dp"
-                        android:layout_marginTop="8dp" android:layout_marginBottom="8dp"
-                        android:max="1000" android:progress="0" />
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnWorkoutPause"
+                    style="@style/Widget.Material3.Button.TonalButton"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/workout_pause"
+                    android:layout_marginStart="4dp"
+                    android:layout_marginEnd="4dp"
+                    android:visibility="gone" />
 
-                    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
-                        android:orientation="horizontal" android:gravity="center"
-                        android:layout_marginTop="8dp">
-
-                        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content"
-                            android:layout_weight="1" android:orientation="vertical" android:gravity="center">
-                            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-                                android:text="@string/lap_time_label" android:textSize="12sp"
-                                android:textColor="?android:attr/textColorSecondary" />
-                            <TextView android:id="@+id/txtLapTime"
-                                android:layout_width="wrap_content" android:layout_height="wrap_content"
-                                android:text="0:00" android:textSize="20sp" android:textStyle="bold" />
-                        </LinearLayout>
-
-                        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content"
-                            android:layout_weight="1" android:orientation="vertical" android:gravity="center">
-                            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-                                android:text="@string/workout_total_time_label" android:textSize="12sp"
-                                android:textColor="?android:attr/textColorSecondary" />
-                            <TextView android:id="@+id/txtLapCount"
-                                android:layout_width="wrap_content" android:layout_height="wrap_content"
-                                android:text="0:00" android:textSize="20sp" android:textStyle="bold" />
-                        </LinearLayout>
-                    </LinearLayout>
-                </LinearLayout>
-            </com.google.android.material.card.MaterialCardView>
-
-            <com.google.android.material.card.MaterialCardView
-                android:id="@+id/chartSection"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:visibility="gone"
-                app:cardElevation="2dp">
-                <net.duhowpi.ftmsbridge.LineChartView
-                    android:id="@+id/liveChart"
-                    android:layout_width="match_parent"
-                    android:layout_height="220dp" />
-            </com.google.android.material.card.MaterialCardView>
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnWorkoutStop"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/workout_stop"
+                    android:layout_marginStart="4dp"
+                    android:visibility="gone" />
+            </LinearLayout>
 
         </LinearLayout>
     </ScrollView>
