@@ -166,9 +166,12 @@ the displayed "speed" and "strides/min" to be identical — the reported bug.
 ### Implementation
 
 `BhFitnessIndoorBike.onDataReceived()` now:
-- Zeroes `speedKmh` and `averageSpeedKmh` (not real speed)
+- Uses repurposed speed bytes as synthetic `speedKmh` (`raw / 100`) with spike filtering
 - Derives `stridesPerMin = totalEnergyKcal / 100.0`
-- Zeroes `totalEnergyKcal`, `energyPerHourKcal`, `energyPerMinuteKcal` (garbage/repurposed)
+- Derives cumulative `totalDistanceM` from synthetic speed over time
+- Derives cumulative `totalEnergyKcal` from power over time
+- Filters one-packet cadence/speed spikes using absolute and time-scaled delta limits
+- Zeroes `energyPerHourKcal`, `energyPerMinuteKcal` (garbage/repurposed)
 - Zeroes `metabolicEquivalent` (constant 0x7B, not a real reading)
 
 See [bh-fitness-indoor-bike.md](bh-fitness-indoor-bike.md) for the full packet decode.

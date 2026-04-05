@@ -157,15 +157,35 @@ per-revolution.  **⚠️ The exact stride/cadence relationship is unconfirmed.*
 | Calories | Field repurposed for strides | Not available |
 | Elapsed Time | Always 0 in FTMS; no C112 data | Not available |
 
+### Practical derivations used by the app
+
+Because the bike does not provide real FTMS distance/calorie counters, the app now
+derives:
+
+- **Speed (km/h):** from repurposed FTMS speed field (`raw_speed / 100`).
+- **Distance (m):** integrated over time from derived speed.
+- **Energy (kcal):** integrated from instantaneous power over time (`W * s / 4184`).
+
+### Spike handling (speed/cadence)
+
+Some sessions show occasional one-packet outliers (speed/cadence jumps that
+immediately return on the next packet). To reduce dashboard/export artifacts:
+
+- Impossible absolute values are rejected.
+- Single-step deltas above a time-scaled limit are treated as outliers and ignored.
+- The last accepted value is kept for that packet.
+
 ---
 
 ## Implementation summary
 
 `BhFitnessIndoorBike.onDataReceived()` corrects:
-- `speedKmh = 0.0` — not real speed
+- `speedKmh` from repurposed speed bytes (`raw / 100`) with outlier filtering
 - `averageSpeedKmh = 0.0` — not present but zeroed for safety
+- `cadenceRpm` with outlier filtering
+- `totalDistanceM` by integrating filtered speed over packet interval
 - `stridesPerMin = totalEnergyKcal / 100.0` — stride counter
-- `totalEnergyKcal = 0` — repurposed field cleared
+- `totalEnergyKcal` by integrating power over packet interval
 - `energyPerHourKcal = 0` — garbage constant cleared
 - `energyPerMinuteKcal = 0` — always 0, cleared for clarity
 - `metabolicEquivalent = 0.0` — constant 0x7B, not a real reading
