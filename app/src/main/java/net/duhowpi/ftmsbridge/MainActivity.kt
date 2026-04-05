@@ -1177,6 +1177,12 @@ class MainActivity : AppCompatActivity() {
         return false
     }
 
+    /**
+     * Seeds two fake workout sessions (treadmill + indoor bike) with realistic sample data
+     * when running in debug mode ([BuildConfig.BT_DEBUG_LOG] == true) and the database is empty.
+     * This allows testing the Workout History and Detail views without a real device.
+     * Only runs once: subsequent launches skip seeding because sessions already exist.
+     */
     private fun createDebugSampleDataIfNeeded() {
         if (!BuildConfig.BT_DEBUG_LOG) return
         lifecycleScope.launch(Dispatchers.IO) {

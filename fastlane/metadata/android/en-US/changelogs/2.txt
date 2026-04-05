@@ -1,4 +1,10 @@
 Add user-facing changes for the next release here.
+- Bluetooth scan list now hides automatically when a workout starts (including when triggered by the treadmill or other device)
+- Tapping a workout in History now opens a detailed view with line charts (speed + inclination for treadmill, cadence + resistance for indoor bike) plus time, distance, and calories summary
+- Export and delete workout buttons moved to the detail view toolbar
+- Debug Info moved to the overflow menu; removed from the main button row
+- FTMS devices in the scan list now show an emoji matching the machine type (🏃 treadmill, 🚴 indoor bike, 🏋️ cross-trainer, 🪜 stair climber)
+- Debug log export now shares only the current app session log
 - Fixed BH Fitness treadmill elapsed time stuck at 0:02 — timer now advances correctly
 - Inclination shown as whole number percent instead of one decimal place
 - Fixed negative (decline) incline showing as large positive value

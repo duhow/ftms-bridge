@@ -13,21 +13,17 @@ data class ScannedDeviceInfo(
     val isBonded: Boolean = false,
     val machineType: String? = null
 ) {
+    private fun emojiForMachineType(suffix: String): String = when (machineType) {
+        "TREADMILL" -> "🏃 $suffix"
+        "INDOOR_BIKE" -> "🚴 $suffix"
+        "CROSS_TRAINER" -> "🏋️ $suffix"
+        "STAIR_CLIMBER" -> "🪜 $suffix"
+        else -> "🏋️ $suffix"
+    }
+
     val typeLabel: String get() = when {
-        isFtms && isHr -> when (machineType) {
-            "TREADMILL" -> "🏃 FTMS+HR"
-            "INDOOR_BIKE" -> "🚴 FTMS+HR"
-            "CROSS_TRAINER" -> "🏋️ FTMS+HR"
-            "STAIR_CLIMBER" -> "🪜 FTMS+HR"
-            else -> "🏋️ FTMS+HR"
-        }
-        isFtms -> when (machineType) {
-            "TREADMILL" -> "🏃 FTMS"
-            "INDOOR_BIKE" -> "🚴 FTMS"
-            "CROSS_TRAINER" -> "🏋️ FTMS"
-            "STAIR_CLIMBER" -> "🪜 FTMS"
-            else -> "🏋️ FTMS"
-        }
+        isFtms && isHr -> emojiForMachineType("FTMS+HR")
+        isFtms -> emojiForMachineType("FTMS")
         isHr -> "HR"
         isBonded -> "Paired"
         else -> "BLE"

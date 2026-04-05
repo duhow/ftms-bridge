@@ -73,6 +73,7 @@ class LineChartView @JvmOverloads constructor(
             linePaint.color = s.color
             val path = Path()
             s.points.forEachIndexed { i, v ->
+                // coerceAtLeast(1) prevents division by zero for a single-point series
                 val x = chartLeft + (i.toFloat() / (s.points.size - 1).coerceAtLeast(1)) * chartW
                 val y = chartBottom - ((v - min) / range) * chartH
                 if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
