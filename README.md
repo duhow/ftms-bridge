@@ -29,7 +29,7 @@
 ## Features
 
 - **FTMS Protocol Support** — Connect to any Bluetooth FTMS-compatible treadmill or indoor bike (BH Fitness, and other brands)
-- **Heart Rate Sensor** — Pair with BLE heart rate monitors (e.g. Xiaomi Smart Band 7 via Gadgetbridge)
+- **Heart Rate Sensor** — Pair with BLE heart rate monitors (e.g. Gadgetbridge-compatible smart bands and standard chest straps)
 - **Real-time Dashboard** — Live metrics: speed, cadence, power, distance, heart rate, energy, time, inclination, resistance
 - **Session Recording** — Automatically log workout data to a local database
 - **Debug BT Logger** — Captures all raw Bluetooth communication for protocol analysis and reverse engineering
@@ -45,7 +45,7 @@
 
 ### Heart Rate Sensors
 - Any BLE Heart Rate Profile (0x180D) device
-- Xiaomi Smart Band 7 (via Gadgetbridge)
+- Gadgetbridge-compatible smart bands and wearables
 - Standard chest straps and arm bands
 
 ## Debug Mode

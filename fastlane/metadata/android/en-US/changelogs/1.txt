@@ -1,46 +1,21 @@
 Initial release.
 
-- Connect to FTMS-compatible treadmills and indoor bikes
-- Heart rate sensor support via BLE (Gadgetbridge compatible)
-- Real-time dashboard with speed, cadence, power, distance, HR, energy
-- Session recording to local database
-- Debug Bluetooth communication logging
-- BH Fitness device support
-- Portrait and landscape layouts
-- Workout controls: Start / Pause / Resume / Stop buttons, shown when a device is connected
-- Auto-detect device type: HR-only devices (e.g. Xiaomi Smart Band) connect automatically as HR sensor
-- HR signal shown live from dedicated HR sensor even without an FTMS machine
-- Workouts can be started with only a HR sensor connected (HR-only mode)
-- Session summary (avg/max speed, power, HR) saved on workout completion
-- Workout History screen with a list of all past workouts
-- Export workouts as FIT or CSV from the History screen (FIT replaces GPX for full indoor data)
-- FIT export includes per-second records with speed, cadence, power, HR, distance, grade and resistance; consecutive identical samples are deduplicated
-- Device info (MAC address, serial number, hardware and firmware revision) shown when connected to a FTMS device, hidden if not available
-- Delete past workouts via long-press
-- BH Fitness iConcept 3.0 treadmill now supported — connect and start using it
+- Connect to FTMS-compatible treadmills and indoor bikes over Bluetooth
+- BH Fitness iConcept support — treadmills, indoor bikes and vertical bikes (C01 models)
+- Heart rate sensor support via BLE (Gadgetbridge compatible) — use a smart band or chest strap as HR sensor
+- HR-only mode: start and record workouts with just a heart rate sensor, no FTMS machine required
+- Real-time dashboard with speed, cadence, power, distance, heart rate, energy, time, inclination and resistance
 - Session recording starts and stops automatically when the machine starts or stops
-- Fixed: GATT operation queue serialized — all CCCD subscriptions and characteristic reads now complete reliably (fixes no data on BH Fitness and similar devices)
-- Audio devices (earbuds, headphones) are now hidden from the scan list
-- Previously connected devices remain visible in the list after disconnect, with a Reconnect button — no need to re-scan
-- Fixed: dashboard metrics are cleared when device disconnects
-- Show notification when device unexpectedly disconnects
-- Fixed: BH Fitness treadmill incline was displayed 6× too high — now correctly divided
-- Fixed: BH Fitness indoor bike shows strides/min (from proprietary energy field) with correct label
-- Fixed: session time now uses wall-clock when device does not provide elapsed time (BH Fitness treadmill/bike)
-- Fixed: energy/calories tile always displays a value; for BH Fitness indoor bikes it shows strides/min instead of a misleading kcal reading
-- Bonded BLE devices (e.g. Xiaomi Mi Band paired via Gadgetbridge) are now shown in the device list after scanning, even if not currently advertising; audio peripherals (headsets, speakers) are excluded
-- To use Mi Band 7 as HR sensor via Gadgetbridge: enable "3rd party realtime HR access" and "Visible while connected" in Gadgetbridge device settings, then scan and select the device as HR Sensor
-- Fixed History button — now opens the Workout History screen
-- Workout History lists all recorded sessions with machine type, date, duration, distance and avg HR
-- Tap a session to export as FIT or CSV file
-- Scan list is hidden during an active workout to reduce clutter
-- Added Cross Trainer (elliptical, 0x2ACE) machine type recognition
-- Added Stair Climber / Step Climber (0x2AD1/0x2AD0) machine type recognition ("vertical bike")
-- FIT export correctly sets sport/sub-sport for Cross Trainer and Stair Climber sessions
-- BLE scan ignores common non-fitness devices by name (smart locks, TVs, speakers, earbuds, etc.)
-- Added About menu entry showing the current app version
-- Main screen buttons (Scan, History, Debug) are now fixed above the device scan list
-- Workout statistics are hidden until a workout begins, for a cleaner UI
-- Second device (HR sensor) connection status is hidden until a second device is connected
-- Added support for BH Fitness vertical bike (C01_XXXXX models)
-- Fixed: BH Fitness devices with iConcept naming (B01_, C01_, etc.) are now correctly detected
+- Session summary (avg/max speed, power, HR) saved on workout completion
+- Workout History screen listing all past sessions with machine type, date, duration, distance and avg HR
+- Export workouts as FIT or CSV from the History screen
+- FIT export includes per-second records with speed, cadence, power, HR, distance, grade and resistance
+- Cross Trainer (elliptical) and Stair Climber / Step Climber machine type recognition with correct FIT sport
+- Device info (MAC address, serial number, hardware and firmware revision) shown when connected
+- Previously connected devices remain visible in the scan list after disconnect, with a Reconnect button
+- Bonded Gadgetbridge devices (smart bands) are shown in the scan list even when not actively advertising
+- Audio peripherals (headsets, earbuds, speakers) are excluded from the scan list
+- Notification shown when a device unexpectedly disconnects
+- Debug Bluetooth communication logging saved to Documents/FTMSBridge/debug/
+- Portrait and landscape layouts
+- About menu entry showing the current app version
