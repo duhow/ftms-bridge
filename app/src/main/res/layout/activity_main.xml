@@ -199,23 +199,62 @@
                         </LinearLayout>
                     </LinearLayout>
 
-                    <LinearLayout android:id="@+id/lapMetricsRow"
-                        android:layout_width="match_parent" android:layout_height="wrap_content"
+                    <!-- Row 1: Incline (tappable) | empty spacer | Speed (tappable) -->
+                    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
                         android:orientation="horizontal" android:gravity="center"
                         android:layout_marginTop="12dp">
 
-                        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content"
-                            android:layout_weight="1" android:orientation="vertical" android:gravity="center">
+                        <LinearLayout android:id="@+id/lapColInclination"
+                            android:layout_width="0dp" android:layout_height="wrap_content"
+                            android:layout_weight="1" android:orientation="vertical" android:gravity="center"
+                            android:padding="8dp"
+                            android:clickable="true" android:focusable="true"
+                            android:background="?attr/selectableItemBackground">
+                            <ImageView android:layout_width="20dp" android:layout_height="20dp"
+                                android:src="@drawable/ic_inclination" app:tint="@color/metric_inclination"
+                                android:contentDescription="@null" />
+                            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                                android:text="@string/metric_inclination" android:textSize="10sp"
+                                android:textColor="@color/metric_inclination" android:layout_marginTop="2dp" />
+                            <TextView android:id="@+id/lapValueInclination"
+                                android:layout_width="wrap_content" android:layout_height="wrap_content"
+                                android:text="--" android:textSize="18sp" android:textStyle="bold"
+                                android:textColor="@color/metric_inclination" />
+                            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                                android:text="@string/unit_percent" android:textSize="10sp"
+                                android:textColor="?android:attr/textColorSecondary" />
+                        </LinearLayout>
+
+                        <!-- Empty middle spacer -->
+                        <View android:layout_width="0dp" android:layout_height="1dp"
+                            android:layout_weight="1" />
+
+                        <LinearLayout android:id="@+id/lapColSpeed"
+                            android:layout_width="0dp" android:layout_height="wrap_content"
+                            android:layout_weight="1" android:orientation="vertical" android:gravity="center"
+                            android:padding="8dp"
+                            android:clickable="true" android:focusable="true"
+                            android:background="?attr/selectableItemBackground">
                             <ImageView android:layout_width="20dp" android:layout_height="20dp"
                                 android:src="@drawable/ic_speed" app:tint="@color/metric_speed"
                                 android:contentDescription="@null" />
+                            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                                android:text="@string/metric_speed" android:textSize="10sp"
+                                android:textColor="@color/metric_speed" android:layout_marginTop="2dp" />
                             <TextView android:id="@+id/lapValueSpeed"
                                 android:layout_width="wrap_content" android:layout_height="wrap_content"
-                                android:text="--" android:textSize="18sp" android:textStyle="bold" />
+                                android:text="--" android:textSize="18sp" android:textStyle="bold"
+                                android:textColor="@color/metric_speed" />
                             <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
                                 android:text="@string/unit_kmh" android:textSize="10sp"
                                 android:textColor="?android:attr/textColorSecondary" />
                         </LinearLayout>
+                    </LinearLayout>
+
+                    <!-- Row 2: Energy | Heart rate -->
+                    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:orientation="horizontal" android:gravity="center"
+                        android:layout_marginTop="8dp">
 
                         <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content"
                             android:layout_weight="1" android:orientation="vertical" android:gravity="center">

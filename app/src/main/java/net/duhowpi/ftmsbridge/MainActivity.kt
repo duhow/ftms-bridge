@@ -238,6 +238,8 @@ class MainActivity : AppCompatActivity() {
 
         binding.cardSpeed.setOnClickListener { showSpeedControlDialog() }
         binding.cardInclination.setOnClickListener { showInclineControlDialog() }
+        binding.lapColSpeed.setOnClickListener { showSpeedControlDialog() }
+        binding.lapColInclination.setOnClickListener { showInclineControlDialog() }
 
         binding.btnViewLap.setOnClickListener { setWorkoutView(false) }
         binding.btnViewChart.setOnClickListener { setWorkoutView(true) }
@@ -305,6 +307,7 @@ class MainActivity : AppCompatActivity() {
         binding.txtLapCount.text = String.format("%d:%02d", tm, ts)
         // Inline metrics row inside the lap card
         binding.lapValueSpeed.text = String.format("%.1f", sample.speedKmh)
+        binding.lapValueInclination.text = "${sample.inclinationPercent.roundToInt()}"
         if (sample.stridesPerMin > 0) {
             binding.lapValueEnergy.text = String.format("%.1f", sample.stridesPerMin)
             binding.lapUnitEnergy.setText(R.string.unit_per_min)
@@ -923,6 +926,7 @@ class MainActivity : AppCompatActivity() {
         binding.valueInclination.text = "--"
         binding.valueResistance.text = "--"
         binding.lapValueSpeed.text = "--"
+        binding.lapValueInclination.text = "--"
         binding.lapValueEnergy.text = "--"
         binding.lapUnitEnergy.setText(R.string.unit_kcal)
         binding.lapValueHr.text = "--"
@@ -958,10 +962,12 @@ class MainActivity : AppCompatActivity() {
         binding.toolbarIndicatorHr.visibility = if (hasHrDevice) View.VISIBLE else View.GONE
         binding.toolbarStatusIcons.visibility = View.VISIBLE
         binding.metricsSection.visibility = View.VISIBLE
-        // During recording keep only the interactive cards (speed + inclination/resistance)
+        // During recording keep only the lap card for interactive metrics (speed + incline now in lap card)
+        binding.cardSpeed.visibility = View.GONE
         binding.cardHeartRate.visibility = View.GONE
         binding.rowDistanceEnergy.visibility = View.GONE
         binding.cardElapsedTime.visibility = View.GONE
+        binding.cardInclination.visibility = View.GONE
         // Hide scan results list during workout to reduce clutter
         binding.rvScanResults.visibility = View.GONE
         binding.txtScanStatus.visibility = View.GONE
