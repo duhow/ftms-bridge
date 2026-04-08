@@ -241,14 +241,13 @@ device to begin streaming data on the iConcept proprietary channel.
 Speed is encoded in **standard FTMS units** (UINT16, 0.01 km/h) for both reads and
 writes.  Example: 6.10 km/h → write value 610.
 
-To enable Set Target Speed on BH Fitness devices, the app sends **Start or Resume**
-(opcode `0x07`) to the control point when a recording session begins and the machine is
-already running.  Without this the device appears to ignore speed commands, consistent
-with the FTMS spec requirement that the machine be in the "active" state before accepting
-Set Target Speed (§4.16.2).
+To enable Set Target Speed or Set Target Inclination on BH Fitness devices, the app
+queues a **Start/Resume (0x07)** command immediately before each control command so the
+device is always in the "Active Control" state required by FTMS §4.16.2 when the
+actual command arrives.
 
-Set Target Inclination (opcode `0x03`) does not require a prior Start/Resume and works
-with the BH-specific encoding described in section 1.
+Set Target Inclination (opcode `0x03`) uses the same **standard FTMS encoding**
+(SINT16 × 0.1 %) as speed — no BH-specific scale is needed for writes.
 
 ---
 

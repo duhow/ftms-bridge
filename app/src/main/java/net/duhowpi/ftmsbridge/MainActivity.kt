@@ -1248,10 +1248,6 @@ class MainActivity : AppCompatActivity() {
             unitFormatter = { value -> "${value.roundToInt()}${getString(R.string.unit_percent)}" },
             rangeText = getString(R.string.control_range_incline, INCLINE_MIN_PERCENT.roundToInt(), INCLINE_MAX_PERCENT.roundToInt()),
             dangerPredicate = { value -> value >= INCLINE_DANGER_PERCENT || value <= INCLINE_DECLINE_DANGER_PERCENT },
-            smallDecLabel = "",
-            largeDecLabel = "",
-            smallIncLabel = "",
-            largeIncLabel = "",
             showAdjustButtons = false
         ) { selected ->
             sendTargetInclinePercent(selected)
@@ -1269,10 +1265,10 @@ class MainActivity : AppCompatActivity() {
         unitFormatter: (Double) -> String,
         rangeText: String,
         dangerPredicate: (Double) -> Boolean,
-        smallDecLabel: String,
-        largeDecLabel: String,
-        smallIncLabel: String,
-        largeIncLabel: String,
+        smallDecLabel: String = "",
+        largeDecLabel: String = "",
+        smallIncLabel: String = "",
+        largeIncLabel: String = "",
         showAdjustButtons: Boolean = true,
         onApply: (Double) -> Boolean
     ) {
