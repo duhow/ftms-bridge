@@ -1357,10 +1357,6 @@ class MainActivity : AppCompatActivity() {
             Log.w(tag, "Encoded speed out of range: $encoded")
             return false
         }
-        // Send Start/Resume immediately before the speed command to ensure the device
-        // is in the "Active Control" state required by the FTMS spec before it will
-        // honour Set Target Speed.  Both are queued so they are sent in order.
-        cm.sendControlPoint(byteArrayOf(FtmsConstants.CONTROL_START_OR_RESUME))
         val payload = ByteBuffer.allocate(3)
             .order(ByteOrder.LITTLE_ENDIAN)
             .put(FtmsConstants.CONTROL_SET_TARGET_SPEED)
@@ -1372,15 +1368,11 @@ class MainActivity : AppCompatActivity() {
     private fun sendTargetInclinePercent(inclinePercent: Double): Boolean {
         val cm = ftmsConnectionManager ?: return false
         val clamped = inclinePercent.coerceIn(INCLINE_MIN_PERCENT, INCLINE_MAX_PERCENT)
-        // Standard FTMS encoding: SINT16 in units of 0.1 %.
-        // Positive: +5 % → 50.  Negative: −2 % → −20.
         val encoded = fitnessDevice?.encodeTargetInclineRaw(clamped) ?: (clamped * 10.0).roundToInt()
         if (!isEncodableAsSint16(encoded)) {
             Log.w(tag, "Encoded incline out of range: $encoded")
             return false
         }
-        // Send Start/Resume immediately before the incline command (same requirement as speed).
-        cm.sendControlPoint(byteArrayOf(FtmsConstants.CONTROL_START_OR_RESUME))
         val payload = ByteBuffer.allocate(3)
             .order(ByteOrder.LITTLE_ENDIAN)
             .put(FtmsConstants.CONTROL_SET_TARGET_INCLINATION)

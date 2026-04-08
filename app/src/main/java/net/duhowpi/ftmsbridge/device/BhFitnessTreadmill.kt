@@ -4,6 +4,7 @@ import android.util.Log
 import net.duhowpi.ftmsbridge.ftms.FtmsConstants
 import net.duhowpi.ftmsbridge.ftms.FtmsDataParser
 import net.duhowpi.ftmsbridge.model.FitnessSample
+import kotlin.math.roundToInt
 
 class BhFitnessTreadmill(deviceName: String) :
     FtmsDevice(deviceName, FtmsConstants.MachineType.TREADMILL) {
@@ -128,6 +129,31 @@ class BhFitnessTreadmill(deviceName: String) :
             totalDistanceM = distanceM,
             totalEnergyKcal = energyKcal
         )
+    }
+
+    /**
+     * Encodes a physical inclination percentage to the raw SINT16 value expected by
+     * BH Fitness treadmills in the FTMS Control Point Set Target Inclination command.
+     *
+     * Positive incline uses standard FTMS encoding (0.1 % units):
+     *   raw = physicalPercent * 10   → +1 % = 10, +5 % = 50
+     *
+     * Decline uses hardcoded values that exactly match what the device reports in
+     * its own Treadmill Data notifications (confirmed from captured device logs):
+     *   -1 % → 450  (device reads back (450−500)/62.5 = −0.8 % → displays −1 %)
+     *   -2 % → 380  (device reads back (380−500)/62.5 = −1.9 % → displays −2 %)
+     *   -3 % → 320  (device reads back (320−500)/62.5 = −2.9 % → displays −3 %)
+     *
+     * The inverse formula (pct × 62.5 + 500) gives 438/375/313, which are NOT the
+     * values the device firmware expects — static values are required.
+     */
+    override fun encodeTargetInclineRaw(physicalPercent: Double): Int {
+        return when {
+            physicalPercent <= -3.0 -> 320
+            physicalPercent <= -2.0 -> 380
+            physicalPercent < 0.0   -> 450
+            else -> (physicalPercent * 10.0).roundToInt()
+        }
     }
 
     /**

@@ -76,21 +76,24 @@ increases **gradually** in ~60-unit steps.
 
 ### Writing inclination (Control Point, opcode 0x03)
 
-The FTMS Control Point Set Target Inclination command uses **standard FTMS encoding**
-(SINT16 in units of 0.1 %) for both positive and negative values.
-
+Positive incline uses **standard FTMS encoding** (SINT16 in units of 0.1 %):
 ```
-Positive: raw = target_percent * 10   (+5 % → 50)
-Negative: raw = target_percent * 10   (−2 % → −20, encoded as negative SINT16)
+raw = target_percent * 10   (+5 % → 50)
 ```
 
-> ⚠️ An earlier hypothesis that BH Fitness requires the same 6.25× non-standard
-> scale for writes that it uses for reads (positive: `pct × 62.5`, decline:
-> `pct × 62.5 + 500`) was confirmed **incorrect** — positive incline stopped
-> working when that encoding was applied and was restored by reverting to standard FTMS.
+Decline uses **hardcoded raw values** that exactly match what the device itself sends in
+its Treadmill Data notifications.  Confirmed from captured device logs:
 
-`FitnessDevice.encodeTargetInclineRaw()` provides the default standard-FTMS encoding.
-`BhFitnessTreadmill` does **not** override this method.
+| Target %  | Write raw | Device reads back         |
+|-----------|-----------|---------------------------|
+| −1 %      | **450**   | (450−500)/62.5 = −0.8 % → displays −1 % |
+| −2 %      | **380**   | (380−500)/62.5 = −1.9 % → displays −2 % |
+| −3 %      | **320**   | (320−500)/62.5 = −2.9 % → displays −3 % |
+
+The inverse formula `pct × 62.5 + 500` gives 438/375/313 — these are **not** the values
+the device firmware expects for decline, so static/hardcoded values are required.
+
+`BhFitnessTreadmill.encodeTargetInclineRaw()` implements this mapping.
 
 The incline control dialog uses **1 % integer steps** only (matching the machine's
 console increments) and omits the fine-adjustment buttons.
@@ -102,10 +105,11 @@ Standard FTMS encoding: UINT16 in units of 0.01 km/h.
 raw = target_kmh * 100    (6.1 km/h → 610 = 0x0262, LE: 62 02)
 ```
 
-Per FTMS §4.16.2, the device must be in the "Active Control" state before it will
-honour Set Target Speed or Set Target Inclination.  The app therefore queues a
-**Start/Resume (0x07)** command immediately before each speed or inclination command
-so the state transition is guaranteed regardless of when the command is sent.
+`Request Control (0x00)` is sent once during connection setup.  After that, the device
+accepts Set Target Speed and Set Target Inclination commands directly without requiring
+a prior `Start/Resume (0x07)`.  Sending `0x07` before each command (as tried previously)
+interferes with the running belt state and prevents the subsequent command from taking
+effect.
 
 ---
 
@@ -241,13 +245,14 @@ device to begin streaming data on the iConcept proprietary channel.
 Speed is encoded in **standard FTMS units** (UINT16, 0.01 km/h) for both reads and
 writes.  Example: 6.10 km/h → write value 610.
 
-To enable Set Target Speed or Set Target Inclination on BH Fitness devices, the app
-queues a **Start/Resume (0x07)** command immediately before each control command so the
-device is always in the "Active Control" state required by FTMS §4.16.2 when the
-actual command arrives.
+After `Request Control (0x00)` succeeds on connection, the device accepts speed and
+inclination commands directly.  Sending `Start/Resume (0x07)` before each command
+interferes with the running belt state; it must **not** be queued before Set Target
+Speed or Set Target Inclination.
 
-Set Target Inclination (opcode `0x03`) uses the same **standard FTMS encoding**
-(SINT16 × 0.1 %) as speed — no BH-specific scale is needed for writes.
+Set Target Inclination (opcode `0x03`) uses **standard FTMS encoding for positive grades**
+(SINT16 × 0.1 %) and **hardcoded raw values for decline** — see the write-encoding table
+in the inclination section above.
 
 ---
 
