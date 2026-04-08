@@ -2,4 +2,24 @@
 <resources>
     <color name="status_connected">#4CAF50</color>
     <color name="status_disconnected">#9E9E9E</color>
+    <!-- Metric tile accent colors -->
+    <color name="metric_speed">#1565C0</color>
+    <color name="metric_heart">#C62828</color>
+    <color name="metric_distance">#2E7D32</color>
+    <color name="metric_energy">#E65100</color>
+    <color name="metric_cadence">#6A1B9A</color>
+    <color name="metric_power">#F57F17</color>
+    <color name="metric_time">#00695C</color>
+    <color name="metric_inclination">#4E342E</color>
+    <color name="metric_resistance">#283593</color>
+    <!-- Metric tile tint colors (lighter backgrounds) -->
+    <color name="metric_speed_bg">#E3F2FD</color>
+    <color name="metric_heart_bg">#FFEBEE</color>
+    <color name="metric_distance_bg">#E8F5E9</color>
+    <color name="metric_energy_bg">#FFF3E0</color>
+    <color name="metric_cadence_bg">#F3E5F5</color>
+    <color name="metric_power_bg">#FFFDE7</color>
+    <color name="metric_time_bg">#E0F2F1</color>
+    <color name="metric_inclination_bg">#EFEBE9</color>
+    <color name="metric_resistance_bg">#E8EAF6</color>
 </resources>

@@ -40,6 +40,8 @@ import net.duhowpi.ftmsbridge.data.WorkoutSample
 import net.duhowpi.ftmsbridge.data.WorkoutSession
 import net.duhowpi.ftmsbridge.databinding.ActivityMainBinding
 import net.duhowpi.ftmsbridge.device.BhFitnessIndoorBike
+import net.duhowpi.ftmsbridge.device.DummyTreadmill
+import net.duhowpi.ftmsbridge.device.FitnessDevice
 import net.duhowpi.ftmsbridge.device.FtmsDevice
 import net.duhowpi.ftmsbridge.device.HeartRateSensor
 import net.duhowpi.ftmsbridge.ftms.FtmsCapabilities
@@ -89,6 +91,42 @@ class MainActivity : AppCompatActivity() {
 
     // Whether permissions were requested from scan button (so we auto-start scan)
     private var pendingScanAfterPermission = false
+
+    // Live chart data (collected every updateDashboard call, cleared on new session)
+    private val liveSpeedPoints = mutableListOf<Float>()
+    private val livePaceSecondaryPoints = mutableListOf<Float>()
+    private val liveHrPoints = mutableListOf<Float>()
+    private var liveChartElapsedSec = 0
+
+    // Lap tracking
+    private var lapStartDistanceM: Int = 0
+    private var lapStartTimeMs: Long = 0
+    private var lapCount: Int = 0
+
+    // Workout view state: false = LAP view, true = CHART view
+    private var isChartViewActive = false
+
+    private val isActiveTreadmill: Boolean
+        get() = dummyTreadmill != null || fitnessDevice?.machineType == FtmsConstants.MachineType.TREADMILL
+
+    // DummyTreadmill (debug only)
+    private var dummyTreadmill: DummyTreadmill? = null
+    private val dummyTreadmillHandler = Handler(Looper.getMainLooper())
+    private val dummyTreadmillRunnable = object : Runnable {
+        override fun run() {
+            val dummy = dummyTreadmill ?: return
+            val sample = dummy.generateSample()
+            val nowRunning = sample.speedKmh > 0.1
+            if (nowRunning != isMachineRunning) {
+                isMachineRunning = nowRunning
+                updateMachineRunningState()
+            }
+            lastFtmsSample = sample
+            updateDashboard(sample)
+            if (isRecording && currentSessionId != null) saveSample(sample)
+            dummyTreadmillHandler.postDelayed(this, 2000)
+        }
+    }
 
     // Recording throttle: minimum 2s between saves; identical data saved at most every 5s
     private var lastSavedSampleMs: Long = 0
@@ -198,14 +236,106 @@ class MainActivity : AppCompatActivity() {
             if (isRecording) stopRecording() else startRecording()
         }
 
+        binding.btnWorkoutStop.setOnClickListener { stopRecording() }
+
         binding.cardSpeed.setOnClickListener { showSpeedControlDialog() }
         binding.cardInclination.setOnClickListener { showInclineControlDialog() }
+        binding.lapColSpeed.setOnClickListener { showSpeedControlDialog() }
+        binding.lapColInclination.setOnClickListener { showInclineControlDialog() }
+
+        binding.btnViewLap.setOnClickListener { setWorkoutView(false) }
+        binding.btnViewChart.setOnClickListener { setWorkoutView(true) }
+        if (BuildConfig.BT_DEBUG_LOG) {
+            binding.btnConnectVirtual.setOnClickListener { connectDummyTreadmill() }
+        }
 
         updateConnectionStatus()
         resetMetrics()
     }
 
     // ---- Permissions --------------------------------------------------------
+
+    private fun setWorkoutView(showChart: Boolean) {
+        isChartViewActive = showChart
+        binding.lapSection.visibility = if (!showChart) View.VISIBLE else View.GONE
+        binding.chartSection.visibility = if (showChart) View.VISIBLE else View.GONE
+        if (showChart) updateLiveChart()
+    }
+
+    private fun updateLiveChart() {
+        if (liveSpeedPoints.isEmpty()) return
+        val isTreadmill = isActiveTreadmill
+        val durationSec = liveChartElapsedSec.coerceAtLeast(60)
+        val speedLabel = if (isTreadmill) getString(R.string.metric_speed) else getString(R.string.metric_cadence)
+        val secondaryLabel = if (isTreadmill) getString(R.string.metric_inclination) else getString(R.string.metric_resistance)
+        val speedColor = ContextCompat.getColor(this, R.color.metric_speed)
+        val secondaryColor = if (isTreadmill)
+            ContextCompat.getColor(this, R.color.metric_inclination)
+        else
+            ContextCompat.getColor(this, R.color.metric_resistance)
+        val hrColor = ContextCompat.getColor(this, R.color.metric_heart)
+
+        val seriesList = mutableListOf(
+            LineChartView.DataSeries(speedLabel, speedColor, liveSpeedPoints.toList(), 0f)
+        )
+        if (hasNonZeroValues(livePaceSecondaryPoints)) {
+            seriesList.add(LineChartView.DataSeries(secondaryLabel, secondaryColor, livePaceSecondaryPoints.toList()))
+        }
+        if (hasNonZeroValues(liveHrPoints)) {
+            seriesList.add(LineChartView.DataSeries(getString(R.string.metric_heart_rate), hrColor, liveHrPoints.toList(), 40f, 200f))
+        }
+        binding.liveChart.setData(*seriesList.toTypedArray(), durationSec = durationSec)
+    }
+
+    private fun updateLapView(sample: FitnessSample, elapsedSec: Int) {
+        val distM = sample.totalDistanceM
+        val lapProgressM = (distM - lapStartDistanceM).coerceAtLeast(0)
+        if (lapProgressM >= LAP_DISTANCE_METERS) {
+            lapCount++
+            lapStartDistanceM = distM - (lapProgressM % LAP_DISTANCE_METERS)
+            lapStartTimeMs = System.currentTimeMillis()
+        }
+        val currentLapM = (distM - lapStartDistanceM).coerceAtLeast(0).coerceAtMost(LAP_DISTANCE_METERS)
+        val lapElapsedMs = System.currentTimeMillis() - lapStartTimeMs
+        val lapSec = (lapElapsedMs / 1000).toInt()
+        binding.progressBarLap.progress = currentLapM
+        // Show total distance covered, not just within-lap distance
+        binding.txtLapProgress.text = getString(R.string.lap_progress_label, distM / 1000.0)
+        val lm = lapSec / 60
+        val ls = lapSec % 60
+        binding.txtLapTime.text = String.format("%d:%02d", lm, ls)
+        val tm = elapsedSec / 60
+        val ts = elapsedSec % 60
+        binding.txtLapCount.text = String.format("%d:%02d", tm, ts)
+        // Inline metrics row inside the lap card
+        binding.lapValueSpeed.text = String.format("%.1f", sample.speedKmh)
+        binding.lapValueInclination.text = "${sample.inclinationPercent.roundToInt()}"
+        if (sample.stridesPerMin > 0) {
+            binding.lapValueEnergy.text = String.format("%.1f", sample.stridesPerMin)
+            binding.lapUnitEnergy.setText(R.string.unit_per_min)
+        } else {
+            binding.lapValueEnergy.text = "${sample.totalEnergyKcal}"
+            binding.lapUnitEnergy.setText(R.string.unit_kcal)
+        }
+        binding.lapValueHr.text = if (sample.heartRateBpm > 0) "${sample.heartRateBpm}" else "--"
+    }
+
+    /** Returns true if [points] contains at least one non-zero value. */
+    private fun hasNonZeroValues(points: List<Float>) = points.any { it != 0f }
+
+    private fun connectDummyTreadmill() {
+        val dummy = DummyTreadmill()
+        dummyTreadmill = dummy
+        binding.rvScanResults.visibility = View.GONE
+        binding.txtScanStatus.visibility = View.GONE
+        binding.debugVirtualDeviceRow.visibility = View.GONE
+        updateConnectionStatus()
+        updateMetricVisibility(dummy.machineType)
+        dummyTreadmillHandler.removeCallbacks(dummyTreadmillRunnable)
+        dummyTreadmillHandler.post(dummyTreadmillRunnable)
+    }
+
+    // ---- Permissions (continued) --------------------------------------------
 
     private fun getRequiredPermissions(): List<String> {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -259,6 +389,9 @@ class MainActivity : AppCompatActivity() {
 
     private fun startScanning() {
         scanResultsMap.clear()
+        if (BuildConfig.BT_DEBUG_LOG) {
+            binding.debugVirtualDeviceRow.visibility = View.VISIBLE
+        }
         binding.rvScanResults.visibility = View.VISIBLE
         binding.txtScanStatus.visibility = View.VISIBLE
         binding.txtScanStatus.text = getString(R.string.scanning_active)
@@ -460,7 +593,11 @@ class MainActivity : AppCompatActivity() {
                 if (shouldAnchorFallbackTimer(mergedSample, nowRunning)) {
                     elapsedFallbackStartTime = mergedSample.timestampMs
                 }
-                runOnUiThread { updateDashboard(mergedSample) }
+                runOnUiThread {
+                    updateDashboard(mergedSample)
+                    animateBeat(binding.indicatorFtms)
+                    animateBeat(binding.toolbarIndicatorFtms)
+                }
                 if (isRecording && currentSessionId != null) saveSample(mergedSample)
             }
 
@@ -468,6 +605,8 @@ class MainActivity : AppCompatActivity() {
                 lastHeartRateBpm = FtmsDataParser.parseHeartRate(data)
                 runOnUiThread {
                     binding.valueHeartRate.text = if (lastHeartRateBpm > 0) "$lastHeartRateBpm" else "--"
+                    animateBeat(binding.indicatorHr)
+                    animateBeat(binding.toolbarIndicatorHr)
                 }
             }
 
@@ -539,6 +678,8 @@ class MainActivity : AppCompatActivity() {
                 lastHeartRateBpm = hr
                 runOnUiThread {
                     binding.valueHeartRate.text = if (hr > 0) "$hr" else "--"
+                    animateBeat(binding.indicatorHr)
+                    animateBeat(binding.toolbarIndicatorHr)
                 }
             }
 
@@ -624,19 +765,27 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updateConnectionStatus() {
-        val ftmsConnected = ftmsConnectionManager?.isConnected == true
+        val ftmsConnected = ftmsConnectionManager?.isConnected == true || dummyTreadmill != null
         val hrConnected = hrConnectionManager?.isConnected == true
         val hasHrDevice = hrConnectionManager != null
 
-        binding.indicatorFtms.setBackgroundResource(
-            if (ftmsConnected) R.color.status_connected else R.color.status_disconnected
-        )
-        binding.indicatorHr.setBackgroundResource(
-            if (hrConnected) R.color.status_connected else R.color.status_disconnected
-        )
-        binding.txtFtmsDevice.text = if (ftmsConnected)
-            ftmsConnectionManager?.connectedDeviceName ?: getString(R.string.connected)
-        else getString(R.string.not_connected)
+        val ftmsColor = ContextCompat.getColor(this, if (ftmsConnected) R.color.status_connected else R.color.status_disconnected)
+        val hrColor = ContextCompat.getColor(this, if (hrConnected) R.color.status_connected else R.color.status_disconnected)
+
+        binding.indicatorFtms.setColorFilter(ftmsColor)
+        binding.indicatorHr.setColorFilter(hrColor)
+        // Keep toolbar indicators in sync
+        binding.toolbarIndicatorFtms.setColorFilter(ftmsColor)
+        binding.toolbarIndicatorHr.setColorFilter(hrColor)
+        if (isRecording) {
+            binding.toolbarIndicatorHr.visibility = if (hasHrDevice) View.VISIBLE else View.GONE
+        }
+
+        binding.txtFtmsDevice.text = when {
+            dummyTreadmill != null -> dummyTreadmill?.deviceName ?: getString(R.string.connected)
+            ftmsConnected -> ftmsConnectionManager?.connectedDeviceName ?: getString(R.string.connected)
+            else -> getString(R.string.not_connected)
+        }
 
         binding.txtHrDevice.text = if (hrConnected)
             hrConnectionManager?.connectedDeviceName ?: getString(R.string.connected)
@@ -713,6 +862,33 @@ class MainActivity : AppCompatActivity() {
         val minutes = elapsedSec / 60
         val seconds = elapsedSec % 60
         binding.valueElapsedTime.text = String.format("%d:%02d", minutes, seconds)
+
+        // Accumulate live chart data while recording
+        if (isRecording) {
+            liveChartElapsedSec = elapsedSec
+            val isTreadmill = isActiveTreadmill
+            liveSpeedPoints.add(if (isTreadmill) sample.speedKmh.toFloat() else sample.cadenceRpm.toFloat())
+            livePaceSecondaryPoints.add(
+                if (isTreadmill) sample.inclinationPercent.toFloat() else sample.resistanceLevel.toFloat()
+            )
+            liveHrPoints.add(sample.heartRateBpm.toFloat())
+            if (isChartViewActive) updateLiveChart()
+            updateLapView(sample, elapsedSec)
+        }
+    }
+
+    /** Scale up by 15 % then back to 1× in 200 ms total to indicate a BLE data beat. */
+    private fun animateBeat(view: View) {
+        view.animate()
+            .scaleX(1.15f).scaleY(1.15f)
+            .setDuration(100)
+            .withEndAction {
+                view.animate()
+                    .scaleX(1f).scaleY(1f)
+                    .setDuration(100)
+                    .start()
+            }
+            .start()
     }
 
     /**
@@ -751,6 +927,11 @@ class MainActivity : AppCompatActivity() {
         binding.valueElapsedTime.text = "0:00"
         binding.valueInclination.text = "--"
         binding.valueResistance.text = "--"
+        binding.lapValueSpeed.text = "--"
+        binding.lapValueInclination.text = "--"
+        binding.lapValueEnergy.text = "--"
+        binding.lapUnitEnergy.setText(R.string.unit_kcal)
+        binding.lapValueHr.text = "--"
         binding.txtMachineType.visibility = View.GONE
         binding.txtFtmsDeviceInfo.visibility = View.GONE
         binding.metricsSection.visibility = View.GONE
@@ -760,7 +941,7 @@ class MainActivity : AppCompatActivity() {
     // ---- Session recording --------------------------------------------------
 
     private fun startRecording() {
-        val device = fitnessDevice ?: return
+        val device: FitnessDevice = fitnessDevice ?: dummyTreadmill ?: return
         isRecording = true
         sessionStartTime = System.currentTimeMillis()
         elapsedFallbackStartTime = 0L
@@ -768,11 +949,45 @@ class MainActivity : AppCompatActivity() {
         lastSavedSampleMs = 0
         lastSavedSampleData = null
         binding.btnWorkoutStart.text = getString(R.string.stop_session)
-        binding.recordingIndicator.visibility = View.VISIBLE
+        // Hide device header and REC indicator; show compact status icons in toolbar instead
+        binding.deviceHeaderRow.visibility = View.GONE
+        binding.recordingIndicator.visibility = View.GONE
+        val ftmsConnected = ftmsConnectionManager?.isConnected == true || dummyTreadmill != null
+        val hrConnected = hrConnectionManager?.isConnected == true
+        val hasHrDevice = hrConnectionManager != null
+        binding.toolbarIndicatorFtms.setColorFilter(
+            ContextCompat.getColor(this, if (ftmsConnected) R.color.status_connected else R.color.status_disconnected)
+        )
+        binding.toolbarIndicatorHr.setColorFilter(
+            ContextCompat.getColor(this, if (hrConnected) R.color.status_connected else R.color.status_disconnected)
+        )
+        binding.toolbarIndicatorHr.visibility = if (hasHrDevice) View.VISIBLE else View.GONE
+        binding.toolbarStatusIcons.visibility = View.VISIBLE
         binding.metricsSection.visibility = View.VISIBLE
+        // During recording keep only the lap card for interactive metrics (speed + incline now in lap card)
+        binding.cardSpeed.visibility = View.GONE
+        binding.cardHeartRate.visibility = View.GONE
+        binding.rowDistanceEnergy.visibility = View.GONE
+        binding.cardElapsedTime.visibility = View.GONE
+        binding.cardInclination.visibility = View.GONE
         // Hide scan results list during workout to reduce clutter
         binding.rvScanResults.visibility = View.GONE
         binding.txtScanStatus.visibility = View.GONE
+        // Clear live chart data
+        liveSpeedPoints.clear()
+        livePaceSecondaryPoints.clear()
+        liveHrPoints.clear()
+        liveChartElapsedSec = 0
+        // Reset lap tracking
+        lapStartDistanceM = 0
+        lapStartTimeMs = System.currentTimeMillis()
+        lapCount = 0
+        // Show workout view toggle - default to lap view
+        binding.viewToggleRow.visibility = View.VISIBLE
+        isChartViewActive = false
+        binding.lapSection.visibility = View.VISIBLE
+        binding.chartSection.visibility = View.GONE
+        binding.btnWorkoutStop.visibility = View.VISIBLE
         lifecycleScope.launch(Dispatchers.IO) {
             val session = WorkoutSession(
                 startTimeMs = sessionStartTime,
@@ -793,6 +1008,19 @@ class MainActivity : AppCompatActivity() {
         lastFallbackElapsedSec = 0
         binding.btnWorkoutStart.text = getString(R.string.start_session)
         binding.recordingIndicator.visibility = View.GONE
+        binding.toolbarStatusIcons.visibility = View.GONE
+        binding.deviceHeaderRow.visibility = View.VISIBLE
+        binding.viewToggleRow.visibility = View.GONE
+        binding.lapSection.visibility = View.GONE
+        binding.chartSection.visibility = View.GONE
+        binding.btnWorkoutStop.visibility = View.GONE
+        // Restore metric cards hidden during recording
+        binding.cardHeartRate.visibility = View.VISIBLE
+        binding.rowDistanceEnergy.visibility = View.VISIBLE
+        binding.cardElapsedTime.visibility = View.VISIBLE
+        val machineType = fitnessDevice?.machineType ?: dummyTreadmill?.machineType
+            ?: FtmsConstants.MachineType.UNKNOWN
+        updateMetricVisibility(machineType)
         val sessionId = currentSessionId ?: return
         lifecycleScope.launch(Dispatchers.IO) {
             val session = db.sessionDao().getById(sessionId)
@@ -1141,6 +1369,8 @@ class MainActivity : AppCompatActivity() {
     override fun onDestroy() {
         super.onDestroy()
         updateHandler.removeCallbacks(scanListUpdateRunnable)
+        dummyTreadmillHandler.removeCallbacks(dummyTreadmillRunnable)
+        dummyTreadmill = null
         bleScanner.stopScan()
         if (isRecording) stopRecording()
         ftmsConnectionManager?.disconnect()
@@ -1307,6 +1537,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     companion object {
+        private const val LAP_DISTANCE_METERS = 1000
         private const val SPEED_MIN_KMH = 0.5
         private const val SPEED_MAX_KMH = 30.0
         private const val INCLINE_MIN_PERCENT = -3.0

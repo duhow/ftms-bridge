@@ -114,4 +114,19 @@
     <!-- Workout detail -->
     <string name="detail_devices_label">Devices</string>
     <string name="detail_laps_label">Laps</string>
+
+    <!-- Workout view toggle -->
+    <string name="view_lap">Lap</string>
+    <string name="view_chart">Chart</string>
+    <string name="lap_view_label">Lap %d</string>
+    <string name="lap_progress_label">%.2f km</string>
+    <string name="lap_time_label">Lap time</string>
+    <string name="lap_count_label">Laps</string>
+    <string name="workout_total_time_label">Total</string>
+
+    <!-- Debug virtual device -->
+    <string name="debug_virtual_treadmill">Virtual Treadmill</string>
+    <string name="debug_virtual_treadmill_speed">Speed (km/h)</string>
+    <string name="debug_virtual_treadmill_incline">Incline (%)</string>
+    <string name="debug_virtual_treadmill_control">Treadmill Control</string>
 </resources>
