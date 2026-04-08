@@ -988,13 +988,6 @@ class MainActivity : AppCompatActivity() {
         updateElapsedDisplay(0)
         elapsedTickHandler.removeCallbacks(elapsedTickRunnable)
         elapsedTickHandler.postDelayed(elapsedTickRunnable, 1000)
-        // Send FTMS Start/Resume so the device enters the "active" control state in
-        // which it accepts Set Target Speed commands (per FTMS spec §4.16.2).  Only
-        // send if the machine is already running to avoid starting a stopped belt.
-        if (isMachineRunning && fitnessDevice != null) {
-            ftmsConnectionManager?.sendControlPoint(byteArrayOf(FtmsConstants.CONTROL_START_OR_RESUME))
-            Log.d(tag, "Sent FTMS Start/Resume to enable speed control")
-        }
         binding.btnWorkoutStart.text = getString(R.string.stop_session)
         // Hide device header and REC indicator; show compact status icons in toolbar instead
         binding.deviceHeaderRow.visibility = View.GONE
@@ -1361,35 +1354,43 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun sendTargetSpeedKmh(speedKmh: Double): Boolean {
+        val cm = ftmsConnectionManager ?: return false
         val clamped = speedKmh.coerceIn(SPEED_MIN_KMH, SPEED_MAX_KMH)
         val encoded = (clamped * 100.0).roundToInt()
         if (!isEncodableAsSint16(encoded)) {
             Log.w(tag, "Encoded speed out of range: $encoded")
             return false
         }
+        // Send Start/Resume immediately before the speed command to ensure the device
+        // is in the "Active Control" state required by the FTMS spec before it will
+        // honour Set Target Speed.  Both are queued so they are sent in order.
+        cm.sendControlPoint(byteArrayOf(FtmsConstants.CONTROL_START_OR_RESUME))
         val payload = ByteBuffer.allocate(3)
             .order(ByteOrder.LITTLE_ENDIAN)
             .put(FtmsConstants.CONTROL_SET_TARGET_SPEED)
             .putShort(encoded.toShort())
             .array()
-        return ftmsConnectionManager?.sendControlPoint(payload) == true
+        return cm.sendControlPoint(payload)
     }
 
     private fun sendTargetInclinePercent(inclinePercent: Double): Boolean {
+        val cm = ftmsConnectionManager ?: return false
         val clamped = inclinePercent.coerceIn(INCLINE_MIN_PERCENT, INCLINE_MAX_PERCENT)
-        // Use device-specific encoding: BH Fitness uses a 6.25× non-standard scale and
-        // encodes decline as positive values around 500 rather than negative SINT16.
+        // Standard FTMS encoding: SINT16 in units of 0.1 %.
+        // Positive: +5 % → 50.  Negative: −2 % → −20.
         val encoded = fitnessDevice?.encodeTargetInclineRaw(clamped) ?: (clamped * 10.0).roundToInt()
         if (!isEncodableAsSint16(encoded)) {
             Log.w(tag, "Encoded incline out of range: $encoded")
             return false
         }
+        // Send Start/Resume immediately before the incline command (same requirement as speed).
+        cm.sendControlPoint(byteArrayOf(FtmsConstants.CONTROL_START_OR_RESUME))
         val payload = ByteBuffer.allocate(3)
             .order(ByteOrder.LITTLE_ENDIAN)
             .put(FtmsConstants.CONTROL_SET_TARGET_INCLINATION)
             .putShort(encoded.toShort())
             .array()
-        return ftmsConnectionManager?.sendControlPoint(payload) == true
+        return cm.sendControlPoint(payload)
     }
 
     private fun calculateFallbackElapsedSec(sampleTimestampMs: Long): Int {

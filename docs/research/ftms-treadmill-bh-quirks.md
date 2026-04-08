@@ -76,34 +76,36 @@ increases **gradually** in ~60-unit steps.
 
 ### Writing inclination (Control Point, opcode 0x03)
 
-The FTMS Control Point Set Target Inclination command uses the **same BH-quirky scale**
-as the read data.  Standard FTMS encoding (0.1 % units, SINT16) is **not** accepted for
-decline values.
-
-Write formula (inverse of the read formula):
+The FTMS Control Point Set Target Inclination command uses **standard FTMS encoding**
+(SINT16 in units of 0.1 %) for both positive and negative values.
 
 ```
-Positive incline:  raw = target_percent * 62.5
-Negative incline:  raw = target_percent * 62.5 + 500
-                   (device does not respond to negative SINT16 values for decline)
+Positive: raw = target_percent * 10   (+5 % → 50)
+Negative: raw = target_percent * 10   (−2 % → −20, encoded as negative SINT16)
 ```
 
-Because the 6.25× factor means raw values are not integer multiples of the target percent,
-the device's physical position will be within ±0.01 % of the requested grade and will
-display the correct rounded integer.
+> ⚠️ An earlier hypothesis that BH Fitness requires the same 6.25× non-standard
+> scale for writes that it uses for reads (positive: `pct × 62.5`, decline:
+> `pct × 62.5 + 500`) was confirmed **incorrect** — positive incline stopped
+> working when that encoding was applied and was restored by reverting to standard FTMS.
 
-| Target % | Encoded raw | Device physical (reads back) |
-|----------|-------------|------------------------------|
-| +1 %     | 62          | 62 / 62.5 = +0.99 % → displays 1 % |
-| +5 %     | 312         | 312 / 62.5 = +4.99 % → displays 5 % |
-| −1 %     | 438         | (438 − 500) / 62.5 = −0.99 % → displays −1 % |
-| −2 %     | 375         | (375 − 500) / 62.5 = −2.0 % → displays −2 % |
-| −3 %     | 313         | (313 − 500) / 62.5 = −2.99 % → displays −3 % |
-
-`BhFitnessTreadmill.encodeTargetInclineRaw()` implements this mapping.
+`FitnessDevice.encodeTargetInclineRaw()` provides the default standard-FTMS encoding.
+`BhFitnessTreadmill` does **not** override this method.
 
 The incline control dialog uses **1 % integer steps** only (matching the machine's
 console increments) and omits the fine-adjustment buttons.
+
+### Writing speed (Control Point, opcode 0x02)
+
+Standard FTMS encoding: UINT16 in units of 0.01 km/h.
+```
+raw = target_kmh * 100    (6.1 km/h → 610 = 0x0262, LE: 62 02)
+```
+
+Per FTMS §4.16.2, the device must be in the "Active Control" state before it will
+honour Set Target Speed or Set Target Inclination.  The app therefore queues a
+**Start/Resume (0x07)** command immediately before each speed or inclination command
+so the state transition is guaranteed regardless of when the command is sent.
 
 ---
 
