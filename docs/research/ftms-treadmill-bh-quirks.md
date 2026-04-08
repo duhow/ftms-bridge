@@ -74,9 +74,36 @@ increases **gradually** in ~60-unit steps.
 - A `hasSeenFlat` guard prevents false triggers when connecting to a machine that is
   already at high positive incline (the machine must pass through flat first).
 
----
+### Writing inclination (Control Point, opcode 0x03)
 
-## 2. Elapsed time / total distance / total energy not reported via FTMS
+The FTMS Control Point Set Target Inclination command uses the **same BH-quirky scale**
+as the read data.  Standard FTMS encoding (0.1 % units, SINT16) is **not** accepted for
+decline values.
+
+Write formula (inverse of the read formula):
+
+```
+Positive incline:  raw = target_percent * 62.5
+Negative incline:  raw = target_percent * 62.5 + 500
+                   (device does not respond to negative SINT16 values for decline)
+```
+
+Examples:
+
+| Target display | Target physical | Encoded raw | Device reads back |
+|---------------|----------------|-------------|-------------------|
+| +1 %          | +1 %           | 62          | 62/62.5 = +0.99 % → 1 % |
+| +5 %          | +5 %           | 312         | 312/62.5 = +4.99 % → 5 % |
+| −1 %          | −0.8 %         | 438         | (438−500)/62.5 = −0.99 % → −1 % |
+| −2 %          | −1.92 %        | 375         | (375−500)/62.5 = −2.0 % → −2 % |
+| −3 %          | −2.88 %        | 313         | (313−500)/62.5 = −2.99 % → −3 % |
+
+`BhFitnessTreadmill.encodeTargetInclineRaw()` implements this mapping.
+
+The incline control dialog uses **1 % integer steps** only (matching the machine's
+console increments) and omits the fine-adjustment buttons.
+
+---
 
 The standard Treadmill Data flags for elapsed time (bit 10), total distance (bit 2),
 and expended energy (bit 7) are technically set in the packet observed from BH Fitness
@@ -94,14 +121,17 @@ and `total_kcal=0`.  It does **not** repeat during the workout.
 Consequence: elapsed time, distance, and energy appear to freeze at their initial
 values for the entire session.
 
-**Elapsed time fix (start-signal anchored):** `BhFitnessTreadmill` does **not** start the
-derived timer at BLE connect. It waits for a workout-start anchor:
-- C112 elapsed snapshot (typically `0:02`) when present, or
-- first non-zero FTMS elapsed value.
+**Elapsed time fix (activity-start anchored):**
 
-Only after this anchor is seen does elapsed advance from packet timestamp deltas
-(`sample.timestampMs`) while FTMS elapsed remains zero. This prevents the timer from
-starting several seconds early due to connection/setup delay.
+When the user starts a recording session, `BhFitnessTreadmill.resetElapsedTime()` is
+called from `MainActivity.startRecording()`.  This zeroes the derived elapsed counter and
+re-enables accumulation so the timer starts from **0 at the moment the user presses
+Start**, not from the BLE connection time.
+
+`MainActivity` also runs a **1-second Handler tick** that increments the display every
+second between BLE notifications (~2 s apart).  When a BLE packet reports a higher
+elapsed value than the current tick counter, the counter is advanced (never decremented)
+to stay in sync.  This gives a smooth per-second count that never jumps backwards.
 
 **Distance and energy fallback:** Because C112 does not continue streaming, the app now
 derives:
@@ -201,6 +231,20 @@ The app therefore:
 
 Writing the *Request Control* opcode (`0x00`) to this characteristic triggers the
 device to begin streaming data on the iConcept proprietary channel.
+
+### Set Target Speed (opcode 0x02)
+
+Speed is encoded in **standard FTMS units** (UINT16, 0.01 km/h) for both reads and
+writes.  Example: 6.10 km/h → write value 610.
+
+To enable Set Target Speed on BH Fitness devices, the app sends **Start or Resume**
+(opcode `0x07`) to the control point when a recording session begins and the machine is
+already running.  Without this the device appears to ignore speed commands, consistent
+with the FTMS spec requirement that the machine be in the "active" state before accepting
+Set Target Speed (§4.16.2).
+
+Set Target Inclination (opcode `0x03`) does not require a prior Start/Resume and works
+with the BH-specific encoding described in section 1.
 
 ---
 

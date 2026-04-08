@@ -4,6 +4,7 @@ import android.util.Log
 import net.duhowpi.ftmsbridge.ftms.FtmsConstants
 import net.duhowpi.ftmsbridge.ftms.FtmsDataParser
 import net.duhowpi.ftmsbridge.model.FitnessSample
+import kotlin.math.roundToInt
 
 class BhFitnessTreadmill(deviceName: String) :
     FtmsDevice(deviceName, FtmsConstants.MachineType.TREADMILL) {
@@ -128,6 +129,43 @@ class BhFitnessTreadmill(deviceName: String) :
             totalDistanceM = distanceM,
             totalEnergyKcal = energyKcal
         )
+    }
+
+    /**
+     * Encodes a physical inclination percentage to the raw value expected by BH Fitness
+     * treadmills in the FTMS Control Point Set Target Inclination command.
+     *
+     * BH Fitness treadmills use the same non-standard 6.25× scale for writes as for reads:
+     *   Positive: raw = physicalPercent * 62.5
+     *   Negative: raw = physicalPercent * 62.5 + 500
+     *             (device does not accept negative SINT16 for decline)
+     *
+     * Examples:
+     *   +5 % → 312   (device reads 312/62.5 = 4.99 % → displays 5 %)
+     *   −1 % → 438   (device reads (438−500)/62.5 = −0.99 % → displays −1 %)
+     *   −2 % → 375   (device reads (375−500)/62.5 = −2.0 % → displays −2 %)
+     */
+    override fun encodeTargetInclineRaw(physicalPercent: Double): Int {
+        return if (physicalPercent < 0.0) {
+            (physicalPercent * 62.5 + 500.0).roundToInt()
+        } else {
+            (physicalPercent * 62.5).roundToInt()
+        }
+    }
+
+    /**
+     * Resets the derived elapsed-time accumulator so that the timer reported in
+     * subsequent samples starts from zero.  Called at recording start to align the
+     * in-app timer with the user's activity start rather than the BLE connect time.
+     */
+    @Synchronized
+    override fun resetElapsedTime() {
+        derivedElapsedSec = 0.0
+        lastSampleTimestampMs = 0L
+        // Keep hasWorkoutStartAnchor = true so the timer resumes counting immediately
+        // from the next FTMS packet without waiting for a new C112 signal (which will
+        // not arrive again because this device only sends C112 once per session).
+        hasWorkoutStartAnchor = true
     }
 
     override fun onIConceptData(data: ByteArray) {
