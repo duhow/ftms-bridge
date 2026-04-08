@@ -88,15 +88,17 @@ Negative incline:  raw = target_percent * 62.5 + 500
                    (device does not respond to negative SINT16 values for decline)
 ```
 
-Examples:
+Because the 6.25× factor means raw values are not integer multiples of the target percent,
+the device's physical position will be within ±0.01 % of the requested grade and will
+display the correct rounded integer.
 
-| Target display | Target physical | Encoded raw | Device reads back |
-|---------------|----------------|-------------|-------------------|
-| +1 %          | +1 %           | 62          | 62/62.5 = +0.99 % → 1 % |
-| +5 %          | +5 %           | 312         | 312/62.5 = +4.99 % → 5 % |
-| −1 %          | −0.8 %         | 438         | (438−500)/62.5 = −0.99 % → −1 % |
-| −2 %          | −1.92 %        | 375         | (375−500)/62.5 = −2.0 % → −2 % |
-| −3 %          | −2.88 %        | 313         | (313−500)/62.5 = −2.99 % → −3 % |
+| Target % | Encoded raw | Device physical (reads back) |
+|----------|-------------|------------------------------|
+| +1 %     | 62          | 62 / 62.5 = +0.99 % → displays 1 % |
+| +5 %     | 312         | 312 / 62.5 = +4.99 % → displays 5 % |
+| −1 %     | 438         | (438 − 500) / 62.5 = −0.99 % → displays −1 % |
+| −2 %     | 375         | (375 − 500) / 62.5 = −2.0 % → displays −2 % |
+| −3 %     | 313         | (313 − 500) / 62.5 = −2.99 % → displays −3 % |
 
 `BhFitnessTreadmill.encodeTargetInclineRaw()` implements this mapping.
 
