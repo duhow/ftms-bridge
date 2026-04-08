@@ -86,9 +86,9 @@ its Treadmill Data notifications.  Confirmed from captured device logs:
 
 | Target %  | Write raw | Device reads back         |
 |-----------|-----------|---------------------------|
-| −1 %      | **450**   | (450−500)/62.5 = −0.8 % → displays −1 % |
-| −2 %      | **380**   | (380−500)/62.5 = −1.9 % → displays −2 % |
-| −3 %      | **320**   | (320−500)/62.5 = −2.9 % → displays −3 % |
+| -1 %      | **450**   | (450-500)/62.5 = -0.8 % -> displays -1 % |
+| -2 %      | **380**   | (380-500)/62.5 = -1.9 % -> displays -2 % |
+| -3 %      | **320**   | (320-500)/62.5 = -2.9 % -> displays -3 % |
 
 The inverse formula `pct × 62.5 + 500` gives 438/375/313 — these are **not** the values
 the device firmware expects for decline, so static/hardcoded values are required.
