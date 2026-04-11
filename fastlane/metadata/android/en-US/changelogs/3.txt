@@ -7,3 +7,4 @@ Add user-facing changes for the next release here.
 - Fixed BH treadmill incline control writes using wrong scale (targets now match selected % again)
 - Fixed indoor bike LAP view showing treadmill metrics; it now shows cadence and resistance consistently
 - Added indoor bike resistance control (levels 1–10) from the resistance metric tile
+- Fixed indoor bike resistance command encoding to send the scaled raw value expected by BH firmware
