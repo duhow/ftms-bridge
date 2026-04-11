@@ -19,6 +19,7 @@ class BhFitnessIndoorBike(deviceName: String) :
         const val MIN_MOVING_CADENCE_RPM = 10.0
         private const val MIN_LEVEL_TORQUE_NM = 2.0
         private const val LEVEL_TORQUE_STEP_NM = 2.0
+        // Test-oriented cap to allow validation of high resistance commands.
         private const val MAX_LEVEL = 100
         private const val STRIDES_TO_CADENCE_FACTOR = 2.6
         private const val TWO_PI_RADIANS = kotlin.math.PI * 2.0
