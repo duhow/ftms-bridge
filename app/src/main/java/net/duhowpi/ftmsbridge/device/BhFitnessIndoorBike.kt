@@ -20,6 +20,7 @@ class BhFitnessIndoorBike(deviceName: String) :
         private const val MIN_LEVEL_TORQUE_NM = 2.0
         private const val LEVEL_TORQUE_STEP_NM = 2.0
         private const val MAX_LEVEL = 10
+        private const val STRIDES_TO_CADENCE_FACTOR = 2.6
         private const val TWO_PI_RADIANS = kotlin.math.PI * 2.0
     }
 
@@ -54,6 +55,35 @@ class BhFitnessIndoorBike(deviceName: String) :
         val clampedLevel = level.coerceIn(1, MAX_LEVEL)
         lastDerivedLevel = clampedLevel
         return clampedLevel
+    }
+
+    private fun estimatePowerForEnergy(
+        cadenceRpm: Double,
+        resistanceLevel: Int,
+        stridesPerMin: Double,
+        reportedPowerW: Int
+    ): Double {
+        val nonNegativePowerW = reportedPowerW.coerceAtLeast(0).toDouble()
+        if (nonNegativePowerW > 0.0) return nonNegativePowerW
+
+        val fallbackLevel = when {
+            resistanceLevel > 0 -> resistanceLevel
+            lastDerivedLevel > 0 -> lastDerivedLevel
+            else -> 0
+        }
+        if (fallbackLevel <= 0) return 0.0
+
+        val cadenceForEstimate = when {
+            cadenceRpm >= MIN_MOVING_CADENCE_RPM -> cadenceRpm
+            stridesPerMin > 0.0 -> (stridesPerMin * STRIDES_TO_CADENCE_FACTOR)
+                .coerceIn(0.0, MAX_VALID_CADENCE_RPM)
+            else -> 0.0
+        }
+        if (cadenceForEstimate < MIN_MOVING_CADENCE_RPM) return 0.0
+
+        val angularVelocityRadPerSec = cadenceForEstimate * TWO_PI_RADIANS / 60.0
+        val fallbackTorqueNm = MIN_LEVEL_TORQUE_NM + (fallbackLevel - 1) * LEVEL_TORQUE_STEP_NM
+        return (fallbackTorqueNm * angularVelocityRadPerSec).coerceAtLeast(0.0)
     }
 
     // BH Fitness indoor bikes repurpose several standard FTMS fields:
@@ -138,8 +168,13 @@ class BhFitnessIndoorBike(deviceName: String) :
 
         if (dtSec > 0.0) {
             accumulateDistance(syntheticSpeedKmh, dtSec)
-            val nonNegativePowerW = sample.instantaneousPowerW.coerceAtLeast(0).toDouble()
-            accumulateEnergyDelta((nonNegativePowerW * dtSec) / FitnessDevice.JOULES_PER_KCAL)
+            val powerForEnergyW = estimatePowerForEnergy(
+                cadenceRpm = filteredCadenceRpm,
+                resistanceLevel = derivedLevel,
+                stridesPerMin = strides,
+                reportedPowerW = sample.instantaneousPowerW
+            )
+            accumulateEnergyDelta((powerForEnergyW * dtSec) / FitnessDevice.JOULES_PER_KCAL)
         }
 
         return sample.copy(

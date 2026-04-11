@@ -340,23 +340,18 @@ class MainActivity : AppCompatActivity() {
         binding.txtLapTime.text = String.format("%d:%02d", lm, ls)
         // txtLapCount (total elapsed) is updated exclusively by updateElapsedDisplay / elapsedTickRunnable
         // Inline metrics row inside the lap card
-        binding.lapValueSpeed.text = if (isTreadmill) {
-            String.format("%.1f", sample.speedKmh)
-        } else {
-            if (sample.cadenceRpm > 0) String.format("%.0f", sample.cadenceRpm) else "--"
+        binding.lapValueSpeed.text = when {
+            isTreadmill -> String.format("%.1f", sample.speedKmh)
+            sample.cadenceRpm > 0 -> String.format("%.0f", sample.cadenceRpm)
+            else -> "--"
         }
-        binding.lapValueInclination.text = if (isTreadmill) {
-            "${resolveDisplayIncline(sample).roundToInt()}"
-        } else {
-            if (sample.resistanceLevel > 0) "${sample.resistanceLevel}" else "--"
+        binding.lapValueInclination.text = when {
+            isTreadmill -> "${resolveDisplayIncline(sample).roundToInt()}"
+            sample.resistanceLevel > 0 -> "${sample.resistanceLevel}"
+            else -> "--"
         }
-        if (sample.stridesPerMin > 0) {
-            binding.lapValueEnergy.text = String.format("%.1f", sample.stridesPerMin)
-            binding.lapUnitEnergy.setText(R.string.unit_per_min)
-        } else {
-            binding.lapValueEnergy.text = "${sample.totalEnergyKcal}"
-            binding.lapUnitEnergy.setText(R.string.unit_kcal)
-        }
+        binding.lapValueEnergy.text = "${sample.totalEnergyKcal}"
+        binding.lapUnitEnergy.setText(R.string.unit_kcal)
         binding.lapValueHr.text = if (sample.heartRateBpm > 0) "${sample.heartRateBpm}" else "--"
     }
 
@@ -953,17 +948,10 @@ class MainActivity : AppCompatActivity() {
         binding.valueDistance.text = String.format("%.2f", sample.totalDistanceM / 1000.0)
         if (sample.heartRateBpm > 0) binding.valueHeartRate.text = "${sample.heartRateBpm}"
 
-        // Energy tile: show strides/min (BH Fitness indoor bike) when available,
-        // otherwise show calories. Always show a numeric value once data is received.
-        if (sample.stridesPerMin > 0) {
-            binding.labelEnergy.setText(R.string.metric_strides)
-            binding.unitEnergy.setText(R.string.unit_per_min)
-            binding.valueEnergy.text = String.format("%.1f", sample.stridesPerMin)
-        } else {
-            binding.labelEnergy.setText(R.string.metric_energy)
-            binding.unitEnergy.setText(R.string.unit_kcal)
-            binding.valueEnergy.text = "${sample.totalEnergyKcal}"
-        }
+        // Always show energy as kcal in the dashboard.
+        binding.labelEnergy.setText(R.string.metric_energy)
+        binding.unitEnergy.setText(R.string.unit_kcal)
+        binding.valueEnergy.text = "${sample.totalEnergyKcal}"
 
         binding.valueInclination.text = "${resolveDisplayIncline(sample).roundToInt()}"
         binding.valueResistance.text = if (sample.resistanceLevel > 0) "${sample.resistanceLevel}" else "--"
@@ -1496,7 +1484,7 @@ class MainActivity : AppCompatActivity() {
         val clamped = level.coerceIn(RESISTANCE_MIN_LEVEL, RESISTANCE_MAX_LEVEL)
         val encoded = (clamped * RESISTANCE_LEVEL_MULTIPLIER).roundToInt()
         if (!isEncodableAsSint16(encoded)) {
-            Log.w(tag, "Encoded resistance out of range: $encoded")
+            Log.w(tag, "Encoded resistance out of range: level=$clamped, encoded=$encoded")
             return false
         }
         val payload = ByteBuffer.allocate(3)
@@ -1819,6 +1807,7 @@ class MainActivity : AppCompatActivity() {
         private const val INCLINE_DECLINE_DANGER_PERCENT = -2.0
         private const val RESISTANCE_MIN_LEVEL = 1
         private const val RESISTANCE_MAX_LEVEL = 10
+        // BH indoor-bike firmware expects FTMS target resistance encoded with this scale.
         private const val RESISTANCE_LEVEL_MULTIPLIER = 6.25
 
         /** Sentinel address used for the virtual (debug) treadmill in the scan list. */
