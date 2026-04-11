@@ -1344,9 +1344,9 @@ class MainActivity : AppCompatActivity() {
             Toast.makeText(this, getString(R.string.control_not_available), Toast.LENGTH_SHORT).show()
             return
         }
-        val current = (lastFtmsSample?.resistanceLevel ?: RESISTANCE_MIN_LEVEL)
-            .coerceIn(RESISTANCE_MIN_LEVEL, RESISTANCE_MAX_LEVEL)
-            .toDouble()
+        val current = (lastFtmsSample?.resistanceLevel
+            ?.coerceIn(RESISTANCE_MIN_LEVEL, RESISTANCE_MAX_LEVEL)
+            ?: RESISTANCE_MIN_LEVEL).toDouble()
         showAdjustDialog(
             title = getString(R.string.control_set_resistance_title),
             label = getString(R.string.control_resistance_label),
@@ -1513,6 +1513,14 @@ class MainActivity : AppCompatActivity() {
     private fun updateLapMetricPresentation(machineType: FtmsConstants.MachineType) {
         val isBike = machineType == FtmsConstants.MachineType.INDOOR_BIKE ||
             machineType == FtmsConstants.MachineType.CROSS_TRAINER
+        val speedIconColor = ContextCompat.getColor(
+            this,
+            if (isBike) R.color.metric_cadence else R.color.metric_speed
+        )
+        val secondaryIconColor = ContextCompat.getColor(
+            this,
+            if (isBike) R.color.metric_resistance else R.color.metric_inclination
+        )
         if (isBike) {
             binding.lapIconSpeed.setImageResource(R.drawable.ic_cadence)
             binding.lapLabelSpeed.setText(R.string.metric_cadence)
@@ -1520,8 +1528,6 @@ class MainActivity : AppCompatActivity() {
             binding.lapIconInclination.setImageResource(R.drawable.ic_resistance)
             binding.lapLabelInclination.setText(R.string.metric_resistance)
             binding.lapUnitInclination.visibility = View.GONE
-            binding.lapIconSpeed.setColorFilter(ContextCompat.getColor(this, R.color.metric_cadence))
-            binding.lapIconInclination.setColorFilter(ContextCompat.getColor(this, R.color.metric_resistance))
         } else {
             binding.lapIconSpeed.setImageResource(R.drawable.ic_speed)
             binding.lapLabelSpeed.setText(R.string.metric_speed)
@@ -1529,9 +1535,9 @@ class MainActivity : AppCompatActivity() {
             binding.lapIconInclination.setImageResource(R.drawable.ic_inclination)
             binding.lapLabelInclination.setText(R.string.metric_inclination)
             binding.lapUnitInclination.visibility = View.VISIBLE
-            binding.lapIconSpeed.setColorFilter(ContextCompat.getColor(this, R.color.metric_speed))
-            binding.lapIconInclination.setColorFilter(ContextCompat.getColor(this, R.color.metric_inclination))
         }
+        binding.lapIconSpeed.setColorFilter(speedIconColor)
+        binding.lapIconInclination.setColorFilter(secondaryIconColor)
     }
 
     private fun calculateFallbackElapsedSec(sampleTimestampMs: Long): Int {
