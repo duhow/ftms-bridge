@@ -59,6 +59,12 @@ class DummyTreadmill : FitnessDevice {
         energyKcal = 0.0
     }
 
+    /**
+     * Resets all accumulated session state so the next recording starts from zero.
+     * Called by [MainActivity.startRecording] via [FitnessDevice.resetElapsedTime].
+     */
+    override fun resetElapsedTime() = reset()
+
     override fun onFeaturesReceived(data: ByteArray) {}
     override fun onDataReceived(data: ByteArray): FitnessSample? = generateSample()
 }
