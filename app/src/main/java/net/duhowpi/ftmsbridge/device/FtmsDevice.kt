@@ -46,7 +46,7 @@ open class FtmsDevice(
                 else -> FtmsConstants.MachineType.UNKNOWN
             }
 
-            return if (FitnessDevice.isBhFitness(deviceName)) {
+            return if (BhFitnessFtmsDevice.matchesDevice(deviceName)) {
                 when (type) {
                     FtmsConstants.MachineType.TREADMILL -> BhFitnessTreadmill(deviceName)
                     FtmsConstants.MachineType.INDOOR_BIKE -> BhFitnessIndoorBike(deviceName)

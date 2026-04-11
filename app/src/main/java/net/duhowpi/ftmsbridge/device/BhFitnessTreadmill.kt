@@ -7,13 +7,7 @@ import net.duhowpi.ftmsbridge.model.FitnessSample
 import kotlin.math.roundToInt
 
 class BhFitnessTreadmill(deviceName: String) :
-    FtmsDevice(deviceName, FtmsConstants.MachineType.TREADMILL) {
-
-    companion object {
-        private const val METERS_PER_KMH_PER_SEC = 1.0 / 3.6
-        private const val DEFAULT_BODY_WEIGHT_KG = 75.0
-        private const val WALK_RUN_THRESHOLD_KMH = 8.0
-    }
+    BhFitnessFtmsDevice(deviceName, FtmsConstants.MachineType.TREADMILL) {
 
     private val tag = "BhFitnessTreadmill"
 
@@ -47,21 +41,6 @@ class BhFitnessTreadmill(deviceName: String) :
     @Volatile private var rawInclinePrev: Int = 0
     @Volatile private var hasSeenFlat: Boolean = false
     @Volatile private var declineMode: Boolean = false
-
-    private fun estimateEnergyDeltaKcal(speedKmh: Double, inclinePercent: Double, dtSec: Double): Double {
-        if (dtSec <= 0.0 || speedKmh <= 0.0) return 0.0
-        val speedMPerMin = speedKmh * 1000.0 / 60.0
-        val grade = inclinePercent / 100.0
-        val vo2MlKgMin = if (speedKmh < WALK_RUN_THRESHOLD_KMH) {
-            // ACSM walking equation
-            (0.1 * speedMPerMin) + (1.8 * speedMPerMin * grade) + 3.5
-        } else {
-            // ACSM running equation
-            (0.2 * speedMPerMin) + (0.9 * speedMPerMin * grade) + 3.5
-        }
-        val kcalPerMin = (vo2MlKgMin * DEFAULT_BODY_WEIGHT_KG) / 200.0
-        return kcalPerMin * (dtSec / 60.0)
-    }
 
     // Elapsed time, distance, and calories are always 0 in the FTMS packet; the real
     // values come from the iConcept 0xC112 notification and are merged here.
@@ -113,7 +92,7 @@ class BhFitnessTreadmill(deviceName: String) :
         }
 
         if (dtSec > 0.0) {
-            derivedDistanceM += sample.speedKmh * dtSec * METERS_PER_KMH_PER_SEC
+            derivedDistanceM += sample.speedKmh * dtSec * BhFitnessFtmsDevice.METERS_PER_KMH_PER_SEC
             derivedEnergyKcal += estimateEnergyDeltaKcal(sample.speedKmh, correctedIncline, dtSec)
         }
 

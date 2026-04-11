@@ -5,7 +5,7 @@ import net.duhowpi.ftmsbridge.ftms.FtmsDataParser
 import net.duhowpi.ftmsbridge.model.FitnessSample
 
 class BhFitnessVerticalBike(deviceName: String) :
-    FtmsDevice(deviceName, FtmsConstants.MachineType.CROSS_TRAINER) {
+    BhFitnessFtmsDevice(deviceName, FtmsConstants.MachineType.CROSS_TRAINER) {
 
     // BH Fitness vertical bikes (e.g. C01_XXXXX) advertise the FTMS Cross Trainer
     // characteristic (0x2ACE) instead of Indoor Bike (0x2AD2).  The iConcept

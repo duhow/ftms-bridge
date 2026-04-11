@@ -37,20 +37,46 @@ interface FitnessDevice {
      */
     fun resetElapsedTime() {}
 
-    companion object {
-        // iConcept / BH Fitness devices use a device-name pattern of the form
-        // <letter><two digits>_<5 hex chars>, e.g. "B01_479D7" (indoor bike) or
-        // "C01_12DB5" (vertical bike).  This pattern is used in addition to the
-        // human-readable brand/product name matches below.
-        private val iConceptNamePattern = Regex("^[a-z]\\d{2}_[0-9a-f]{5}$")
-
-        fun isBhFitness(name: String): Boolean {
-            val lower = name.lowercase()
-            return lower.startsWith("bh") ||
-                    lower.contains("i.concept") ||
-                    lower.contains("bhfitness") ||
-                    lower.contains("bh fitness") ||
-                    iConceptNamePattern.matches(lower)
+    /**
+     * Estimates the caloric energy expenditure over a time interval using ACSM
+     * metabolic equations.
+     *
+     * Walking equation (speed < [walkRunThresholdKmh]):
+     *   VO₂ (mL/kg/min) = 0.1·v + 1.8·v·grade + 3.5
+     * Running equation (speed ≥ [walkRunThresholdKmh]):
+     *   VO₂ (mL/kg/min) = 0.2·v + 0.9·v·grade + 3.5
+     * where v = speed in m/min and grade = incline / 100.
+     *
+     * Energy (kcal) = VO₂ × bodyWeight / 200 × dtMin
+     *
+     * Returns 0 when [dtSec] ≤ 0 or [speedKmh] ≤ 0.
+     */
+    fun estimateEnergyDeltaKcal(
+        speedKmh: Double,
+        inclinePercent: Double,
+        dtSec: Double,
+        bodyWeightKg: Double = DEFAULT_BODY_WEIGHT_KG,
+        walkRunThresholdKmh: Double = WALK_RUN_THRESHOLD_KMH
+    ): Double {
+        if (dtSec <= 0.0 || speedKmh <= 0.0) return 0.0
+        val speedMPerMin = speedKmh * 1000.0 / 60.0
+        val grade = inclinePercent / 100.0
+        val vo2MlKgMin = if (speedKmh < walkRunThresholdKmh) {
+            // ACSM walking equation
+            (0.1 * speedMPerMin) + (1.8 * speedMPerMin * grade) + 3.5
+        } else {
+            // ACSM running equation
+            (0.2 * speedMPerMin) + (0.9 * speedMPerMin * grade) + 3.5
         }
+        val kcalPerMin = (vo2MlKgMin * bodyWeightKg) / 200.0
+        return kcalPerMin * (dtSec / 60.0)
+    }
+
+    companion object {
+        /** Default assumed body weight (kg) used in ACSM energy estimation. */
+        const val DEFAULT_BODY_WEIGHT_KG = 75.0
+
+        /** Speed threshold (km/h) between walking and running ACSM equations. */
+        const val WALK_RUN_THRESHOLD_KMH = 8.0
     }
 }
