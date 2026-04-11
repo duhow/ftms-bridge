@@ -263,6 +263,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         binding.btnWorkoutStop.setOnClickListener { stopRecording() }
+        binding.btnBackToIdle.setOnClickListener { returnToIdle() }
 
         binding.cardSpeed.setOnClickListener { showSpeedControlDialog() }
         binding.cardInclination.setOnClickListener { showInclineControlDialog() }
@@ -570,8 +571,12 @@ class MainActivity : AppCompatActivity() {
                     stateMachine.onDisconnected()
                     updateConnectionStatus()
                     scanAdapter.markDisconnected(device.address)
-                    stateMachine.resetMetrics()
-                    if (hadSession) stopRecording()
+                    if (hadSession) {
+                        // Keep frozen metric values visible in the stopped review view.
+                        stopRecording()
+                    } else {
+                        stateMachine.resetMetrics()
+                    }
                     Toast.makeText(this@MainActivity, getString(R.string.device_disconnected), Toast.LENGTH_SHORT).show()
                     updateScanListUI()
                 }
@@ -1011,22 +1016,17 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun stopRecording() {
-        // Determine if we're still connected (for UI restoration after stop)
         val ftmsConnected = ftmsConnectionManager?.isConnected == true || dummyTreadmill != null
         val hrConnected = hrConnectionManager?.isConnected == true
         val hasHrDevice = hrConnectionManager != null
 
-        if (ftmsConnected) {
-            stateMachine.onSessionStopped()
-        } else {
-            stateMachine.onReturnToIdle()
-        }
+        stateMachine.onSessionFinished()
 
         elapsedTickHandler.removeCallbacks(elapsedTickRunnable)
         elapsedFallbackStartTime = 0L
         lastFallbackElapsedSec = 0
 
-        // Apply connected or idle UI via state machine
+        // Keep the frozen session view so the user can review it; Back button returns to idle.
         stateMachine.applyUI(ftmsConnected, hrConnected, hasHrDevice, fitnessDevice)
 
         val sessionId = currentSessionId ?: return
@@ -1036,6 +1036,39 @@ class MainActivity : AppCompatActivity() {
             Log.i(tag, "Session stopped: $sessionId")
         }
         currentSessionId = null
+    }
+
+    /**
+     * Clears all in-memory session data and transitions to the idle or connected state,
+     * showing the scan list ready for a new session.
+     */
+    private fun returnToIdle() {
+        val ftmsConnected = ftmsConnectionManager?.isConnected == true || dummyTreadmill != null
+        val hrConnected = hrConnectionManager?.isConnected == true
+        val hasHrDevice = hrConnectionManager != null
+
+        // Reset accumulated session data so it does not bleed into the next session.
+        liveSpeedPoints.clear()
+        livePaceSecondaryPoints.clear()
+        liveHrPoints.clear()
+        liveChartElapsedSec = 0
+        lapStartDistanceM = 0
+        lapStartTimeMs = 0
+        lapCount = 0
+        elapsedTickSec = 0
+        elapsedFallbackStartTime = 0L
+        lastFallbackElapsedSec = 0
+        lastHeartRateBpm = 0
+        lastFtmsSample = null
+        stateMachine.resetMetrics()
+
+        if (ftmsConnected) {
+            stateMachine.onSessionStopped()
+            stateMachine.applyUI(ftmsConnected, hrConnected, hasHrDevice, fitnessDevice)
+        } else {
+            stateMachine.onReturnToIdle()
+            stateMachine.applyUI()
+        }
     }
 
     /**
@@ -1441,14 +1474,16 @@ class MainActivity : AppCompatActivity() {
     }
 
     /**
-     * Restores the recording or paused UI state after the activity is recreated (e.g. process death).
-     * Since the BLE connection is gone after a process restart, the session is treated as a
-     * disconnected-with-active-session so the user can review the frozen stats and press Stop.
+     * Restores the recording, paused, or stopped UI state after the activity is recreated
+     * (e.g. screen rotation or process death).
+     * Active sessions without a BLE connection are restored as Disconnected so the user can
+     * press Stop to finalise.  A previously-stopped session is restored directly as Stopped
+     * so the user can review the frozen stats and press Back.
      */
     private fun restoreInstanceState(state: Bundle) {
         val savedStateLabel = state.getString(KEY_SESSION_STATE) ?: return
         val savedState = SessionState.fromLabel(savedStateLabel) ?: return
-        if (!savedState.hasActiveSession) return
+        if (!savedState.hasActiveSession && savedState !is SessionState.Stopped) return
 
         val savedSessionId = state.getLong(KEY_CURRENT_SESSION_ID, -1L).takeIf { it != -1L }
 
@@ -1465,9 +1500,13 @@ class MainActivity : AppCompatActivity() {
         state.getFloatArray(KEY_LIVE_PACE_POINTS)?.let { livePaceSecondaryPoints.addAll(it.toList()) }
         state.getFloatArray(KEY_LIVE_HR_POINTS)?.let { liveHrPoints.addAll(it.toList()) }
 
-        // BLE is disconnected after process death — restore as Disconnected with active session
-        // so the user can press Stop to finalise.
-        val restoredState = SessionState.Disconnected(sessionActive = savedSessionId != null)
+        // After process death (or screen rotation) the BLE link is gone, so restore
+        // active sessions as Disconnected (user can press Stop to finalise) and
+        // already-stopped sessions directly as Stopped (user reviews then presses Back).
+        val restoredState = when {
+            savedState is SessionState.Stopped -> SessionState.Stopped
+            else -> SessionState.Disconnected(sessionActive = savedSessionId != null)
+        }
         stateMachine.restoreState(restoredState)
         stateMachine.applyUI()
 

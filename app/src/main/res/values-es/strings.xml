@@ -18,6 +18,7 @@
     <string name="stop_session">Detener</string>
     <string name="recording">● REC</string>
     <string name="paused">⏸ EN PAUSA</string>
+    <string name="back_to_idle">◀ Volver</string>
 
     <!-- Workout controls -->
     <string name="workout_start">▶ Iniciar</string>

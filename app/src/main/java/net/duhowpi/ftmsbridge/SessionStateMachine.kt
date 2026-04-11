@@ -59,6 +59,11 @@ class SessionStateMachine(
         transition(SessionState.Connected)
     }
 
+    /** Transition to [SessionState.Stopped] (session saved; user reviewing frozen stats). */
+    fun onSessionFinished() {
+        transition(SessionState.Stopped)
+    }
+
     /** Transition to [SessionState.Disconnected]. */
     fun onDisconnected() {
         val hadSession = state.hasActiveSession
@@ -95,6 +100,7 @@ class SessionStateMachine(
             is SessionState.Recording -> applyRecordingUI(ftmsConnected, hrConnected, hasHrDevice)
             is SessionState.Paused -> applyPausedUI(ftmsConnected, hrConnected, hasHrDevice)
             is SessionState.Disconnected -> applyDisconnectedUI((state as SessionState.Disconnected).sessionActive)
+            is SessionState.Stopped -> applyStoppedUI(ftmsConnected, hrConnected, hasHrDevice)
         }
     }
 
@@ -114,6 +120,7 @@ class SessionStateMachine(
         binding.btnWorkoutStart.visibility = View.VISIBLE
         binding.btnWorkoutStart.isEnabled = false
         binding.btnWorkoutStop.visibility = View.GONE
+        binding.btnBackToIdle.visibility = View.GONE
 
         // Workout views
         binding.viewToggleRow.visibility = View.GONE
@@ -163,6 +170,7 @@ class SessionStateMachine(
         binding.btnWorkoutStart.visibility = View.VISIBLE
         binding.btnWorkoutStart.isEnabled = ftmsConnected
         binding.btnWorkoutStop.visibility = View.GONE
+        binding.btnBackToIdle.visibility = View.GONE
 
         // Workout views
         binding.viewToggleRow.visibility = View.GONE
@@ -214,6 +222,7 @@ class SessionStateMachine(
         // Workout buttons: hide start, show stop
         binding.btnWorkoutStart.visibility = View.GONE
         binding.btnWorkoutStop.visibility = View.VISIBLE
+        binding.btnBackToIdle.visibility = View.GONE
 
         // Workout views
         binding.viewToggleRow.visibility = View.VISIBLE
@@ -228,6 +237,20 @@ class SessionStateMachine(
     ) {
         // Paused keeps the same layout as recording so the user sees frozen data
         applyRecordingUI(ftmsConnected, hrConnected, hasHrDevice)
+    }
+
+    // --- Stopped -------------------------------------------------------------
+
+    private fun applyStoppedUI(
+        ftmsConnected: Boolean,
+        hrConnected: Boolean,
+        hasHrDevice: Boolean
+    ) {
+        // Reuse the paused layout so the user can review the frozen session data,
+        // but replace the Stop button with a Back button.
+        applyRecordingUI(ftmsConnected, hrConnected, hasHrDevice)
+        binding.btnWorkoutStop.visibility = View.GONE
+        binding.btnBackToIdle.visibility = View.VISIBLE
     }
 
     // --- Disconnected --------------------------------------------------------

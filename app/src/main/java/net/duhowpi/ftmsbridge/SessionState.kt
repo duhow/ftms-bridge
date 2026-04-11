@@ -8,7 +8,10 @@ package net.duhowpi.ftmsbridge
  *  Idle ──► Connecting ──► Connected ──► Recording ──► Paused ──► Recording
  *   ▲                          │              │           │
  *   │                          ▼              ▼           ▼
- *   └──────── Disconnected ◄──────────────────────────────┘
+ *   │        Disconnected ◄──────────────────────────────┘
+ *   │             │
+ *   │             ▼
+ *   └──── Stopped ◄── (also from Recording / Paused on explicit Stop)
  * ```
  *
  * - [Idle]          – No device paired; scan list visible.
@@ -17,6 +20,7 @@ package net.duhowpi.ftmsbridge
  * - [Recording]     – Workout session actively recording data.
  * - [Paused]        – Workout paused (by machine or user); session data retained.
  * - [Disconnected]  – Device lost; may hold a paused session for stop/save.
+ * - [Stopped]       – Session finished; user is reviewing the frozen stats.
  */
 sealed class SessionState {
 
@@ -42,6 +46,12 @@ sealed class SessionState {
      */
     data class Disconnected(val sessionActive: Boolean = false) : SessionState()
 
+    /**
+     * Session has been saved; the UI keeps the frozen stats visible so the user can
+     * review them before pressing Back to return to the scan view.
+     */
+    data object Stopped : SessionState()
+
     // -- Convenience queries --------------------------------------------------
 
     /** True when a BLE device connection is active (Connected, Recording, or Paused). */
@@ -66,6 +76,7 @@ sealed class SessionState {
             is Recording -> "RECORDING"
             is Paused -> "PAUSED"
             is Disconnected -> if (this.sessionActive) "DISCONNECTED_SESSION" else "DISCONNECTED"
+            is Stopped -> "STOPPED"
         }
 
     companion object {
@@ -78,6 +89,7 @@ sealed class SessionState {
             "PAUSED" -> Paused
             "DISCONNECTED_SESSION" -> Disconnected(sessionActive = true)
             "DISCONNECTED" -> Disconnected(sessionActive = false)
+            "STOPPED" -> Stopped
             else -> null
         }
     }
