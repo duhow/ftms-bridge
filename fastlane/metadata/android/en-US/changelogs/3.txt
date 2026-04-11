@@ -1,4 +1,3 @@
-Add user-facing changes for the next release here.
 - Fixed BH Fitness treadmill incline/decline commands sending wrong value to device
 - Fixed BH Fitness treadmill distance and calories display showing 0 when device reports none
 - Fixed BH treadmills with hex model IDs (e.g. T01_07D57) not applying incline and distance corrections
@@ -15,4 +14,3 @@ Add user-facing changes for the next release here.
 - Aligned indoor bike resistance test calibration to the 1–22 supported range
 - Fixed indoor bike kcal formula to derive metabolic energy from power with cycling efficiency
 - Fixed indoor bike resistance control calibration so selected levels better match bike console values
-- Fixed treadmill incline conversion so 1–3% selections and UI readback match machine values
