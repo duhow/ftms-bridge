@@ -109,6 +109,20 @@ class MainActivity : AppCompatActivity() {
     private val isActiveTreadmill: Boolean
         get() = dummyTreadmill != null || fitnessDevice?.machineType == FtmsConstants.MachineType.TREADMILL
 
+    // 1-second elapsed-time tick: runs while recording to give a smooth per-second
+    // display between BLE notifications (which arrive every ~2 s).  The counter is
+    // monotonically non-decreasing: BLE-reported elapsed syncs it forward, never back.
+    private var elapsedTickSec: Int = 0
+    private val elapsedTickHandler = Handler(Looper.getMainLooper())
+    private val elapsedTickRunnable = object : Runnable {
+        override fun run() {
+            if (!isRecording) return
+            elapsedTickSec++
+            updateElapsedDisplay(elapsedTickSec)
+            elapsedTickHandler.postDelayed(this, 1000)
+        }
+    }
+
     // DummyTreadmill (debug only)
     private var dummyTreadmill: DummyTreadmill? = null
     private val dummyTreadmillHandler = Handler(Looper.getMainLooper())
@@ -287,7 +301,7 @@ class MainActivity : AppCompatActivity() {
         binding.liveChart.setData(*seriesList.toTypedArray(), durationSec = durationSec)
     }
 
-    private fun updateLapView(sample: FitnessSample, elapsedSec: Int) {
+    private fun updateLapView(sample: FitnessSample) {
         val distM = sample.totalDistanceM
         val lapProgressM = (distM - lapStartDistanceM).coerceAtLeast(0)
         if (lapProgressM >= LAP_DISTANCE_METERS) {
@@ -304,9 +318,7 @@ class MainActivity : AppCompatActivity() {
         val lm = lapSec / 60
         val ls = lapSec % 60
         binding.txtLapTime.text = String.format("%d:%02d", lm, ls)
-        val tm = elapsedSec / 60
-        val ts = elapsedSec % 60
-        binding.txtLapCount.text = String.format("%d:%02d", tm, ts)
+        // txtLapCount (total elapsed) is updated exclusively by updateElapsedDisplay / elapsedTickRunnable
         // Inline metrics row inside the lap card
         binding.lapValueSpeed.text = String.format("%.1f", sample.speedKmh)
         binding.lapValueInclination.text = "${sample.inclinationPercent.roundToInt()}"
@@ -859,13 +871,24 @@ class MainActivity : AppCompatActivity() {
 
         binding.valueInclination.text = "${sample.inclinationPercent.roundToInt()}"
         binding.valueResistance.text = if (sample.resistanceLevel > 0) "${sample.resistanceLevel}" else "--"
-        val minutes = elapsedSec / 60
-        val seconds = elapsedSec % 60
-        binding.valueElapsedTime.text = String.format("%d:%02d", minutes, seconds)
+
+        // During recording the elapsed display is driven by the 1 s tick handler; we
+        // only sync the tick counter here (taking the max so it never goes backwards).
+        // Outside of recording we just show whatever the device reports.
+        if (isRecording) {
+            if (elapsedSec > elapsedTickSec) {
+                elapsedTickSec = elapsedSec
+                updateElapsedDisplay(elapsedTickSec)
+            }
+        } else {
+            val minutes = elapsedSec / 60
+            val seconds = elapsedSec % 60
+            binding.valueElapsedTime.text = String.format("%d:%02d", minutes, seconds)
+        }
 
         // Accumulate live chart data while recording
         if (isRecording) {
-            liveChartElapsedSec = elapsedSec
+            liveChartElapsedSec = elapsedTickSec
             val isTreadmill = isActiveTreadmill
             liveSpeedPoints.add(if (isTreadmill) sample.speedKmh.toFloat() else sample.cadenceRpm.toFloat())
             livePaceSecondaryPoints.add(
@@ -873,8 +896,17 @@ class MainActivity : AppCompatActivity() {
             )
             liveHrPoints.add(sample.heartRateBpm.toFloat())
             if (isChartViewActive) updateLiveChart()
-            updateLapView(sample, elapsedSec)
+            updateLapView(sample)
         }
+    }
+
+    /** Updates the elapsed-time display in both the metric card and the lap-view total. */
+    private fun updateElapsedDisplay(elapsedSec: Int) {
+        val minutes = elapsedSec / 60
+        val seconds = elapsedSec % 60
+        val formatted = String.format("%d:%02d", minutes, seconds)
+        binding.valueElapsedTime.text = formatted
+        binding.txtLapCount.text = formatted
     }
 
     /** Scale up by 15 % then back to 1× in 200 ms total to indicate a BLE data beat. */
@@ -948,6 +980,14 @@ class MainActivity : AppCompatActivity() {
         lastFallbackElapsedSec = 0
         lastSavedSampleMs = 0
         lastSavedSampleData = null
+        // Reset device-internal elapsed so it starts from zero at activity start, not
+        // from the BLE connection time.
+        device.resetElapsedTime()
+        // Reset and start the 1-second tick so the elapsed display counts smoothly.
+        elapsedTickSec = 0
+        updateElapsedDisplay(0)
+        elapsedTickHandler.removeCallbacks(elapsedTickRunnable)
+        elapsedTickHandler.postDelayed(elapsedTickRunnable, 1000)
         binding.btnWorkoutStart.text = getString(R.string.stop_session)
         // Hide device header and REC indicator; show compact status icons in toolbar instead
         binding.deviceHeaderRow.visibility = View.GONE
@@ -1004,6 +1044,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun stopRecording() {
         isRecording = false
+        elapsedTickHandler.removeCallbacks(elapsedTickRunnable)
         elapsedFallbackStartTime = 0L
         lastFallbackElapsedSec = 0
         binding.btnWorkoutStart.text = getString(R.string.start_session)
@@ -1193,22 +1234,21 @@ class MainActivity : AppCompatActivity() {
             Toast.makeText(this, getString(R.string.control_not_available), Toast.LENGTH_SHORT).show()
             return
         }
-        val current = (lastFtmsSample?.inclinationPercent ?: INCLINE_DEFAULT_PERCENT).coerceIn(INCLINE_MIN_PERCENT, INCLINE_MAX_PERCENT)
+        // Round current incline to nearest integer so the seekbar starts on a whole-% step.
+        val current = (lastFtmsSample?.inclinationPercent?.roundToInt()?.toDouble()
+            ?: INCLINE_DEFAULT_PERCENT).coerceIn(INCLINE_MIN_PERCENT, INCLINE_MAX_PERCENT)
         showAdjustDialog(
             title = getString(R.string.control_set_incline_title),
             label = getString(R.string.control_incline_label),
             min = INCLINE_MIN_PERCENT,
             max = INCLINE_MAX_PERCENT,
-            step = 0.5,
+            step = 1.0,
             largeStep = 1.0,
             initial = current,
             unitFormatter = { value -> "${value.roundToInt()}${getString(R.string.unit_percent)}" },
             rangeText = getString(R.string.control_range_incline, INCLINE_MIN_PERCENT.roundToInt(), INCLINE_MAX_PERCENT.roundToInt()),
             dangerPredicate = { value -> value >= INCLINE_DANGER_PERCENT || value <= INCLINE_DECLINE_DANGER_PERCENT },
-            smallDecLabel = getString(R.string.control_dec_incline_small),
-            largeDecLabel = getString(R.string.control_dec_incline_large),
-            smallIncLabel = getString(R.string.control_inc_incline_small),
-            largeIncLabel = getString(R.string.control_inc_incline_large)
+            showAdjustButtons = false
         ) { selected ->
             sendTargetInclinePercent(selected)
         }
@@ -1225,10 +1265,11 @@ class MainActivity : AppCompatActivity() {
         unitFormatter: (Double) -> String,
         rangeText: String,
         dangerPredicate: (Double) -> Boolean,
-        smallDecLabel: String,
-        largeDecLabel: String,
-        smallIncLabel: String,
-        largeIncLabel: String,
+        smallDecLabel: String = "",
+        largeDecLabel: String = "",
+        smallIncLabel: String = "",
+        largeIncLabel: String = "",
+        showAdjustButtons: Boolean = true,
         onApply: (Double) -> Boolean
     ) {
         val view = layoutInflater.inflate(R.layout.dialog_adjust_metric, null)
@@ -1237,6 +1278,7 @@ class MainActivity : AppCompatActivity() {
         val rangeView = view.findViewById<TextView>(R.id.txtDialogRange)
         val dangerView = view.findViewById<TextView>(R.id.txtDialogDanger)
         val seek = view.findViewById<SeekBar>(R.id.seekDialogMetric)
+        val buttonRow = view.findViewById<android.widget.LinearLayout>(R.id.buttonRowAdjust)
         val decLarge = view.findViewById<Button>(R.id.btnDialogDecLarge)
         val decSmall = view.findViewById<Button>(R.id.btnDialogDecSmall)
         val incSmall = view.findViewById<Button>(R.id.btnDialogIncSmall)
@@ -1244,14 +1286,19 @@ class MainActivity : AppCompatActivity() {
 
         labelView.text = label
         rangeView.text = rangeText
-        decLarge.text = largeDecLabel
-        decSmall.text = smallDecLabel
-        incSmall.text = smallIncLabel
-        incLarge.text = largeIncLabel
-        decLarge.contentDescription = getString(R.string.control_cd_decrease_by, largeDecLabel.removePrefix("-"))
-        decSmall.contentDescription = getString(R.string.control_cd_decrease_by, smallDecLabel.removePrefix("-"))
-        incSmall.contentDescription = getString(R.string.control_cd_increase_by, smallIncLabel.removePrefix("+"))
-        incLarge.contentDescription = getString(R.string.control_cd_increase_by, largeIncLabel.removePrefix("+"))
+
+        if (showAdjustButtons) {
+            decLarge.text = largeDecLabel
+            decSmall.text = smallDecLabel
+            incSmall.text = smallIncLabel
+            incLarge.text = largeIncLabel
+            decLarge.contentDescription = getString(R.string.control_cd_decrease_by, largeDecLabel.removePrefix("-"))
+            decSmall.contentDescription = getString(R.string.control_cd_decrease_by, smallDecLabel.removePrefix("-"))
+            incSmall.contentDescription = getString(R.string.control_cd_increase_by, smallIncLabel.removePrefix("+"))
+            incLarge.contentDescription = getString(R.string.control_cd_increase_by, largeIncLabel.removePrefix("+"))
+        } else {
+            buttonRow.visibility = View.GONE
+        }
 
         val maxProgress = ((max - min) / step).roundToInt().coerceAtLeast(1)
         seek.max = maxProgress
@@ -1281,10 +1328,12 @@ class MainActivity : AppCompatActivity() {
             override fun onStopTrackingTouch(seekBar: SeekBar?) {}
         })
 
-        decLarge.setOnClickListener { selected -= largeStep; updateViews() }
-        decSmall.setOnClickListener { selected -= step; updateViews() }
-        incSmall.setOnClickListener { selected += step; updateViews() }
-        incLarge.setOnClickListener { selected += largeStep; updateViews() }
+        if (showAdjustButtons) {
+            decLarge.setOnClickListener { selected -= largeStep; updateViews() }
+            decSmall.setOnClickListener { selected -= step; updateViews() }
+            incSmall.setOnClickListener { selected += step; updateViews() }
+            incLarge.setOnClickListener { selected += largeStep; updateViews() }
+        }
 
         updateViews()
 
@@ -1301,6 +1350,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun sendTargetSpeedKmh(speedKmh: Double): Boolean {
+        val cm = ftmsConnectionManager ?: return false
         val clamped = speedKmh.coerceIn(SPEED_MIN_KMH, SPEED_MAX_KMH)
         val encoded = (clamped * 100.0).roundToInt()
         if (!isEncodableAsSint16(encoded)) {
@@ -1312,12 +1362,13 @@ class MainActivity : AppCompatActivity() {
             .put(FtmsConstants.CONTROL_SET_TARGET_SPEED)
             .putShort(encoded.toShort())
             .array()
-        return ftmsConnectionManager?.sendControlPoint(payload) == true
+        return cm.sendControlPoint(payload)
     }
 
     private fun sendTargetInclinePercent(inclinePercent: Double): Boolean {
+        val cm = ftmsConnectionManager ?: return false
         val clamped = inclinePercent.coerceIn(INCLINE_MIN_PERCENT, INCLINE_MAX_PERCENT)
-        val encoded = (clamped * 10.0).roundToInt()
+        val encoded = fitnessDevice?.encodeTargetInclineRaw(clamped) ?: (clamped * 10.0).roundToInt()
         if (!isEncodableAsSint16(encoded)) {
             Log.w(tag, "Encoded incline out of range: $encoded")
             return false
@@ -1327,7 +1378,7 @@ class MainActivity : AppCompatActivity() {
             .put(FtmsConstants.CONTROL_SET_TARGET_INCLINATION)
             .putShort(encoded.toShort())
             .array()
-        return ftmsConnectionManager?.sendControlPoint(payload) == true
+        return cm.sendControlPoint(payload)
     }
 
     private fun calculateFallbackElapsedSec(sampleTimestampMs: Long): Int {
@@ -1370,6 +1421,7 @@ class MainActivity : AppCompatActivity() {
         super.onDestroy()
         updateHandler.removeCallbacks(scanListUpdateRunnable)
         dummyTreadmillHandler.removeCallbacks(dummyTreadmillRunnable)
+        elapsedTickHandler.removeCallbacks(elapsedTickRunnable)
         dummyTreadmill = null
         bleScanner.stopScan()
         if (isRecording) stopRecording()

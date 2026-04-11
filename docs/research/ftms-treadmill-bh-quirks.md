@@ -74,9 +74,44 @@ increases **gradually** in ~60-unit steps.
 - A `hasSeenFlat` guard prevents false triggers when connecting to a machine that is
   already at high positive incline (the machine must pass through flat first).
 
----
+### Writing inclination (Control Point, opcode 0x03)
 
-## 2. Elapsed time / total distance / total energy not reported via FTMS
+Positive incline uses **standard FTMS encoding** (SINT16 in units of 0.1 %):
+```
+raw = target_percent * 10   (+5 % → 50)
+```
+
+Decline uses **hardcoded raw values** that exactly match what the device itself sends in
+its Treadmill Data notifications.  Confirmed from captured device logs:
+
+| Target %  | Write raw | Device reads back         |
+|-----------|-----------|---------------------------|
+| -1 %      | **450**   | (450-500)/62.5 = -0.8 % -> displays -1 % |
+| -2 %      | **380**   | (380-500)/62.5 = -1.9 % -> displays -2 % |
+| -3 %      | **320**   | (320-500)/62.5 = -2.9 % -> displays -3 % |
+
+The inverse formula `pct × 62.5 + 500` gives 438/375/313 — these are **not** the values
+the device firmware expects for decline, so static/hardcoded values are required.
+
+`BhFitnessTreadmill.encodeTargetInclineRaw()` implements this mapping.
+
+The incline control dialog uses **1 % integer steps** only (matching the machine's
+console increments) and omits the fine-adjustment buttons.
+
+### Writing speed (Control Point, opcode 0x02)
+
+Standard FTMS encoding: UINT16 in units of 0.01 km/h.
+```
+raw = target_kmh * 100    (6.1 km/h → 610 = 0x0262, LE: 62 02)
+```
+
+`Request Control (0x00)` is sent once during connection setup.  After that, the device
+accepts Set Target Speed and Set Target Inclination commands directly without requiring
+a prior `Start/Resume (0x07)`.  Sending `0x07` before each command (as tried previously)
+interferes with the running belt state and prevents the subsequent command from taking
+effect.
+
+---
 
 The standard Treadmill Data flags for elapsed time (bit 10), total distance (bit 2),
 and expended energy (bit 7) are technically set in the packet observed from BH Fitness
@@ -94,14 +129,17 @@ and `total_kcal=0`.  It does **not** repeat during the workout.
 Consequence: elapsed time, distance, and energy appear to freeze at their initial
 values for the entire session.
 
-**Elapsed time fix (start-signal anchored):** `BhFitnessTreadmill` does **not** start the
-derived timer at BLE connect. It waits for a workout-start anchor:
-- C112 elapsed snapshot (typically `0:02`) when present, or
-- first non-zero FTMS elapsed value.
+**Elapsed time fix (activity-start anchored):**
 
-Only after this anchor is seen does elapsed advance from packet timestamp deltas
-(`sample.timestampMs`) while FTMS elapsed remains zero. This prevents the timer from
-starting several seconds early due to connection/setup delay.
+When the user starts a recording session, `BhFitnessTreadmill.resetElapsedTime()` is
+called from `MainActivity.startRecording()`.  This zeroes the derived elapsed counter and
+re-enables accumulation so the timer starts from **0 at the moment the user presses
+Start**, not from the BLE connection time.
+
+`MainActivity` also runs a **1-second Handler tick** that increments the display every
+second between BLE notifications (~2 s apart).  When a BLE packet reports a higher
+elapsed value than the current tick counter, the counter is advanced (never decremented)
+to stay in sync.  This gives a smooth per-second count that never jumps backwards.
 
 **Distance and energy fallback:** Because C112 does not continue streaming, the app now
 derives:
@@ -201,6 +239,20 @@ The app therefore:
 
 Writing the *Request Control* opcode (`0x00`) to this characteristic triggers the
 device to begin streaming data on the iConcept proprietary channel.
+
+### Set Target Speed (opcode 0x02)
+
+Speed is encoded in **standard FTMS units** (UINT16, 0.01 km/h) for both reads and
+writes.  Example: 6.10 km/h → write value 610.
+
+After `Request Control (0x00)` succeeds on connection, the device accepts speed and
+inclination commands directly.  Sending `Start/Resume (0x07)` before each command
+interferes with the running belt state; it must **not** be queued before Set Target
+Speed or Set Target Inclination.
+
+Set Target Inclination (opcode `0x03`) uses **standard FTMS encoding for positive grades**
+(SINT16 × 0.1 %) and **hardcoded raw values for decline** — see the write-encoding table
+in the inclination section above.
 
 ---
 

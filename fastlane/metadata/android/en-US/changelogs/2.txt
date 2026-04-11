@@ -34,3 +34,8 @@ Add user-facing changes for the next release here.
 - Heart rate is now shown as a red line in the workout chart when HR data is available
 - FIT export now records one lap per km (plus the final partial km) with per-lap speed, HR, cadence, and power averages
 - Reduced recording frequency: samples saved at most every 2 seconds; unchanged data saved at most every 5 seconds
+- Fixed negative (decline) incline control: write now sends the exact raw values the device firmware expects (450 for −1 %, 380 for −2 %, 320 for −3 %) confirmed from live BLE logs
+- Fixed treadmill speed and positive incline control: removed erroneous Start/Resume (0x07) sent before each command which was interfering with the running belt state
+- Workout session timer now starts at zero when the user presses Start (not at BLE connection time)
+- Elapsed time now counts every second smoothly between Bluetooth packets (was updating only on packet arrival ~every 2 s)
+- Incline control dialog now uses 1 % integer steps matching the machine console; removed fine-adjustment buttons
