@@ -7,7 +7,8 @@ import net.duhowpi.ftmsbridge.databinding.ItemScanResultBinding
 import net.duhowpi.ftmsbridge.model.ScannedDeviceInfo
 
 class ScanResultAdapter(
-    private val onConnect: (ScannedDeviceInfo) -> Unit
+    private val onConnect: (ScannedDeviceInfo) -> Unit,
+    private val onDisconnect: (ScannedDeviceInfo) -> Unit = {}
 ) : RecyclerView.Adapter<ScanResultAdapter.ViewHolder>() {
 
     private val items = mutableListOf<ScannedDeviceInfo>()
@@ -32,12 +33,14 @@ class ScanResultAdapter(
             txtSignalBars.text = item.signalBars
             txtRssi.text = item.rssiLabel
             btnConnect.text = when {
-                isConnected -> root.context.getString(R.string.connected_label)
+                isConnected -> root.context.getString(R.string.disconnect)
                 isDisconnected -> root.context.getString(R.string.reconnect)
                 else -> root.context.getString(R.string.connect)
             }
-            btnConnect.isEnabled = !isConnected
-            btnConnect.setOnClickListener { if (!isConnected) onConnect(item) }
+            btnConnect.isEnabled = true
+            btnConnect.setOnClickListener {
+                if (isConnected) onDisconnect(item) else onConnect(item)
+            }
         }
     }
 

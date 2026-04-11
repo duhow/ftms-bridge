@@ -239,7 +239,10 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupScanList() {
-        scanAdapter = ScanResultAdapter { info -> onDeviceConnectTapped(info) }
+        scanAdapter = ScanResultAdapter(
+            onConnect = { info -> onDeviceConnectTapped(info) },
+            onDisconnect = { info -> onDeviceDisconnectTapped(info) }
+        )
         binding.rvScanResults.apply {
             layoutManager = LinearLayoutManager(this@MainActivity)
             adapter = scanAdapter
@@ -272,9 +275,6 @@ class MainActivity : AppCompatActivity() {
 
         binding.btnViewLap.setOnClickListener { setWorkoutView(false) }
         binding.btnViewChart.setOnClickListener { setWorkoutView(true) }
-        if (BuildConfig.BT_DEBUG_LOG) {
-            binding.btnConnectVirtual.setOnClickListener { connectDummyTreadmill() }
-        }
 
         updateConnectionStatus()
         // Apply initial Idle UI (which also resets all metric displays).
@@ -354,7 +354,7 @@ class MainActivity : AppCompatActivity() {
         dummyTreadmill = dummy
         binding.rvScanResults.visibility = View.GONE
         binding.txtScanStatus.visibility = View.GONE
-        binding.debugVirtualDeviceRow.visibility = View.GONE
+        scanAdapter.markConnected(VIRTUAL_TREADMILL_ADDRESS)
         stateMachine.onConnected()
         updateConnectionStatus()
         stateMachine.applyMetricVisibility(dummy.machineType)
@@ -417,7 +417,16 @@ class MainActivity : AppCompatActivity() {
     private fun startScanning() {
         scanResultsMap.clear()
         if (BuildConfig.BT_DEBUG_LOG) {
-            binding.debugVirtualDeviceRow.visibility = View.VISIBLE
+            scanResultsMap[VIRTUAL_TREADMILL_ADDRESS] = ScannedDeviceInfo(
+                name = getString(R.string.debug_virtual_treadmill),
+                address = VIRTUAL_TREADMILL_ADDRESS,
+                rssi = 0,
+                isFtms = true,
+                isHr = false,
+                device = null,
+                machineType = FtmsConstants.MachineType.TREADMILL.name,
+                isVirtual = true
+            )
         }
         binding.rvScanResults.visibility = View.VISIBLE
         binding.txtScanStatus.visibility = View.VISIBLE
@@ -494,7 +503,7 @@ class MainActivity : AppCompatActivity() {
         updateHandler.removeCallbacks(scanListUpdateRunnable)
         addBondedDevicesToList()
         updateScanListUI() // final refresh
-        binding.txtScanStatus.text = getString(R.string.devices_found, scanResultsMap.size)
+        binding.txtScanStatus.text = getString(R.string.devices_found, scanResultsMap.values.count { !it.isVirtual })
         // Stop spinning and restore static icon
         (binding.btnScan.icon as? Animatable)?.stop()
         binding.btnScan.setIconResource(R.drawable.ic_refresh)
@@ -511,9 +520,9 @@ class MainActivity : AppCompatActivity() {
         val list = combined.values.toList()
         runOnUiThread {
             binding.txtScanStatus.text = if (bleScanner.isScanning)
-                "${getString(R.string.scanning_active)} ${scanResultsMap.size}"
+                "${getString(R.string.scanning_active)} ${scanResultsMap.values.count { !it.isVirtual }}"
             else
-                getString(R.string.devices_found, scanResultsMap.size)
+                getString(R.string.devices_found, scanResultsMap.values.count { !it.isVirtual })
             if (list.isNotEmpty()) {
                 binding.rvScanResults.visibility = View.VISIBLE
                 binding.txtScanStatus.visibility = View.VISIBLE
@@ -522,19 +531,46 @@ class MainActivity : AppCompatActivity() {
             // Mark already-connected devices
             ftmsConnectionManager?.connectedDeviceAddress?.let { scanAdapter.markConnected(it) }
             hrConnectionManager?.connectedDeviceAddress?.let { scanAdapter.markConnected(it) }
+            if (dummyTreadmill != null) scanAdapter.markConnected(VIRTUAL_TREADMILL_ADDRESS)
         }
     }
 
     // ---- Device connection from scan list -----------------------------------
 
     private fun onDeviceConnectTapped(info: ScannedDeviceInfo) {
+        if (info.isVirtual) {
+            connectDummyTreadmill()
+            return
+        }
+        val device = info.device ?: return
         // Save device info so it remains accessible for reconnect after scanning stops
         knownDevicesMap[info.address] = info
         when {
-            info.isFtms -> connectFtmsDevice(info.device)
-            info.isHr -> connectHrDevice(info.device)
-            else -> probeAndConnect(info.device)
+            info.isFtms -> connectFtmsDevice(device)
+            info.isHr -> connectHrDevice(device)
+            else -> probeAndConnect(device)
         }
+    }
+
+    private fun onDeviceDisconnectTapped(info: ScannedDeviceInfo) {
+        when {
+            info.isVirtual -> disconnectDummyTreadmill()
+            ftmsConnectionManager?.connectedDeviceAddress == info.address -> {
+                ftmsConnectionManager?.disconnect()
+            }
+            hrConnectionManager?.connectedDeviceAddress == info.address -> {
+                hrConnectionManager?.disconnect()
+            }
+        }
+    }
+
+    private fun disconnectDummyTreadmill() {
+        dummyTreadmillHandler.removeCallbacks(dummyTreadmillRunnable)
+        dummyTreadmill = null
+        scanAdapter.markDisconnected(VIRTUAL_TREADMILL_ADDRESS)
+        stateMachine.onDisconnected()
+        updateConnectionStatus()
+        updateScanListUI()
     }
 
     /**
@@ -1694,6 +1730,9 @@ class MainActivity : AppCompatActivity() {
         private const val SPEED_DANGER_KMH = 20.0
         private const val INCLINE_DANGER_PERCENT = 12.0
         private const val INCLINE_DECLINE_DANGER_PERCENT = -2.0
+
+        /** Sentinel address used for the virtual (debug) treadmill in the scan list. */
+        private const val VIRTUAL_TREADMILL_ADDRESS = "VIRTUAL:TREADMILL"
 
         // Keys for onSaveInstanceState
         private const val KEY_SESSION_STATE = "session_state"

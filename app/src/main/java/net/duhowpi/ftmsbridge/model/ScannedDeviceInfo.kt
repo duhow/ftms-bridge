@@ -8,10 +8,12 @@ data class ScannedDeviceInfo(
     var rssi: Int,
     val isFtms: Boolean,
     val isHr: Boolean,
-    val device: BluetoothDevice,
+    val device: BluetoothDevice?,
     /** True when the device was found via the bonded-devices list rather than an active BLE scan. */
     val isBonded: Boolean = false,
-    val machineType: String? = null
+    val machineType: String? = null,
+    /** True for simulated (non-Bluetooth) devices, e.g. the debug virtual treadmill. */
+    val isVirtual: Boolean = false
 ) {
     private fun emojiForMachineType(suffix: String): String = when (machineType) {
         "TREADMILL" -> "🏃 $suffix"
