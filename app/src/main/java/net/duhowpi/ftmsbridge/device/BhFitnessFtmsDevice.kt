@@ -75,17 +75,17 @@ abstract class BhFitnessFtmsDevice(
     }
 
     /** Returns the rounded accumulated distance in metres. */
-    fun getAccumulatedDistanceM(): Int = kotlin.math.round(accumulatedDistanceM).toInt()
+    protected fun getAccumulatedDistanceM(): Int = kotlin.math.round(accumulatedDistanceM).toInt()
 
     /** Returns the rounded accumulated energy in kcal. */
-    fun getAccumulatedEnergyKcal(): Int = kotlin.math.round(accumulatedEnergyKcal).toInt()
+    protected fun getAccumulatedEnergyKcal(): Int = kotlin.math.round(accumulatedEnergyKcal).toInt()
 
     /**
      * Resets the accumulated distance, energy, and the inter-sample timestamp to zero.
      * Subclasses that track additional per-session state should call this method from
      * their own [reset] override rather than overriding it.
      */
-    fun resetAccumulators() {
+    protected fun resetAccumulators() {
         accumulatedDistanceM = 0.0
         accumulatedEnergyKcal = 0.0
         lastAccumulatorTimestampMs = 0L

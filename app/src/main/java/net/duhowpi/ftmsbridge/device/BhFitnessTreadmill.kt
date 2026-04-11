@@ -68,9 +68,16 @@ class BhFitnessTreadmill(deviceName: String) :
     override fun encodeTargetInclineRaw(physicalPercent: Double): Int =
         toRawIncline(physicalPercent)
 
-    override fun getDisplayIncline(sample: FitnessSample): Double = sample.inclinationPercent
+    override fun getDisplayIncline(sample: FitnessSample): Double {
+        val incline = sample.inclinationPercent
+        // Safety net: if a raw-encoded FTMS value leaks into UI path, decode it.
+        // Example raw leak: 180 (device raw) would otherwise display as 180%, while the
+        // physical inclination should be 180 / 62.5 = 2.88% (~3%). UI values above 30%
+        // are treated as leaked raw device codes for this treadmill family.
+        return if (incline > INCLINE_UI_MAX_ABS_PERCENT) getIncline(sample) else incline
+    }
 
-    fun getIncline(sample: FitnessSample): Double {
+    private fun getIncline(sample: FitnessSample): Double {
         // Recover the raw INT16 device value (FTMS parses inclinationPercent = rawDevice * 0.1).
         val rawInclination = (sample.inclinationPercent * 10).toInt()
 
@@ -99,22 +106,25 @@ class BhFitnessTreadmill(deviceName: String) :
      * The inverse formula (pct × 62.5 + 500) gives 438/375/313, which are NOT the
      * values the device firmware expects — static values are required.
      */
-    fun toRawIncline(incline: Double): Int {
+    private fun toRawIncline(incline: Double): Int {
         if (incline < 0) {
             // Use explicit mapping for the discrete decline steps the device expects.
             // Map keys: -3 -> 320, -2 -> 380, -1 -> 450.
             val key = incline.roundToInt().coerceIn(-3, -1)
             return DECLINE_RAW[key] ?: 450
         }
-        return (incline * INCLINE_POSITIVE_SCALE).roundToInt()
+        return (incline * FTMS_INCLINE_ENCODING_MULTIPLIER).roundToInt()
     }
 
     companion object {
         /** BH Fitness treadmill inclination scale factor: raw / 62.5 = physical %. */
         const val INCLINE_SCALE = 62.5
 
-        /** Standard FTMS positive-inclination encoding: raw = physicalPercent * 10. */
-        const val INCLINE_POSITIVE_SCALE = 10.0
+        /** FTMS encoding factor for positive incline: raw = physicalPercent * 10. */
+        const val FTMS_INCLINE_ENCODING_MULTIPLIER = 10.0
+
+        /** Upper bound for sane UI incline percentages from this treadmill family. */
+        const val INCLINE_UI_MAX_ABS_PERCENT = 30.0
 
         /** Mapping from negative physical percent to device raw value required by firmware. */
         val DECLINE_RAW: Map<Int, Int> = mapOf(
