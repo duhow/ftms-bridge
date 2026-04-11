@@ -124,6 +124,7 @@ class BhFitnessTreadmill(deviceName: String) :
         /** BH Fitness treadmill inclination scale factor: raw / 62.5 = physical %. */
         const val INCLINE_SCALE = 62.5
 
+        /** Tolerance (in incline %) used to treat near-integer values as whole-percent steps. */
         private const val PERCENT_ROUNDING_TOLERANCE = 0.05
 
         /** Physical incline range for BH treadmill UI percentages. */
