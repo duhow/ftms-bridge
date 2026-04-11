@@ -73,10 +73,10 @@ class BhFitnessTreadmill(deviceName: String) :
 
     private fun getIncline(sample: FitnessSample): Double {
         val incline = sample.inclinationPercent
-        // Already-corrected physical values are whole-percent (or very near whole-percent)
-        // steps in the expected range.
+        // Already-corrected physical values are whole-percent steps in the expected
+        // range, with a small ±0.05 % rounding tolerance.
         if (incline in INCLINE_PHYSICAL_MIN_PERCENT..INCLINE_PHYSICAL_MAX_PERCENT &&
-            abs(incline - incline.roundToInt().toDouble()) < WHOLE_PERCENT_TOLERANCE
+            abs(incline - incline.roundToInt().toDouble()) < PERCENT_ROUNDING_TOLERANCE
         ) {
             return incline
         }
@@ -124,7 +124,7 @@ class BhFitnessTreadmill(deviceName: String) :
         /** BH Fitness treadmill inclination scale factor: raw / 62.5 = physical %. */
         const val INCLINE_SCALE = 62.5
 
-        private const val WHOLE_PERCENT_TOLERANCE = 0.05
+        private const val PERCENT_ROUNDING_TOLERANCE = 0.05
 
         /** Physical incline range for BH treadmill UI percentages. */
         const val INCLINE_PHYSICAL_MIN_PERCENT = -3.0
