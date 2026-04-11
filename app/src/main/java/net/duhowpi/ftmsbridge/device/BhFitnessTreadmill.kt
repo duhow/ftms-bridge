@@ -11,29 +11,18 @@ class BhFitnessTreadmill(deviceName: String) :
     private val tag = "BhFitnessTreadmill"
     override fun getSupportedDeviceName(): Regex = Regex("^T01_\\d{5}$")
 
-    // Last values received from the iConcept 0xC112 workout-counter notification.
-    // C112 fires only once at session start on this device model, so elapsed time,
-    // distance, and energy continue from derived packet-delta estimates.
-    @Volatile private var iConceptDistanceM: Int = 0
-    @Volatile private var iConceptCalories: Int = 0
-    @Volatile private var lastSampleTimestampMs: Long = 0L
+    // Treadmill-specific session accumulators.
+    // Distance and energy are tracked via the shared BhFitnessFtmsDevice accumulators.
+    // Elapsed time requires its own anchor because C112 fires only once at session start.
     @Volatile private var hasWorkoutStartAnchor: Boolean = false
     @Volatile private var derivedElapsedSec: Double = 0.0
-    @Volatile private var derivedDistanceM: Double = 0.0
-    @Volatile private var derivedEnergyKcal: Double = 0.0
 
     // Elapsed time, distance, and calories are always 0 in the FTMS packet; the real
     // values come from the iConcept 0xC112 notification and are merged here.
     @Synchronized
     override fun onDataReceived(data: ByteArray): FitnessSample? {
         val sample = super.onDataReceived(data) ?: return null
-        val nowMs = sample.timestampMs
-        val dtSec = if (lastSampleTimestampMs > 0L) {
-            ((nowMs - lastSampleTimestampMs).coerceAtLeast(0L)) / 1000.0
-        } else {
-            0.0
-        }
-        lastSampleTimestampMs = nowMs
+        val dtSec = sampleDtSec(sample.timestampMs)
 
         if (dtSec > 0.0 && hasWorkoutStartAnchor) {
             derivedElapsedSec += dtSec
@@ -49,12 +38,12 @@ class BhFitnessTreadmill(deviceName: String) :
         val correctedIncline = getIncline(sample)
 
         if (dtSec > 0.0) {
-            derivedDistanceM += sample.speedKmh * dtSec * FitnessDevice.METERS_PER_KMH_PER_SEC
-            derivedEnergyKcal += estimateEnergyDeltaKcal(sample.speedKmh, correctedIncline, dtSec)
+            accumulateDistance(sample.speedKmh, dtSec)
+            accumulateEnergy(sample.speedKmh, correctedIncline, dtSec)
         }
 
-        val distanceM = kotlin.math.round(derivedDistanceM).toInt()
-        val energyKcal = kotlin.math.round(derivedEnergyKcal).toInt()
+        val distanceM = getAccumulatedDistanceM()
+        val energyKcal = getAccumulatedEnergyKcal()
 
         Log.d(tag, "treadmill: speed=%.2f km/h incl=%.1f%% elapsed=${elapsedSec}s dist=${distanceM}m kcal=${energyKcal}"
             .format(sample.speedKmh, correctedIncline))
@@ -113,12 +102,15 @@ class BhFitnessTreadmill(deviceName: String) :
             val key = incline.roundToInt().coerceIn(-3, -1)
             return DECLINE_RAW[key] ?: 450
         }
-        return (incline * 10.0).roundToInt()
+        return (incline * INCLINE_POSITIVE_SCALE).roundToInt()
     }
 
     companion object {
         /** BH Fitness treadmill inclination scale factor: raw / 62.5 = physical %. */
         const val INCLINE_SCALE = 62.5
+
+        /** Standard FTMS positive-inclination encoding: raw = physicalPercent * 10. */
+        const val INCLINE_POSITIVE_SCALE = 10.0
 
         /** Mapping from negative physical percent to device raw value required by firmware. */
         val DECLINE_RAW: Map<Int, Int> = mapOf(
@@ -129,31 +121,29 @@ class BhFitnessTreadmill(deviceName: String) :
     }
 
     /**
-     * Resets the derived elapsed-time accumulator so that the timer reported in
-     * subsequent samples starts from zero.  Called at recording start to align the
-     * in-app timer with the user's activity start rather than the BLE connect time.
+     * Resets all session accumulators so the timer and counters start from zero on the
+     * next recording.  Called at recording start to align the in-app timer with the
+     * user's activity start rather than the BLE connect time.
      */
     @Synchronized
     override fun reset() {
         derivedElapsedSec = 0.0
-        lastSampleTimestampMs = 0L
         // Keep hasWorkoutStartAnchor = true so the timer resumes counting immediately
         // from the next FTMS packet without waiting for a new C112 signal (which will
         // not arrive again because this device only sends C112 once per session).
         hasWorkoutStartAnchor = true
+        resetAccumulators()
     }
 
     override fun onIConceptData(data: ByteArray) {
         val parsed = parseIConceptWorkoutData(data) ?: return
-        iConceptDistanceM = parsed.totalDistanceM
-        iConceptCalories = parsed.totalEnergyKcal
         if (parsed.elapsedTimeSec > 0) {
             derivedElapsedSec = kotlin.math.max(derivedElapsedSec, parsed.elapsedTimeSec.toDouble())
             hasWorkoutStartAnchor = true
         }
         // Use iConcept snapshot as lower-bound baseline if present, then continue
         // with derived progression because this device does not keep streaming counters.
-        derivedDistanceM = kotlin.math.max(derivedDistanceM, parsed.totalDistanceM.toDouble())
-        derivedEnergyKcal = kotlin.math.max(derivedEnergyKcal, parsed.totalEnergyKcal.toDouble())
+        accumulatedDistanceM = kotlin.math.max(accumulatedDistanceM, parsed.totalDistanceM.toDouble())
+        accumulatedEnergyKcal = kotlin.math.max(accumulatedEnergyKcal, parsed.totalEnergyKcal.toDouble())
     }
 }

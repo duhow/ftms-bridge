@@ -34,6 +34,20 @@ interface FitnessDevice {
     fun reset() {}
 
     /**
+     * Computes the distance delta (in metres) travelled at [speedKmh] over [dtSec] seconds.
+     *
+     * This is the inverse of `speedKmh = distanceDeltaM / dtSec * 3.6`.  Provided as a
+     * named helper so device subclasses that derive their own distance (because the device
+     * always reports 0 in FTMS packets) can call it instead of duplicating the conversion.
+     *
+     * Returns 0 when [dtSec] ≤ 0 or [speedKmh] ≤ 0.
+     */
+    fun computeDistanceDeltaM(speedKmh: Double, dtSec: Double): Double {
+        if (dtSec <= 0.0 || speedKmh <= 0.0) return 0.0
+        return speedKmh * dtSec * METERS_PER_KMH_PER_SEC
+    }
+
+    /**
      * Returns the display-ready inclination percentage for the given [sample].
      *
      * Default: returns [FitnessSample.inclinationPercent] directly.
