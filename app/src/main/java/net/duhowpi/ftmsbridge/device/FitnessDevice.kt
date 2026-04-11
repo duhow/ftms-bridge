@@ -32,8 +32,8 @@ interface FitnessDevice {
      * Default: standard FTMS encoding — SINT16 in units of 0.1 %.
      * Devices with non-standard scaling (e.g. BH Fitness) override this.
      */
-    fun encodeTargetInclineRaw(physicalPercent: Double): Int =
-        (physicalPercent * 10.0).roundToInt()
+    fun encodeTargetInclineRaw(physicalPercent: Double): Short =
+        (physicalPercent * 10.0).roundToInt().toShort()
 
     /**
      * Resets internal state (elapsed-time accumulators, distance, energy, etc.) to zero.
@@ -67,7 +67,7 @@ interface FitnessDevice {
      * treadmill) already return a corrected sample, so the default pass-through is sufficient;
      * the override hook is provided for any future device that may need post-processing here.
      */
-    fun getDisplayIncline(sample: FitnessSample): Double = sample.inclinationPercent
+    fun getIncline(sample: FitnessSample): Double = sample.inclinationPercent
 
     /**
      * Returns `true` when the machine is actively moving based on the given [sample].
