@@ -24,15 +24,14 @@ interface FitnessDevice {
         (physicalPercent * 10.0).roundToInt()
 
     /**
-     * Resets internal elapsed-time accumulators so that the derived elapsed time
-     * reported in subsequent samples starts from zero.  Called when a new recording
-     * session begins so the in-app timer is anchored to the activity start, not to
-     * the BLE connection time.
+     * Resets internal state (elapsed-time accumulators, distance, energy, etc.) to zero.
+     * Called when a new recording session begins so the in-app timer is anchored to the
+     * activity start, not to the BLE connection time.
      *
-     * Default implementation is a no-op; devices that derive elapsed time internally
-     * (e.g. BH Fitness treadmill) should override this.
+     * Default implementation is a no-op; devices that track state internally
+     * (e.g. BH Fitness treadmill, DummyTreadmill) should override this.
      */
-    fun resetElapsedTime() {}
+    fun reset() {}
 
     /**
      * Returns `true` when the machine is actively moving based on the given [sample].
