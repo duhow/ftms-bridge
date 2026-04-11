@@ -345,9 +345,10 @@ class MainActivity : AppCompatActivity() {
             sample.cadenceRpm > 0 -> String.format("%.0f", sample.cadenceRpm)
             else -> "--"
         }
+        val displayResistanceLevel = resolveDisplayResistanceLevel(sample)
         binding.lapValueInclination.text = when {
             isTreadmill -> "${resolveDisplayIncline(sample).roundToInt()}"
-            sample.resistanceLevel > 0 -> "${sample.resistanceLevel}"
+            displayResistanceLevel > 0 -> "$displayResistanceLevel"
             else -> "--"
         }
         binding.lapValueEnergy.text = "${sample.totalEnergyKcal}"
@@ -954,7 +955,8 @@ class MainActivity : AppCompatActivity() {
         binding.valueEnergy.text = "${sample.totalEnergyKcal}"
 
         binding.valueInclination.text = "${resolveDisplayIncline(sample).roundToInt()}"
-        binding.valueResistance.text = if (sample.resistanceLevel > 0) "${sample.resistanceLevel}" else "--"
+        val displayResistanceLevel = resolveDisplayResistanceLevel(sample)
+        binding.valueResistance.text = if (displayResistanceLevel > 0) "$displayResistanceLevel" else "--"
 
         // Elapsed display is driven by the 1 s tick handler; sync the tick counter here
         // (taking the max so it never goes backwards).
@@ -968,7 +970,7 @@ class MainActivity : AppCompatActivity() {
         val isTreadmill = isActiveTreadmill
         liveSpeedPoints.add(if (isTreadmill) sample.speedKmh.toFloat() else sample.cadenceRpm.toFloat())
         livePaceSecondaryPoints.add(
-            if (isTreadmill) resolveDisplayIncline(sample).toFloat() else sample.resistanceLevel.toFloat()
+            if (isTreadmill) resolveDisplayIncline(sample).toFloat() else resolveDisplayResistanceLevel(sample).toFloat()
         )
         liveHrPoints.add(sample.heartRateBpm.toFloat())
         if (isChartViewActive) updateLiveChart()
@@ -1332,7 +1334,7 @@ class MainActivity : AppCompatActivity() {
             Toast.makeText(this, getString(R.string.control_not_available), Toast.LENGTH_SHORT).show()
             return
         }
-        val current = (lastFtmsSample?.resistanceLevel
+        val current = (lastFtmsSample?.let { resolveDisplayResistanceLevel(it) }
             ?.coerceIn(RESISTANCE_MIN_LEVEL, RESISTANCE_MAX_LEVEL)
             ?: RESISTANCE_MIN_LEVEL).toDouble()
         showAdjustDialog(
@@ -1482,9 +1484,15 @@ class MainActivity : AppCompatActivity() {
     private fun sendTargetResistanceLevel(level: Int): Boolean {
         val cm = ftmsConnectionManager ?: return false
         val clamped = level.coerceIn(RESISTANCE_MIN_LEVEL, RESISTANCE_MAX_LEVEL)
-        val encoded = (clamped * RESISTANCE_LEVEL_MULTIPLIER).roundToInt()
+        val isIndoorBike = fitnessDevice?.machineType == FtmsConstants.MachineType.INDOOR_BIKE
+        val deviceLevel = if (isIndoorBike) {
+            (clamped + INDOOR_BIKE_RESISTANCE_DISPLAY_OFFSET).coerceAtMost(RESISTANCE_DEVICE_MAX_LEVEL)
+        } else {
+            clamped
+        }
+        val encoded = (deviceLevel * RESISTANCE_LEVEL_MULTIPLIER).roundToInt()
         if (!isEncodableAsSint16(encoded)) {
-            Log.w(tag, "Encoded resistance out of range: level=$clamped, encoded=$encoded")
+            Log.w(tag, "Encoded resistance out of range: level=$clamped, deviceLevel=$deviceLevel, encoded=$encoded")
             return false
         }
         val payload = ByteBuffer.allocate(3)
@@ -1498,6 +1506,15 @@ class MainActivity : AppCompatActivity() {
     /** Returns the display-ready inclination for [sample], delegating to the active device. */
     private fun resolveDisplayIncline(sample: FitnessSample): Double =
         fitnessDevice?.getDisplayIncline(sample) ?: sample.inclinationPercent
+
+    /** Returns the display-ready resistance level for [sample]. */
+    private fun resolveDisplayResistanceLevel(sample: FitnessSample): Int {
+        val rawLevel = sample.resistanceLevel
+        if (rawLevel <= 0) return 0
+        val isIndoorBike = fitnessDevice?.machineType == FtmsConstants.MachineType.INDOOR_BIKE
+        val adjustedLevel = if (isIndoorBike) rawLevel - INDOOR_BIKE_RESISTANCE_DISPLAY_OFFSET else rawLevel
+        return adjustedLevel.coerceIn(RESISTANCE_MIN_LEVEL, RESISTANCE_MAX_LEVEL)
+    }
 
     private fun updateLapMetricPresentation(machineType: FtmsConstants.MachineType) {
         val isBike = machineType == FtmsConstants.MachineType.INDOOR_BIKE ||
@@ -1807,7 +1824,9 @@ class MainActivity : AppCompatActivity() {
         private const val INCLINE_DANGER_PERCENT = 12.0
         private const val INCLINE_DECLINE_DANGER_PERCENT = -2.0
         private const val RESISTANCE_MIN_LEVEL = 1
-        private const val RESISTANCE_MAX_LEVEL = 100
+        private const val RESISTANCE_MAX_LEVEL = 22
+        private const val INDOOR_BIKE_RESISTANCE_DISPLAY_OFFSET = 1
+        private const val RESISTANCE_DEVICE_MAX_LEVEL = RESISTANCE_MAX_LEVEL + INDOOR_BIKE_RESISTANCE_DISPLAY_OFFSET
         // BH indoor-bike firmware expects FTMS target resistance encoded with this scale.
         private const val RESISTANCE_LEVEL_MULTIPLIER = 10.0
 

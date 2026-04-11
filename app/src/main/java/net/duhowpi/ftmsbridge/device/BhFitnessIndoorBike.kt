@@ -19,8 +19,8 @@ class BhFitnessIndoorBike(deviceName: String) :
         const val MIN_MOVING_CADENCE_RPM = 10.0
         private const val MIN_LEVEL_TORQUE_NM = 2.0
         private const val LEVEL_TORQUE_STEP_NM = 2.0
-        // Keep a broad safety cap so derived levels remain bounded for higher-resistance bikes.
-        private const val MAX_LEVEL = 100
+        // Raw derived level is clamped to 23; UI applies a -1 offset to match the bike console (1..22).
+        private const val MAX_LEVEL = 23
         // Typical cycling gross efficiency (~24%): metabolic work ≈ mechanical work / 0.24.
         private const val CYCLING_GROSS_EFFICIENCY = 0.24
         // Empirical BH-specific mapping between decoded strides/min and crank cadence RPM.
@@ -54,7 +54,7 @@ class BhFitnessIndoorBike(deviceName: String) :
         }
         val torqueNm = powerW.toDouble() / angularVelocityRadPerSec
         // Empirical mapping for BH indoor-bike console levels:
-        // level ~= round((torqueNm - 2.0) / 2.0) + 1, clamped to 1..100 while moving.
+        // level ~= round((torqueNm - 2.0) / 2.0) + 1, clamped to 1..23 while moving.
         val level = kotlin.math.round((torqueNm - MIN_LEVEL_TORQUE_NM) / LEVEL_TORQUE_STEP_NM).toInt() + 1
         val clampedLevel = level.coerceIn(1, MAX_LEVEL)
         lastDerivedLevel = clampedLevel
