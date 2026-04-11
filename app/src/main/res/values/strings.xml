@@ -133,4 +133,8 @@
     <string name="debug_virtual_treadmill_speed">Speed (km/h)</string>
     <string name="debug_virtual_treadmill_incline">Incline (%)</string>
     <string name="debug_virtual_treadmill_control">Treadmill Control</string>
+    <string name="debug_virtual_bike">Virtual Bike</string>
+    <string name="debug_virtual_bike_cadence">Cadence (RPM)</string>
+    <string name="debug_virtual_bike_resistance">Resistance level</string>
+    <string name="debug_virtual_bike_control">Bike Control</string>
 </resources>

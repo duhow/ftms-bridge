@@ -314,11 +314,11 @@ class SessionStateMachine(
         val isTreadmill = machineType == FtmsConstants.MachineType.TREADMILL
         val isBike = machineType == FtmsConstants.MachineType.INDOOR_BIKE ||
                 machineType == FtmsConstants.MachineType.CROSS_TRAINER
-        val showSpeed = !isBike
-        binding.cardSpeed.visibility = if (showSpeed) View.VISIBLE else View.GONE
+        binding.cardSpeed.visibility = View.VISIBLE
+        binding.cardCadence.visibility = if (isBike) View.GONE else View.VISIBLE
         binding.rowCadencePower.visibility = if (isBike) View.VISIBLE else View.GONE
         binding.cardInclination.visibility = if (isTreadmill) View.VISIBLE else View.GONE
-        binding.cardResistance.visibility = if (isBike) View.VISIBLE else View.GONE
+        binding.cardResistance.visibility = View.GONE
     }
 
     /** Resets all metric text views to their placeholder values. */

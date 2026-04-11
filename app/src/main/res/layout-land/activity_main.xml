@@ -436,6 +436,7 @@
                     android:orientation="horizontal" android:visibility="gone">
 
                     <com.google.android.material.card.MaterialCardView
+                        android:id="@+id/cardCadence"
                         android:layout_width="0dp" android:layout_height="wrap_content"
                         android:layout_weight="1" android:layout_margin="3dp"
                         app:cardBackgroundColor="@color/metric_cadence_bg">
@@ -458,8 +459,11 @@
                     </com.google.android.material.card.MaterialCardView>
 
                     <com.google.android.material.card.MaterialCardView
+                        android:id="@+id/cardPower"
                         android:layout_width="0dp" android:layout_height="wrap_content"
                         android:layout_weight="1" android:layout_margin="3dp"
+                        android:clickable="true" android:focusable="true"
+                        android:foreground="?attr/selectableItemBackground"
                         app:cardBackgroundColor="@color/metric_power_bg">
                         <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
                             android:orientation="vertical" android:padding="10dp" android:gravity="center">
