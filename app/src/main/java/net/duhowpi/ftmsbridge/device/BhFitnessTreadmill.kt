@@ -107,7 +107,7 @@ class BhFitnessTreadmill(deviceName: String) :
         if (abs(incline - rounded.toDouble()) < PERCENT_ROUNDING_TOLERANCE) {
             DECLINE_RAW[rounded]?.let { return it }
         }
-        return (incline * (INCLINE_SCALE / 10.0)).roundToInt()
+        return (incline * INCLINE_SCALE).roundToInt()
     }
 
     companion object {
