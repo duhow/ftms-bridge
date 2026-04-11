@@ -277,7 +277,8 @@ class MainActivity : AppCompatActivity() {
         }
 
         updateConnectionStatus()
-        stateMachine.resetMetrics()
+        // Apply initial Idle UI (which also resets all metric displays).
+        stateMachine.applyUI()
     }
 
     // ---- Permissions --------------------------------------------------------
@@ -574,8 +575,6 @@ class MainActivity : AppCompatActivity() {
                     if (hadSession) {
                         // Keep frozen metric values visible in the stopped review view.
                         stopRecording()
-                    } else {
-                        stateMachine.resetMetrics()
                     }
                     Toast.makeText(this@MainActivity, getString(R.string.device_disconnected), Toast.LENGTH_SHORT).show()
                     updateScanListUI()
@@ -1060,7 +1059,6 @@ class MainActivity : AppCompatActivity() {
         lastFallbackElapsedSec = 0
         lastHeartRateBpm = 0
         lastFtmsSample = null
-        stateMachine.resetMetrics()
 
         if (ftmsConnected) {
             stateMachine.onSessionStopped()

@@ -133,6 +133,9 @@ class SessionStateMachine(
 
         // Connection indicators
         applyConnectionIndicators(ftmsConnected = false, hrConnected = false, hasHrDevice = false)
+
+        // Always reset all metric displays when entering Idle.
+        resetMetrics()
     }
 
     // --- Connecting ----------------------------------------------------------
