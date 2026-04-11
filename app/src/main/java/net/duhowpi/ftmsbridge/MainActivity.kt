@@ -170,7 +170,7 @@ class MainActivity : AppCompatActivity() {
             lastFtmsSample = sample
             updateDashboard(sample)
             if (isRecording && currentSessionId != null) saveSample(sample)
-            dummyBikeHandler.postDelayed(this, 2000)
+            dummyBikeHandler.postDelayed(this, DummyBike.SAMPLE_INTERVAL_MS)
         }
     }
 
