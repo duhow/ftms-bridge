@@ -1468,15 +1468,11 @@ class MainActivity : AppCompatActivity() {
     private fun sendTargetInclinePercent(inclinePercent: Double): Boolean {
         val cm = ftmsConnectionManager ?: return false
         val clamped = inclinePercent.coerceIn(INCLINE_MIN_PERCENT, INCLINE_MAX_PERCENT)
-        val encoded = fitnessDevice?.encodeTargetInclineRaw(clamped) ?: (clamped * 10.0).roundToInt()
-        if (!isEncodableAsSint16(encoded)) {
-            Log.w(tag, "Encoded incline out of range: $encoded")
-            return false
-        }
+        val encoded = fitnessDevice?.encodeTargetInclineRaw(clamped) ?: (clamped * 10.0).roundToInt().toShort()
         val payload = ByteBuffer.allocate(3)
             .order(ByteOrder.LITTLE_ENDIAN)
             .put(FtmsConstants.CONTROL_SET_TARGET_INCLINATION)
-            .putShort(encoded.toShort())
+            .putShort(encoded)
             .array()
         return cm.sendControlPoint(payload)
     }
@@ -1505,7 +1501,7 @@ class MainActivity : AppCompatActivity() {
 
     /** Returns the display-ready inclination for [sample], delegating to the active device. */
     private fun resolveDisplayIncline(sample: FitnessSample): Double =
-        fitnessDevice?.getDisplayIncline(sample) ?: sample.inclinationPercent
+        fitnessDevice?.getIncline(sample) ?: sample.inclinationPercent
 
     /** Returns the display-ready resistance level for [sample]. */
     private fun resolveDisplayResistanceLevel(sample: FitnessSample): Int {
