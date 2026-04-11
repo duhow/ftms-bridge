@@ -1038,15 +1038,12 @@ class MainActivity : AppCompatActivity() {
     }
 
     /**
-     * Clears all in-memory session data and transitions to the idle or connected state,
-     * showing the scan list ready for a new session.
+     * Resets all in-memory session data to zero.
+     * Called by [SessionStateMachine] whenever the state transitions to [SessionState.Idle],
+     * ensuring the reset always happens regardless of which code path leads to Idle.
      */
-    private fun returnToIdle() {
-        val ftmsConnected = ftmsConnectionManager?.isConnected == true || dummyTreadmill != null
-        val hrConnected = hrConnectionManager?.isConnected == true
-        val hasHrDevice = hrConnectionManager != null
-
-        // Reset accumulated session data so it does not bleed into the next session.
+    internal fun resetSessionData() {
+        currentSessionId = null
         liveSpeedPoints.clear()
         livePaceSecondaryPoints.clear()
         liveHrPoints.clear()
@@ -1059,12 +1056,29 @@ class MainActivity : AppCompatActivity() {
         lastFallbackElapsedSec = 0
         lastHeartRateBpm = 0
         lastFtmsSample = null
+    }
+
+    /**
+     * Transitions to idle (or connected if device is still linked), resetting all session data
+     * and showing the scan list ready for a new session.
+     *
+     * The reset is always triggered by routing through [SessionState.Idle] first, which causes
+     * [SessionStateMachine] to call [resetSessionData] and [SessionStateMachine.resetMetrics].
+     * If the device is still connected, the state immediately advances to [SessionState.Connected].
+     */
+    private fun returnToIdle() {
+        val ftmsConnected = ftmsConnectionManager?.isConnected == true || dummyTreadmill != null
+        val hrConnected = hrConnectionManager?.isConnected == true
+        val hasHrDevice = hrConnectionManager != null
+
+        // Always pass through Idle so the state machine triggers the data + UI reset.
+        stateMachine.onReturnToIdle()
 
         if (ftmsConnected) {
-            stateMachine.onSessionStopped()
+            // Device still connected — advance to Connected without showing the Idle layout.
+            stateMachine.onConnected()
             stateMachine.applyUI(ftmsConnected, hrConnected, hasHrDevice, fitnessDevice)
         } else {
-            stateMachine.onReturnToIdle()
             stateMachine.applyUI()
         }
     }

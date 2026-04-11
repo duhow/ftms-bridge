@@ -353,5 +353,11 @@ class SessionStateMachine(
         val old = state
         state = newState
         Log.i(tag, "Transition: ${old.label} → ${newState.label}")
+        if (newState is SessionState.Idle) {
+            // Reset all metric displays and in-memory session data on every entry to Idle,
+            // regardless of the code path that triggered the transition.
+            resetMetrics()
+            activity.resetSessionData()
+        }
     }
 }
