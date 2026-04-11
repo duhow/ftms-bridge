@@ -38,6 +38,25 @@ interface FitnessDevice {
     fun resetElapsedTime() {}
 
     /**
+     * Returns `true` when the machine is actively moving based on the given [sample].
+     *
+     * Default: speed > 0.1 km/h.
+     * Devices without a meaningful speed field (e.g. BH Fitness indoor bikes) override
+     * this to use cadence or power instead.
+     */
+    fun isMoving(sample: FitnessSample): Boolean = sample.speedKmh > 0.1
+
+    /**
+     * Returns `true` if the device does not produce a meaningful speed metric and the
+     * speed card should be hidden in the UI.
+     *
+     * Default: `false` — speed is shown for all standard FTMS devices.
+     * Override to `true` for devices where the speed field is repurposed or absent
+     * (e.g. BH Fitness indoor bikes).
+     */
+    fun hidesSpeed(): Boolean = false
+
+    /**
      * Estimates the caloric energy expenditure over a time interval using ACSM
      * metabolic equations.
      *
@@ -73,6 +92,12 @@ interface FitnessDevice {
     }
 
     companion object {
+        /** km/h → m/s conversion factor (1 km/h = 1/3.6 m/s). */
+        const val METERS_PER_KMH_PER_SEC = 1.0 / 3.6
+
+        /** Energy conversion factor: 1 kcal = 4184 J. */
+        const val JOULES_PER_KCAL = 4184.0
+
         /** Default assumed body weight (kg) used in ACSM energy estimation. */
         const val DEFAULT_BODY_WEIGHT_KG = 75.0
 

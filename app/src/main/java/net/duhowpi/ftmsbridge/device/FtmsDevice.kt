@@ -28,6 +28,27 @@ open class FtmsDevice(
         }
     }
 
+    /**
+     * Returns a [Regex] that matches advertised device names supported by this device
+     * class, or `null` if this class does not use name-based detection.
+     *
+     * Subclasses (e.g. [BhFitnessFtmsDevice]) override this to return their pattern.
+     * The default implementation returns `null` (no name-based filter).
+     */
+    open fun getSupportedDeviceName(): Regex? = null
+
+    /**
+     * Returns `true` if the given advertised [name] (and optional [macAddress])
+     * match this device class.
+     *
+     * Default: delegates to [getSupportedDeviceName]; returns `true` when the regex
+     * finds a match anywhere in [name].
+     *
+     * TODO: MAC address prefix matching is not yet implemented; only [name] is used.
+     */
+    fun matchesDevice(name: String, macAddress: String? = null): Boolean =
+        getSupportedDeviceName()?.containsMatchIn(name) == true
+
     companion object {
         fun createFromCharacteristics(
             deviceName: String,
@@ -46,7 +67,7 @@ open class FtmsDevice(
                 else -> FtmsConstants.MachineType.UNKNOWN
             }
 
-            return if (BhFitnessFtmsDevice.matchesDevice(deviceName)) {
+            return if (BhFitnessFtmsDevice.getSupportedDeviceName().containsMatchIn(deviceName)) {
                 when (type) {
                     FtmsConstants.MachineType.TREADMILL -> BhFitnessTreadmill(deviceName)
                     FtmsConstants.MachineType.INDOOR_BIKE -> BhFitnessIndoorBike(deviceName)
