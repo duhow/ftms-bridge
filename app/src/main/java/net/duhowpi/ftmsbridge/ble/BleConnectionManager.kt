@@ -16,6 +16,7 @@ import androidx.core.app.ActivityCompat
 import net.duhowpi.ftmsbridge.ftms.FtmsConstants
 import java.util.LinkedList
 import java.util.UUID
+import kotlin.math.roundToInt
 
 class BleConnectionManager(
     private val context: Context,
@@ -171,7 +172,15 @@ class BleConnectionManager(
             is GattOp.WriteChar -> {
                 if (ActivityCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) false
                 else {
-                    debugLogger.logMessage("Char write ${op.char.uuid.toString().takeLast(4)}: ${op.data.joinToString(" ") { String.format("%02X", it) }}")
+                    val dataHex = op.data.joinToString(" ") { String.format("%02X", it) }
+                    val extractedLevel = extractResistanceLevelFromControlWrite(op.char.uuid, op.data)
+                    if (extractedLevel != null) {
+                        debugLogger.logMessage(
+                            "Char write ${op.char.uuid.toString().takeLast(4)}: $dataHex (resistanceLevel=$extractedLevel)"
+                        )
+                    } else {
+                        debugLogger.logMessage("Char write ${op.char.uuid.toString().takeLast(4)}: $dataHex")
+                    }
                     @Suppress("DEPRECATION")
                     op.char.value = op.data
                     @Suppress("DEPRECATION")
@@ -203,6 +212,16 @@ class BleConnectionManager(
             if (recentEvents.size >= 30) recentEvents.removeFirst()
             recentEvents.addLast(entry)
         }
+    }
+
+    private fun extractResistanceLevelFromControlWrite(charUuid: UUID, payload: ByteArray): Int? {
+        if (charUuid != FtmsConstants.FITNESS_MACHINE_CONTROL_POINT_UUID) return null
+        if (payload.size < 3) return null
+        val opCode = payload[0].toInt() and 0xFF
+        if (opCode != (FtmsConstants.CONTROL_SET_TARGET_RESISTANCE_LEVEL.toInt() and 0xFF)) return null
+        val rawValue = (payload[1].toInt() and 0xFF) or ((payload[2].toInt() and 0xFF) shl 8)
+        val decodedLevel = (rawValue / RESISTANCE_LEVEL_MULTIPLIER).roundToInt()
+        return decodedLevel.coerceIn(RESISTANCE_LOG_MIN_LEVEL, RESISTANCE_LOG_MAX_LEVEL)
     }
 
     private val gattCallback = object : BluetoothGattCallback() {
@@ -461,5 +480,11 @@ class BleConnectionManager(
             debugLogger.logMessage("Characteristic write for ${characteristic.uuid}: status=$status")
             onOperationComplete()
         }
+    }
+
+    companion object {
+        private const val RESISTANCE_LEVEL_MULTIPLIER = 6.25
+        private const val RESISTANCE_LOG_MIN_LEVEL = 1
+        private const val RESISTANCE_LOG_MAX_LEVEL = 8
     }
 }
