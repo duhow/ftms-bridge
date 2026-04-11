@@ -6,14 +6,12 @@ Add user-facing changes for the next release here.
 - Fixed BH indoor/vertical bike detection for hex model IDs (B01_/C01_)
 - Fixed BH treadmill incline control writes using wrong scale (targets now match selected % again)
 - Fixed indoor bike LAP view showing treadmill metrics; it now shows cadence and resistance consistently
-- Added indoor bike resistance control (levels 1–8) from the resistance metric tile
+- Added indoor bike resistance control (levels 1–22) from the resistance metric tile
 - Fixed indoor bike resistance command encoding to send the scaled raw value expected by BH firmware
 - Fixed indoor bike energy tile/lap display to show kcal (not stride-speed-like values)
 - Added fallback indoor bike energy estimation when direct energy is unavailable
-- Added exact resistance level extraction (1–8) from resistance control write payload logs
+- Added exact resistance level extraction (1–22) from resistance control write payload logs
 - Improved indoor bike kcal accuracy by prioritizing watts-based energy accumulation
-- Increased indoor bike resistance test max to level 100
+- Aligned indoor bike resistance test calibration to the 1–22 supported range
 - Fixed indoor bike kcal formula to derive metabolic energy from power with cycling efficiency
-- Updated indoor bike resistance command scaling factor from 6.25 to 10
-- Updated indoor bike resistance UI mapping to match bike console levels (1–22, app offset corrected)
-- Recalibrated indoor bike resistance control mapping to better match requested app levels on bike console
+- Fixed indoor bike resistance control calibration so selected levels better match bike console values

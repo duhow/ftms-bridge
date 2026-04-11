@@ -1486,11 +1486,11 @@ class MainActivity : AppCompatActivity() {
         val clamped = level.coerceIn(RESISTANCE_MIN_LEVEL, RESISTANCE_MAX_LEVEL)
         val isIndoorBike = fitnessDevice?.machineType == FtmsConstants.MachineType.INDOOR_BIKE
         val deviceLevel = if (isIndoorBike) {
-            (clamped + INDOOR_BIKE_RESISTANCE_COMMAND_OFFSET).coerceAtMost(RESISTANCE_DEVICE_MAX_LEVEL)
+            clamped + FtmsConstants.INDOOR_BIKE_RESISTANCE_COMMAND_OFFSET
         } else {
             clamped
         }
-        val encoded = (deviceLevel * RESISTANCE_LEVEL_MULTIPLIER).roundToInt()
+        val encoded = (deviceLevel * FtmsConstants.RESISTANCE_LEVEL_MULTIPLIER).roundToInt()
         if (!isEncodableAsSint16(encoded)) {
             Log.w(tag, "Encoded resistance out of range: level=$clamped, deviceLevel=$deviceLevel, encoded=$encoded")
             return false
@@ -1512,8 +1512,10 @@ class MainActivity : AppCompatActivity() {
         val rawLevel = sample.resistanceLevel
         if (rawLevel <= 0) return 0
         val isIndoorBike = fitnessDevice?.machineType == FtmsConstants.MachineType.INDOOR_BIKE
-        val adjustedLevel = if (isIndoorBike) rawLevel - INDOOR_BIKE_RESISTANCE_DISPLAY_OFFSET else rawLevel
-        return adjustedLevel.coerceIn(RESISTANCE_MIN_LEVEL, RESISTANCE_MAX_LEVEL)
+        if (!isIndoorBike) return rawLevel.coerceIn(RESISTANCE_MIN_LEVEL, RESISTANCE_MAX_LEVEL)
+        val adjustedLevel = rawLevel - INDOOR_BIKE_RESISTANCE_DISPLAY_OFFSET
+        if (adjustedLevel < RESISTANCE_MIN_LEVEL) return 0
+        return adjustedLevel.coerceAtMost(RESISTANCE_MAX_LEVEL)
     }
 
     private fun updateLapMetricPresentation(machineType: FtmsConstants.MachineType) {
@@ -1794,9 +1796,7 @@ class MainActivity : AppCompatActivity() {
                 val elapsed = i * 30
                 val phase = i.toDouble() / 40.0
                 val cadence = 60.0 + 30.0 * Math.abs(Math.sin(phase * Math.PI * 3)) + 2.0 * (Math.random() - 0.5)
-                val dummyResistanceBaseLevel = 3
-                val dummyResistanceWaveAmplitude = 5
-                val resistance = (dummyResistanceBaseLevel + (dummyResistanceWaveAmplitude * Math.abs(Math.sin(phase * Math.PI * 2))).toInt())
+                val resistance = (DUMMY_RESISTANCE_BASE_LEVEL + (DUMMY_RESISTANCE_WAVE_AMPLITUDE * Math.abs(Math.sin(phase * Math.PI * 2))).toInt())
                     .coerceIn(RESISTANCE_MIN_LEVEL, RESISTANCE_MAX_LEVEL)
                 // Accumulate distance over 30-second interval (cadence × wheel factor)
                 bikeDistanceM += (cadence * 2 * 30 / 60).toInt()
@@ -1827,13 +1827,10 @@ class MainActivity : AppCompatActivity() {
         private const val INCLINE_DECLINE_DANGER_PERCENT = -2.0
         private const val RESISTANCE_MIN_LEVEL = 1
         private const val RESISTANCE_MAX_LEVEL = 22
+        // Display-only offset for parsed resistance telemetry; command offset is in FtmsConstants.
         private const val INDOOR_BIKE_RESISTANCE_DISPLAY_OFFSET = 1
-        // Indoor bike command offset is empirically calibrated from device logs.
-        private const val INDOOR_BIKE_RESISTANCE_COMMAND_OFFSET = 5
-        // Device-level command ceiling includes command offset relative to user-visible 1..22 range.
-        private const val RESISTANCE_DEVICE_MAX_LEVEL = RESISTANCE_MAX_LEVEL + INDOOR_BIKE_RESISTANCE_COMMAND_OFFSET
-        // BH indoor-bike firmware expects FTMS target resistance encoded with this scale.
-        private const val RESISTANCE_LEVEL_MULTIPLIER = 10.0
+        private const val DUMMY_RESISTANCE_BASE_LEVEL = 3
+        private const val DUMMY_RESISTANCE_WAVE_AMPLITUDE = 5
 
         /** Sentinel address used for the virtual (debug) treadmill in the scan list. */
         private const val VIRTUAL_TREADMILL_ADDRESS = "VIRTUAL:TREADMILL"
