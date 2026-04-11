@@ -13,3 +13,5 @@ Add user-facing changes for the next release here.
 - Added exact resistance level extraction (1–8) from resistance control write payload logs
 - Improved indoor bike kcal accuracy by prioritizing watts-based energy accumulation
 - Increased indoor bike resistance test max to level 100
+- Fixed indoor bike kcal formula to derive metabolic energy from power with cycling efficiency
+- Updated indoor bike resistance command scaling factor from 6.25 to 10

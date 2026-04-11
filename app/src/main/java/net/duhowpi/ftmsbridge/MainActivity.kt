@@ -1809,7 +1809,7 @@ class MainActivity : AppCompatActivity() {
         private const val RESISTANCE_MIN_LEVEL = 1
         private const val RESISTANCE_MAX_LEVEL = 100
         // BH indoor-bike firmware expects FTMS target resistance encoded with this scale.
-        private const val RESISTANCE_LEVEL_MULTIPLIER = 6.25
+        private const val RESISTANCE_LEVEL_MULTIPLIER = 10.0
 
         /** Sentinel address used for the virtual (debug) treadmill in the scan list. */
         private const val VIRTUAL_TREADMILL_ADDRESS = "VIRTUAL:TREADMILL"

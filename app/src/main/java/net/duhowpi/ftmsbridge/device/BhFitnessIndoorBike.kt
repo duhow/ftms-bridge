@@ -21,6 +21,7 @@ class BhFitnessIndoorBike(deviceName: String) :
         private const val LEVEL_TORQUE_STEP_NM = 2.0
         // Test-oriented cap to allow validation of high resistance commands.
         private const val MAX_LEVEL = 100
+        private const val CYCLING_GROSS_EFFICIENCY = 0.24
         private const val STRIDES_TO_CADENCE_FACTOR = 2.6
         private const val TWO_PI_RADIANS = kotlin.math.PI * 2.0
     }
@@ -85,6 +86,26 @@ class BhFitnessIndoorBike(deviceName: String) :
         val angularVelocityRadPerSec = cadenceForEstimate * TWO_PI_RADIANS / 60.0
         val fallbackTorqueNm = MIN_LEVEL_TORQUE_NM + (fallbackLevel - 1) * LEVEL_TORQUE_STEP_NM
         return (fallbackTorqueNm * angularVelocityRadPerSec).coerceAtLeast(0.0)
+    }
+
+    private fun estimateEnergyDeltaKcal(
+        cadenceRpm: Double,
+        resistanceLevel: Int,
+        stridesPerMin: Double,
+        reportedPowerW: Int,
+        dtSec: Double
+    ): Double {
+        if (dtSec <= 0.0) return 0.0
+        val powerForEnergyW = estimatePowerForEnergy(
+            cadenceRpm = cadenceRpm,
+            resistanceLevel = resistanceLevel,
+            stridesPerMin = stridesPerMin,
+            reportedPowerW = reportedPowerW
+        )
+        if (powerForEnergyW <= 0.0) return 0.0
+        val mechanicalJoules = powerForEnergyW * dtSec
+        val metabolicJoules = mechanicalJoules / CYCLING_GROSS_EFFICIENCY
+        return metabolicJoules / FitnessDevice.JOULES_PER_KCAL
     }
 
     // BH Fitness indoor bikes repurpose several standard FTMS fields:
@@ -171,13 +192,14 @@ class BhFitnessIndoorBike(deviceName: String) :
             accumulateDistance(syntheticSpeedKmh, dtSec)
             // Prefer measured watts for kcal integration; fallback estimation is used only
             // when the bike omits instantaneous power in a packet.
-            val powerForEnergyW = estimatePowerForEnergy(
+            val energyDeltaKcal = estimateEnergyDeltaKcal(
                 cadenceRpm = filteredCadenceRpm,
                 resistanceLevel = derivedLevel,
                 stridesPerMin = strides,
-                reportedPowerW = sample.instantaneousPowerW
+                reportedPowerW = sample.instantaneousPowerW,
+                dtSec = dtSec
             )
-            accumulateEnergyDelta((powerForEnergyW * dtSec) / FitnessDevice.JOULES_PER_KCAL)
+            accumulateEnergyDelta(energyDeltaKcal)
         }
 
         return sample.copy(
