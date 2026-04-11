@@ -314,8 +314,7 @@ class SessionStateMachine(
         val isTreadmill = machineType == FtmsConstants.MachineType.TREADMILL
         val isBike = machineType == FtmsConstants.MachineType.INDOOR_BIKE ||
                 machineType == FtmsConstants.MachineType.CROSS_TRAINER
-        val isBhIndoorBike = fitnessDevice?.hidesSpeed() == true
-        val showSpeed = !isBhIndoorBike
+        val showSpeed = !isBike
         binding.cardSpeed.visibility = if (showSpeed) View.VISIBLE else View.GONE
         binding.rowCadencePower.visibility = if (isBike) View.VISIBLE else View.GONE
         binding.cardInclination.visibility = if (isTreadmill) View.VISIBLE else View.GONE

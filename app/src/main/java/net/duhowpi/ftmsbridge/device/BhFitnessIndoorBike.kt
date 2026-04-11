@@ -31,7 +31,6 @@ class BhFitnessIndoorBike(deviceName: String) :
         sample.cadenceRpm > MIN_MOVING_CADENCE_RPM || sample.instantaneousPowerW > MIN_MOVING_POWER_W
 
     override fun getSupportedDeviceName(): Regex = Regex("^B01_\\d{5}$")
-    override fun hidesSpeed(): Boolean = true
 
     private var lastSampleTimestampMs: Long = 0L
     private var cumulativeDistanceM: Double = 0.0

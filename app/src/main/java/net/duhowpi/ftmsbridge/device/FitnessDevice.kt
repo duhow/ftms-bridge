@@ -43,16 +43,6 @@ interface FitnessDevice {
     fun isMoving(sample: FitnessSample): Boolean = sample.speedKmh > 0.1
 
     /**
-     * Returns `true` if the device does not produce a meaningful speed metric and the
-     * speed card should be hidden in the UI.
-     *
-     * Default: `false` — speed is shown for all standard FTMS devices.
-     * Override to `true` for devices where the speed field is repurposed or absent
-     * (e.g. BH Fitness indoor bikes).
-     */
-    fun hidesSpeed(): Boolean = false
-
-    /**
      * Estimates the caloric energy expenditure over a time interval using ACSM
      * metabolic equations.
      *
