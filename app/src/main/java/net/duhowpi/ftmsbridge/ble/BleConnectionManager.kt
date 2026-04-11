@@ -220,8 +220,9 @@ class BleConnectionManager(
         val opCode = payload[0].toInt() and 0xFF
         if (opCode != (FtmsConstants.CONTROL_SET_TARGET_RESISTANCE_LEVEL.toInt() and 0xFF)) return null
         val rawValue = (payload[1].toInt() and 0xFF) or ((payload[2].toInt() and 0xFF) shl 8)
-        val decodedLevel = ((rawValue / RESISTANCE_LEVEL_MULTIPLIER).roundToInt() - RESISTANCE_LEVEL_DISPLAY_OFFSET)
-        return decodedLevel.coerceIn(RESISTANCE_LOG_MIN_LEVEL, RESISTANCE_LOG_MAX_LEVEL)
+        val deviceLevel = (rawValue / RESISTANCE_LEVEL_MULTIPLIER).roundToInt()
+        val appLevel = deviceLevel - RESISTANCE_LEVEL_DISPLAY_OFFSET
+        return appLevel.coerceIn(RESISTANCE_LOG_MIN_LEVEL, RESISTANCE_LOG_MAX_LEVEL)
     }
 
     private val gattCallback = object : BluetoothGattCallback() {

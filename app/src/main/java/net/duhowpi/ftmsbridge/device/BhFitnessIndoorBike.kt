@@ -19,7 +19,7 @@ class BhFitnessIndoorBike(deviceName: String) :
         const val MIN_MOVING_CADENCE_RPM = 10.0
         private const val MIN_LEVEL_TORQUE_NM = 2.0
         private const val LEVEL_TORQUE_STEP_NM = 2.0
-        // Raw derived level is clamped to 23; UI applies a -1 offset to match the bike console (1..22).
+        // Internal raw ceiling is 23 because app UI subtracts 1 to match bike-console levels (1..22).
         private const val MAX_LEVEL = 23
         // Typical cycling gross efficiency (~24%): metabolic work ≈ mechanical work / 0.24.
         private const val CYCLING_GROSS_EFFICIENCY = 0.24
@@ -122,7 +122,8 @@ class BhFitnessIndoorBike(deviceName: String) :
     //  Distance         — always 0; derive cumulatively from synthetic speed + time.
     //  Total Energy     — derive cumulatively from power + time.
     //  Resistance Level — FTMS resistance flag is absent in observed packets; derive
-    //                     bike level (1..100) from torque estimated via power+cadence.
+    //                     bike level (1..23 raw, displayed as 1..22) from torque
+    //                     estimated via power+cadence.
     //
     //  Reliable fields: cadenceRpm, instantaneousPowerW, heartRateBpm.
     //  Some sessions show occasional one-packet speed/cadence spikes. To avoid

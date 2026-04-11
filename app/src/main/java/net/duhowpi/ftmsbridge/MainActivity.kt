@@ -1794,7 +1794,9 @@ class MainActivity : AppCompatActivity() {
                 val elapsed = i * 30
                 val phase = i.toDouble() / 40.0
                 val cadence = 60.0 + 30.0 * Math.abs(Math.sin(phase * Math.PI * 3)) + 2.0 * (Math.random() - 0.5)
-                val resistance = (3 + (5 * Math.abs(Math.sin(phase * Math.PI * 2))).toInt())
+                val dummyResistanceBaseLevel = 3
+                val dummyResistanceWaveAmplitude = 5
+                val resistance = (dummyResistanceBaseLevel + (dummyResistanceWaveAmplitude * Math.abs(Math.sin(phase * Math.PI * 2))).toInt())
                     .coerceIn(RESISTANCE_MIN_LEVEL, RESISTANCE_MAX_LEVEL)
                 // Accumulate distance over 30-second interval (cadence × wheel factor)
                 bikeDistanceM += (cadence * 2 * 30 / 60).toInt()
@@ -1826,6 +1828,7 @@ class MainActivity : AppCompatActivity() {
         private const val RESISTANCE_MIN_LEVEL = 1
         private const val RESISTANCE_MAX_LEVEL = 22
         private const val INDOOR_BIKE_RESISTANCE_DISPLAY_OFFSET = 1
+        // Device-level command ceiling includes +1 offset relative to user-visible 1..22 range.
         private const val RESISTANCE_DEVICE_MAX_LEVEL = RESISTANCE_MAX_LEVEL + INDOOR_BIKE_RESISTANCE_DISPLAY_OFFSET
         // BH indoor-bike firmware expects FTMS target resistance encoded with this scale.
         private const val RESISTANCE_LEVEL_MULTIPLIER = 10.0
