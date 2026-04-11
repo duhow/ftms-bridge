@@ -12,3 +12,4 @@ Add user-facing changes for the next release here.
 - Added fallback indoor bike energy estimation when direct energy is unavailable
 - Added exact resistance level extraction (1–8) from resistance control write payload logs
 - Improved indoor bike kcal accuracy by prioritizing watts-based energy accumulation
+- Increased indoor bike resistance test max to level 100
