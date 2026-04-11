@@ -56,6 +56,7 @@ object FtmsConstants {
     const val CONTROL_RESET: Byte = 0x01
     const val CONTROL_SET_TARGET_SPEED: Byte = 0x02
     const val CONTROL_SET_TARGET_INCLINATION: Byte = 0x03
+    const val CONTROL_SET_TARGET_RESISTANCE_LEVEL: Byte = 0x04
     const val CONTROL_START_OR_RESUME: Byte = 0x07
     const val CONTROL_STOP_OR_PAUSE: Byte = 0x08
     const val CONTROL_RESPONSE_CODE = 0x80
