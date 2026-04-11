@@ -194,10 +194,14 @@
                             android:padding="4dp"
                             android:clickable="true" android:focusable="true"
                             android:background="?attr/selectableItemBackground">
-                            <ImageView android:layout_width="16dp" android:layout_height="16dp"
+                            <ImageView
+                                android:id="@+id/lapIconInclination"
+                                android:layout_width="16dp" android:layout_height="16dp"
                                 android:src="@drawable/ic_inclination" app:tint="@color/metric_inclination"
                                 android:contentDescription="@null" />
-                            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                            <TextView
+                                android:id="@+id/lapLabelInclination"
+                                android:layout_width="wrap_content" android:layout_height="wrap_content"
                                 android:text="@string/metric_inclination" android:textSize="9sp"
                                 android:textColor="?android:attr/textColorSecondary" />
                             <LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content"
@@ -205,7 +209,9 @@
                                 <TextView android:id="@+id/lapValueInclination"
                                     android:layout_width="wrap_content" android:layout_height="wrap_content"
                                     android:text="--" android:textSize="20sp" android:textStyle="bold" />
-                                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                                <TextView
+                                    android:id="@+id/lapUnitInclination"
+                                    android:layout_width="wrap_content" android:layout_height="wrap_content"
                                     android:text="@string/unit_percent" android:textSize="11sp"
                                     android:textColor="?android:attr/textColorSecondary"
                                     android:layout_marginStart="2dp" />
@@ -264,10 +270,14 @@
                             android:padding="4dp"
                             android:clickable="true" android:focusable="true"
                             android:background="?attr/selectableItemBackground">
-                            <ImageView android:layout_width="16dp" android:layout_height="16dp"
+                            <ImageView
+                                android:id="@+id/lapIconSpeed"
+                                android:layout_width="16dp" android:layout_height="16dp"
                                 android:src="@drawable/ic_speed" app:tint="@color/metric_speed"
                                 android:contentDescription="@null" />
-                            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                            <TextView
+                                android:id="@+id/lapLabelSpeed"
+                                android:layout_width="wrap_content" android:layout_height="wrap_content"
                                 android:text="@string/metric_speed" android:textSize="9sp"
                                 android:textColor="?android:attr/textColorSecondary" />
                             <LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content"
@@ -275,7 +285,9 @@
                                 <TextView android:id="@+id/lapValueSpeed"
                                     android:layout_width="wrap_content" android:layout_height="wrap_content"
                                     android:text="--" android:textSize="20sp" android:textStyle="bold" />
-                                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                                <TextView
+                                    android:id="@+id/lapUnitSpeed"
+                                    android:layout_width="wrap_content" android:layout_height="wrap_content"
                                     android:text="@string/unit_kmh" android:textSize="11sp"
                                     android:textColor="?android:attr/textColorSecondary"
                                     android:layout_marginStart="2dp" />

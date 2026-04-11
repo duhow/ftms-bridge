@@ -269,9 +269,14 @@ class MainActivity : AppCompatActivity() {
         binding.btnBackToIdle.setOnClickListener { returnToIdle() }
 
         binding.cardSpeed.setOnClickListener { showSpeedControlDialog() }
-        binding.cardInclination.setOnClickListener { showInclineControlDialog() }
+        binding.cardInclination.setOnClickListener {
+            if (isActiveTreadmill) showInclineControlDialog() else showResistanceControlDialog()
+        }
+        binding.cardResistance.setOnClickListener { showResistanceControlDialog() }
         binding.lapColSpeed.setOnClickListener { showSpeedControlDialog() }
-        binding.lapColInclination.setOnClickListener { showInclineControlDialog() }
+        binding.lapColInclination.setOnClickListener {
+            if (isActiveTreadmill) showInclineControlDialog() else showResistanceControlDialog()
+        }
 
         binding.btnViewLap.setOnClickListener { setWorkoutView(false) }
         binding.btnViewChart.setOnClickListener { setWorkoutView(true) }
@@ -316,6 +321,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updateLapView(sample: FitnessSample) {
+        val isTreadmill = isActiveTreadmill
         val distM = sample.totalDistanceM
         val lapProgressM = (distM - lapStartDistanceM).coerceAtLeast(0)
         if (lapProgressM >= LAP_DISTANCE_METERS) {
@@ -334,15 +340,19 @@ class MainActivity : AppCompatActivity() {
         binding.txtLapTime.text = String.format("%d:%02d", lm, ls)
         // txtLapCount (total elapsed) is updated exclusively by updateElapsedDisplay / elapsedTickRunnable
         // Inline metrics row inside the lap card
-        binding.lapValueSpeed.text = String.format("%.1f", sample.speedKmh)
-        binding.lapValueInclination.text = "${resolveDisplayIncline(sample).roundToInt()}"
-        if (sample.stridesPerMin > 0) {
-            binding.lapValueEnergy.text = String.format("%.1f", sample.stridesPerMin)
-            binding.lapUnitEnergy.setText(R.string.unit_per_min)
-        } else {
-            binding.lapValueEnergy.text = "${sample.totalEnergyKcal}"
-            binding.lapUnitEnergy.setText(R.string.unit_kcal)
+        binding.lapValueSpeed.text = when {
+            isTreadmill -> String.format("%.1f", sample.speedKmh)
+            sample.cadenceRpm > 0 -> String.format("%.0f", sample.cadenceRpm)
+            else -> "--"
         }
+        val displayResistanceLevel = resolveDisplayResistanceLevel(sample)
+        binding.lapValueInclination.text = when {
+            isTreadmill -> "${resolveDisplayIncline(sample).roundToInt()}"
+            displayResistanceLevel > 0 -> "$displayResistanceLevel"
+            else -> "--"
+        }
+        binding.lapValueEnergy.text = "${sample.totalEnergyKcal}"
+        binding.lapUnitEnergy.setText(R.string.unit_kcal)
         binding.lapValueHr.text = if (sample.heartRateBpm > 0) "${sample.heartRateBpm}" else "--"
     }
 
@@ -358,6 +368,7 @@ class MainActivity : AppCompatActivity() {
         stateMachine.onConnected()
         updateConnectionStatus()
         stateMachine.applyMetricVisibility(dummy.machineType)
+        updateLapMetricPresentation(dummy.machineType)
         dummyTreadmillHandler.removeCallbacks(dummyTreadmillRunnable)
         dummyTreadmillHandler.post(dummyTreadmillRunnable)
     }
@@ -851,9 +862,13 @@ class MainActivity : AppCompatActivity() {
         val ftmsConnected = ftmsConnectionManager?.isConnected == true || dummyTreadmill != null
         val hrConnected = hrConnectionManager?.isConnected == true
         val hasHrDevice = hrConnectionManager != null
+        val machineType = dummyTreadmill?.machineType
+            ?: fitnessDevice?.machineType
+            ?: FtmsConstants.MachineType.UNKNOWN
 
         // Delegate indicator colours and HR-row visibility to the state machine
         stateMachine.applyConnectionIndicators(ftmsConnected, hrConnected, hasHrDevice)
+        updateLapMetricPresentation(machineType)
 
         binding.txtFtmsDevice.text = when {
             dummyTreadmill != null -> dummyTreadmill?.deviceName ?: getString(R.string.connected)
@@ -934,20 +949,14 @@ class MainActivity : AppCompatActivity() {
         binding.valueDistance.text = String.format("%.2f", sample.totalDistanceM / 1000.0)
         if (sample.heartRateBpm > 0) binding.valueHeartRate.text = "${sample.heartRateBpm}"
 
-        // Energy tile: show strides/min (BH Fitness indoor bike) when available,
-        // otherwise show calories. Always show a numeric value once data is received.
-        if (sample.stridesPerMin > 0) {
-            binding.labelEnergy.setText(R.string.metric_strides)
-            binding.unitEnergy.setText(R.string.unit_per_min)
-            binding.valueEnergy.text = String.format("%.1f", sample.stridesPerMin)
-        } else {
-            binding.labelEnergy.setText(R.string.metric_energy)
-            binding.unitEnergy.setText(R.string.unit_kcal)
-            binding.valueEnergy.text = "${sample.totalEnergyKcal}"
-        }
+        // Always show energy as kcal in the dashboard.
+        binding.labelEnergy.setText(R.string.metric_energy)
+        binding.unitEnergy.setText(R.string.unit_kcal)
+        binding.valueEnergy.text = "${sample.totalEnergyKcal}"
 
         binding.valueInclination.text = "${resolveDisplayIncline(sample).roundToInt()}"
-        binding.valueResistance.text = if (sample.resistanceLevel > 0) "${sample.resistanceLevel}" else "--"
+        val displayResistanceLevel = resolveDisplayResistanceLevel(sample)
+        binding.valueResistance.text = if (displayResistanceLevel > 0) "$displayResistanceLevel" else "--"
 
         // Elapsed display is driven by the 1 s tick handler; sync the tick counter here
         // (taking the max so it never goes backwards).
@@ -961,7 +970,7 @@ class MainActivity : AppCompatActivity() {
         val isTreadmill = isActiveTreadmill
         liveSpeedPoints.add(if (isTreadmill) sample.speedKmh.toFloat() else sample.cadenceRpm.toFloat())
         livePaceSecondaryPoints.add(
-            if (isTreadmill) resolveDisplayIncline(sample).toFloat() else sample.resistanceLevel.toFloat()
+            if (isTreadmill) resolveDisplayIncline(sample).toFloat() else resolveDisplayResistanceLevel(sample).toFloat()
         )
         liveHrPoints.add(sample.heartRateBpm.toFloat())
         if (isChartViewActive) updateLiveChart()
@@ -1316,6 +1325,35 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun showResistanceControlDialog() {
+        val cm = ftmsConnectionManager
+        val machine = fitnessDevice
+        val supportsResistanceControl = machine?.machineType == FtmsConstants.MachineType.INDOOR_BIKE ||
+            machine?.machineType == FtmsConstants.MachineType.CROSS_TRAINER
+        if (cm?.isConnected != true || !supportsResistanceControl) {
+            Toast.makeText(this, getString(R.string.control_not_available), Toast.LENGTH_SHORT).show()
+            return
+        }
+        val current = (lastFtmsSample?.let { resolveDisplayResistanceLevel(it) }
+            ?.coerceIn(RESISTANCE_MIN_LEVEL, RESISTANCE_MAX_LEVEL)
+            ?: RESISTANCE_MIN_LEVEL).toDouble()
+        showAdjustDialog(
+            title = getString(R.string.control_set_resistance_title),
+            label = getString(R.string.control_resistance_label),
+            min = RESISTANCE_MIN_LEVEL.toDouble(),
+            max = RESISTANCE_MAX_LEVEL.toDouble(),
+            step = 1.0,
+            largeStep = 1.0,
+            initial = current,
+            unitFormatter = { value -> "${value.roundToInt()}" },
+            rangeText = getString(R.string.control_range_resistance, RESISTANCE_MIN_LEVEL, RESISTANCE_MAX_LEVEL),
+            dangerPredicate = { false },
+            showAdjustButtons = false
+        ) { selected ->
+            sendTargetResistanceLevel(selected.roundToInt())
+        }
+    }
+
     private fun showAdjustDialog(
         title: String,
         label: String,
@@ -1443,9 +1481,72 @@ class MainActivity : AppCompatActivity() {
         return cm.sendControlPoint(payload)
     }
 
+    private fun sendTargetResistanceLevel(level: Int): Boolean {
+        val cm = ftmsConnectionManager ?: return false
+        val clamped = level.coerceIn(RESISTANCE_MIN_LEVEL, RESISTANCE_MAX_LEVEL)
+        val isIndoorBike = fitnessDevice?.machineType == FtmsConstants.MachineType.INDOOR_BIKE
+        val deviceLevel = if (isIndoorBike) {
+            clamped + FtmsConstants.INDOOR_BIKE_RESISTANCE_COMMAND_OFFSET
+        } else {
+            clamped
+        }
+        val encoded = (deviceLevel * FtmsConstants.RESISTANCE_LEVEL_MULTIPLIER).roundToInt()
+        if (!isEncodableAsSint16(encoded)) {
+            Log.w(tag, "Encoded resistance out of range: level=$clamped, deviceLevel=$deviceLevel, encoded=$encoded")
+            return false
+        }
+        val payload = ByteBuffer.allocate(3)
+            .order(ByteOrder.LITTLE_ENDIAN)
+            .put(FtmsConstants.CONTROL_SET_TARGET_RESISTANCE_LEVEL)
+            .putShort(encoded.toShort())
+            .array()
+        return cm.sendControlPoint(payload)
+    }
+
     /** Returns the display-ready inclination for [sample], delegating to the active device. */
     private fun resolveDisplayIncline(sample: FitnessSample): Double =
         fitnessDevice?.getDisplayIncline(sample) ?: sample.inclinationPercent
+
+    /** Returns the display-ready resistance level for [sample]. */
+    private fun resolveDisplayResistanceLevel(sample: FitnessSample): Int {
+        val rawLevel = sample.resistanceLevel
+        if (rawLevel <= 0) return 0
+        val isIndoorBike = fitnessDevice?.machineType == FtmsConstants.MachineType.INDOOR_BIKE
+        if (!isIndoorBike) return rawLevel.coerceIn(RESISTANCE_MIN_LEVEL, RESISTANCE_MAX_LEVEL)
+        val adjustedLevel = rawLevel - INDOOR_BIKE_RESISTANCE_DISPLAY_OFFSET
+        if (adjustedLevel < RESISTANCE_MIN_LEVEL) return 0
+        return adjustedLevel.coerceAtMost(RESISTANCE_MAX_LEVEL)
+    }
+
+    private fun updateLapMetricPresentation(machineType: FtmsConstants.MachineType) {
+        val isBike = machineType == FtmsConstants.MachineType.INDOOR_BIKE ||
+            machineType == FtmsConstants.MachineType.CROSS_TRAINER
+        val speedIconColor = ContextCompat.getColor(
+            this,
+            if (isBike) R.color.metric_cadence else R.color.metric_speed
+        )
+        val secondaryIconColor = ContextCompat.getColor(
+            this,
+            if (isBike) R.color.metric_resistance else R.color.metric_inclination
+        )
+        if (isBike) {
+            binding.lapIconSpeed.setImageResource(R.drawable.ic_cadence)
+            binding.lapLabelSpeed.setText(R.string.metric_cadence)
+            binding.lapUnitSpeed.setText(R.string.unit_rpm)
+            binding.lapIconInclination.setImageResource(R.drawable.ic_resistance)
+            binding.lapLabelInclination.setText(R.string.metric_resistance)
+            binding.lapUnitInclination.visibility = View.GONE
+        } else {
+            binding.lapIconSpeed.setImageResource(R.drawable.ic_speed)
+            binding.lapLabelSpeed.setText(R.string.metric_speed)
+            binding.lapUnitSpeed.setText(R.string.unit_kmh)
+            binding.lapIconInclination.setImageResource(R.drawable.ic_inclination)
+            binding.lapLabelInclination.setText(R.string.metric_inclination)
+            binding.lapUnitInclination.visibility = View.VISIBLE
+        }
+        binding.lapIconSpeed.setColorFilter(speedIconColor)
+        binding.lapIconInclination.setColorFilter(secondaryIconColor)
+    }
 
     private fun calculateFallbackElapsedSec(sampleTimestampMs: Long): Int {
         val deltaMs = sampleTimestampMs - elapsedFallbackStartTime
@@ -1695,7 +1796,8 @@ class MainActivity : AppCompatActivity() {
                 val elapsed = i * 30
                 val phase = i.toDouble() / 40.0
                 val cadence = 60.0 + 30.0 * Math.abs(Math.sin(phase * Math.PI * 3)) + 2.0 * (Math.random() - 0.5)
-                val resistance = (3 + (5 * Math.abs(Math.sin(phase * Math.PI * 2))).toInt()).coerceIn(1, 11)
+                val resistance = (DUMMY_RESISTANCE_BASE_LEVEL + (DUMMY_RESISTANCE_WAVE_AMPLITUDE * Math.abs(Math.sin(phase * Math.PI * 2))).toInt())
+                    .coerceIn(RESISTANCE_MIN_LEVEL, RESISTANCE_MAX_LEVEL)
                 // Accumulate distance over 30-second interval (cadence × wheel factor)
                 bikeDistanceM += (cadence * 2 * 30 / 60).toInt()
                 WorkoutSample(
@@ -1723,6 +1825,12 @@ class MainActivity : AppCompatActivity() {
         private const val SPEED_DANGER_KMH = 20.0
         private const val INCLINE_DANGER_PERCENT = 12.0
         private const val INCLINE_DECLINE_DANGER_PERCENT = -2.0
+        private const val RESISTANCE_MIN_LEVEL = 1
+        private const val RESISTANCE_MAX_LEVEL = 22
+        // Display-only offset for parsed resistance telemetry; command offset is in FtmsConstants.
+        private const val INDOOR_BIKE_RESISTANCE_DISPLAY_OFFSET = 1
+        private const val DUMMY_RESISTANCE_BASE_LEVEL = 3
+        private const val DUMMY_RESISTANCE_WAVE_AMPLITUDE = 5
 
         /** Sentinel address used for the virtual (debug) treadmill in the scan list. */
         private const val VIRTUAL_TREADMILL_ADDRESS = "VIRTUAL:TREADMILL"

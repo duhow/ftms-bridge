@@ -19,7 +19,12 @@ class BhFitnessIndoorBike(deviceName: String) :
         const val MIN_MOVING_CADENCE_RPM = 10.0
         private const val MIN_LEVEL_TORQUE_NM = 2.0
         private const val LEVEL_TORQUE_STEP_NM = 2.0
-        private const val MAX_LEVEL = 11
+        // Raw internal ceiling for torque-derived level values before UI display offset is applied.
+        private const val MAX_LEVEL = 23
+        // Typical cycling gross efficiency (~24%): metabolic work ≈ mechanical work / 0.24.
+        private const val CYCLING_GROSS_EFFICIENCY = 0.24
+        // Empirical BH-specific mapping between decoded strides/min and crank cadence RPM.
+        private const val STRIDES_TO_CADENCE_FACTOR = 2.6
         private const val TWO_PI_RADIANS = kotlin.math.PI * 2.0
     }
 
@@ -49,11 +54,60 @@ class BhFitnessIndoorBike(deviceName: String) :
         }
         val torqueNm = powerW.toDouble() / angularVelocityRadPerSec
         // Empirical mapping for BH indoor-bike console levels:
-        // level ~= round((torqueNm - 2.0) / 2.0) + 1, clamped to 1..11 while moving.
+        // level ~= round((torqueNm - 2.0) / 2.0) + 1, clamped to 1..23 while moving.
         val level = kotlin.math.round((torqueNm - MIN_LEVEL_TORQUE_NM) / LEVEL_TORQUE_STEP_NM).toInt() + 1
         val clampedLevel = level.coerceIn(1, MAX_LEVEL)
         lastDerivedLevel = clampedLevel
         return clampedLevel
+    }
+
+    private fun estimatePowerForEnergy(
+        cadenceRpm: Double,
+        resistanceLevel: Int,
+        stridesPerMin: Double,
+        reportedPowerW: Int
+    ): Double {
+        val nonNegativePowerW = reportedPowerW.coerceAtLeast(0).toDouble()
+        if (nonNegativePowerW > 0.0) return nonNegativePowerW
+
+        val fallbackLevel = when {
+            resistanceLevel > 0 -> resistanceLevel
+            lastDerivedLevel > 0 -> lastDerivedLevel
+            else -> 0
+        }
+        if (fallbackLevel <= 0) return 0.0
+
+        val cadenceForEstimate = when {
+            cadenceRpm >= MIN_MOVING_CADENCE_RPM -> cadenceRpm
+            stridesPerMin > 0.0 -> (stridesPerMin * STRIDES_TO_CADENCE_FACTOR)
+                .coerceIn(0.0, MAX_VALID_CADENCE_RPM)
+            else -> 0.0
+        }
+        if (cadenceForEstimate < MIN_MOVING_CADENCE_RPM) return 0.0
+
+        val angularVelocityRadPerSec = cadenceForEstimate * TWO_PI_RADIANS / 60.0
+        val fallbackTorqueNm = MIN_LEVEL_TORQUE_NM + (fallbackLevel - 1) * LEVEL_TORQUE_STEP_NM
+        return (fallbackTorqueNm * angularVelocityRadPerSec).coerceAtLeast(0.0)
+    }
+
+    private fun estimateEnergyDeltaKcal(
+        cadenceRpm: Double,
+        resistanceLevel: Int,
+        stridesPerMin: Double,
+        reportedPowerW: Int,
+        dtSec: Double
+    ): Double {
+        if (dtSec <= 0.0) return 0.0
+        val powerForEnergyW = estimatePowerForEnergy(
+            cadenceRpm = cadenceRpm,
+            resistanceLevel = resistanceLevel,
+            stridesPerMin = stridesPerMin,
+            reportedPowerW = reportedPowerW
+        )
+        if (powerForEnergyW <= 0.0) return 0.0
+        val mechanicalJoules = powerForEnergyW * dtSec
+        val metabolicJoules = mechanicalJoules / CYCLING_GROSS_EFFICIENCY
+        return metabolicJoules / FitnessDevice.JOULES_PER_KCAL
     }
 
     // BH Fitness indoor bikes repurpose several standard FTMS fields:
@@ -68,7 +122,8 @@ class BhFitnessIndoorBike(deviceName: String) :
     //  Distance         — always 0; derive cumulatively from synthetic speed + time.
     //  Total Energy     — derive cumulatively from power + time.
     //  Resistance Level — FTMS resistance flag is absent in observed packets; derive
-    //                     bike level (1..11) from torque estimated via power+cadence.
+    //                     bike level (1..23 raw) from torque estimated via power+cadence.
+    //                     UI applies an offset and treats 0 as unavailable, so users see 1..22.
     //
     //  Reliable fields: cadenceRpm, instantaneousPowerW, heartRateBpm.
     //  Some sessions show occasional one-packet speed/cadence spikes. To avoid
@@ -138,8 +193,16 @@ class BhFitnessIndoorBike(deviceName: String) :
 
         if (dtSec > 0.0) {
             accumulateDistance(syntheticSpeedKmh, dtSec)
-            val nonNegativePowerW = sample.instantaneousPowerW.coerceAtLeast(0).toDouble()
-            accumulateEnergyDelta((nonNegativePowerW * dtSec) / FitnessDevice.JOULES_PER_KCAL)
+            // Prefer measured watts for kcal integration; fallback estimation is used only
+            // when the bike omits instantaneous power in a packet.
+            val energyDeltaKcal = estimateEnergyDeltaKcal(
+                cadenceRpm = filteredCadenceRpm,
+                resistanceLevel = derivedLevel,
+                stridesPerMin = strides,
+                reportedPowerW = sample.instantaneousPowerW,
+                dtSec = dtSec
+            )
+            accumulateEnergyDelta(energyDeltaKcal)
         }
 
         return sample.copy(
