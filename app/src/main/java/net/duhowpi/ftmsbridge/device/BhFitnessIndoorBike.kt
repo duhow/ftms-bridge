@@ -27,6 +27,11 @@ class BhFitnessIndoorBike(deviceName: String) :
         return if (energyField > 0) energyField / STRIDES_ENCODING_FACTOR else 0.0
     }
 
+    override fun isMoving(sample: FitnessSample): Boolean =
+        sample.cadenceRpm > MIN_MOVING_CADENCE_RPM || sample.instantaneousPowerW > MIN_MOVING_POWER_W
+
+    override fun hidesSpeed(): Boolean = true
+
     private var lastSampleTimestampMs: Long = 0L
     private var cumulativeDistanceM: Double = 0.0
     private var cumulativeEnergyKcal: Double = 0.0
@@ -137,9 +142,9 @@ class BhFitnessIndoorBike(deviceName: String) :
         val derivedLevel = deriveResistanceLevel(filteredCadenceRpm, sample.instantaneousPowerW)
 
         if (dtSec > 0.0) {
-            cumulativeDistanceM += syntheticSpeedKmh * dtSec * BhFitnessFtmsDevice.METERS_PER_KMH_PER_SEC
+            cumulativeDistanceM += syntheticSpeedKmh * dtSec * FitnessDevice.METERS_PER_KMH_PER_SEC
             val nonNegativePowerW = sample.instantaneousPowerW.coerceAtLeast(0).toDouble()
-            val energyDeltaKcal = (nonNegativePowerW * dtSec) / BhFitnessFtmsDevice.JOULES_PER_KCAL
+            val energyDeltaKcal = (nonNegativePowerW * dtSec) / FitnessDevice.JOULES_PER_KCAL
             cumulativeEnergyKcal += energyDeltaKcal
         }
 

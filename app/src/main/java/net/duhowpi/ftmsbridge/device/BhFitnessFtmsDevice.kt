@@ -1,12 +1,16 @@
 package net.duhowpi.ftmsbridge.device
 
+import android.util.Log
 import net.duhowpi.ftmsbridge.ftms.FtmsConstants
+import net.duhowpi.ftmsbridge.model.FitnessSample
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 
 /**
  * Abstract base class for all BH Fitness FTMS devices.
  *
- * Centralises BH Fitness / iConcept-specific detection logic and shared physical
- * constants so that concrete device classes ([BhFitnessTreadmill],
+ * Centralises BH Fitness / iConcept-specific detection logic and the iConcept
+ * proprietary packet parser so that concrete device classes ([BhFitnessTreadmill],
  * [BhFitnessIndoorBike], [BhFitnessVerticalBike]) do not need to redeclare them.
  */
 abstract class BhFitnessFtmsDevice(
@@ -14,25 +18,43 @@ abstract class BhFitnessFtmsDevice(
     machineType: FtmsConstants.MachineType
 ) : FtmsDevice(deviceName, machineType) {
 
+    /**
+     * Parses the BH Fitness iConcept proprietary 0xC112 notification packet.
+     *
+     * The packet header is [F1 0D] for a workout-counter message.
+     * Layout (all little-endian):
+     *   [0]    F1  – header
+     *   [1]    0D  – sub-type (workout data)
+     *   [2-3]  UINT16  elapsed time (seconds)
+     *   [4-6]  UINT24  total distance (metres)
+     *   [7-8]  UINT16  total energy (kcal); 0xFFFF = not available
+     *
+     * Returns null if the data does not match the expected header or is too short.
+     */
+    protected fun parseIConceptWorkoutData(data: ByteArray): FitnessSample? {
+        if (data.size < 9) return null
+        if ((data[0].toInt() and 0xFF) != 0xF1 || (data[1].toInt() and 0xFF) != 0x0D) return null
+        val buf = ByteBuffer.wrap(data).order(ByteOrder.LITTLE_ENDIAN)
+        buf.position(2)
+        val elapsedTimeSec = buf.short.toInt() and 0xFFFF
+        val b0 = buf.get().toInt() and 0xFF
+        val b1 = buf.get().toInt() and 0xFF
+        val b2 = buf.get().toInt() and 0xFF
+        val distanceM = b0 or (b1 shl 8) or (b2 shl 16)
+        val rawCalories = buf.short.toInt() and 0xFFFF
+        val calories = if (rawCalories == FtmsConstants.INVALID_UINT16) 0 else rawCalories
+        Log.d(TAG, "iConcept C112: elapsed=${elapsedTimeSec}s dist=${distanceM}m kcal=${calories}")
+        return FitnessSample(elapsedTimeSec = elapsedTimeSec, totalDistanceM = distanceM, totalEnergyKcal = calories)
+    }
+
+    /**
+     * Returns the [Regex] defined in the companion object so the instance-level
+     * [matchesDevice] inherited from [FtmsDevice] works correctly.
+     */
+    override fun getSupportedDeviceName(): Regex = Companion.getSupportedDeviceName()
+
     companion object {
-        // ── Physical constants ──────────────────────────────────────────────────
-
-        /** km/h → m/s conversion factor (1 km/h = 1/3.6 m/s). */
-        const val METERS_PER_KMH_PER_SEC = 1.0 / 3.6
-
-        /** Energy conversion factor: 1 kcal = 4184 J. */
-        const val JOULES_PER_KCAL = 4184.0
-
-        // ── BH Fitness / iConcept device-name detection ─────────────────────────
-        //
-        // iConcept devices advertise a short-code name of the form
-        // <letter><two digits>_<5 hex chars>, e.g. "B01_479D7" (indoor bike) or
-        // "C01_12DB5" (vertical bike).  This is checked in addition to the
-        // human-readable brand/product name patterns below.
-        private val iConceptShortNamePattern = Regex(
-            "^[a-z]\\d{2}_[0-9a-f]{5}$",
-            RegexOption.IGNORE_CASE
-        )
+        private const val TAG = "BhFitnessFtmsDevice"
 
         /**
          * Returns a [Regex] that matches any BH Fitness or iConcept device name.
@@ -49,30 +71,5 @@ abstract class BhFitnessFtmsDevice(
             "(?:^bh|bhfitness|bh fitness|i\\.concept|^[a-z]\\d{2}_[0-9a-f]{5}$)",
             RegexOption.IGNORE_CASE
         )
-
-        /**
-         * Returns `true` if the advertised [name] (and optional [macAddress]) belong
-         * to a BH Fitness or iConcept device.
-         *
-         * TODO: MAC address prefix matching (e.g. known BH Fitness OUI prefixes)
-         *   is not yet implemented; currently only [name] is evaluated.
-         */
-        fun matchesDevice(name: String, macAddress: String? = null): Boolean =
-            isBhFitness(name)
-
-        /**
-         * Returns `true` if [name] identifies a BH Fitness or iConcept device.
-         *
-         * Checks for known brand/product name substrings as well as the iConcept
-         * short-code name format.
-         */
-        fun isBhFitness(name: String): Boolean {
-            val lower = name.lowercase()
-            return lower.startsWith("bh") ||
-                    lower.contains("i.concept") ||
-                    lower.contains("bhfitness") ||
-                    lower.contains("bh fitness") ||
-                    iConceptShortNamePattern.matches(lower)
-        }
     }
 }

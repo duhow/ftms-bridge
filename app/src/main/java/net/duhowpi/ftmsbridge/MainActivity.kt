@@ -39,7 +39,6 @@ import net.duhowpi.ftmsbridge.data.AppDatabase
 import net.duhowpi.ftmsbridge.data.WorkoutSample
 import net.duhowpi.ftmsbridge.data.WorkoutSession
 import net.duhowpi.ftmsbridge.databinding.ActivityMainBinding
-import net.duhowpi.ftmsbridge.device.BhFitnessIndoorBike
 import net.duhowpi.ftmsbridge.device.DummyTreadmill
 import net.duhowpi.ftmsbridge.device.FitnessDevice
 import net.duhowpi.ftmsbridge.device.FtmsDevice
@@ -652,14 +651,7 @@ class MainActivity : AppCompatActivity() {
                     sample.copy(heartRateBpm = lastHeartRateBpm) else sample
                 lastFtmsSample = mergedSample
                 // Detect machine running state for devices without machine-status updates.
-                // BH indoor bikes do not provide a meaningful speed field, so use cadence/power.
-                val isBhIndoorBike = fitnessDevice is BhFitnessIndoorBike
-                val nowRunning = if (isBhIndoorBike) {
-                    mergedSample.cadenceRpm > BhFitnessIndoorBike.MIN_MOVING_CADENCE_RPM ||
-                            mergedSample.instantaneousPowerW > BhFitnessIndoorBike.MIN_MOVING_POWER_W
-                } else {
-                    mergedSample.speedKmh > 0.1
-                }
+                val nowRunning = fitnessDevice?.isMoving(mergedSample) ?: (mergedSample.speedKmh > 0.1)
                 if (nowRunning != isMachineRunning) {
                     isMachineRunning = nowRunning
                     runOnUiThread { updateMachineRunningState() }

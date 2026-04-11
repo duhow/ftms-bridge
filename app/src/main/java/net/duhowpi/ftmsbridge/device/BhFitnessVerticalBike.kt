@@ -1,7 +1,6 @@
 package net.duhowpi.ftmsbridge.device
 
 import net.duhowpi.ftmsbridge.ftms.FtmsConstants
-import net.duhowpi.ftmsbridge.ftms.FtmsDataParser
 import net.duhowpi.ftmsbridge.model.FitnessSample
 
 class BhFitnessVerticalBike(deviceName: String) :
@@ -31,7 +30,7 @@ class BhFitnessVerticalBike(deviceName: String) :
     }
 
     override fun onIConceptData(data: ByteArray) {
-        val parsed = FtmsDataParser.parseIConceptWorkoutData(data) ?: return
+        val parsed = parseIConceptWorkoutData(data) ?: return
         iConceptElapsedSec = parsed.elapsedTimeSec
         iConceptDistanceM = parsed.totalDistanceM
         iConceptCalories = parsed.totalEnergyKcal

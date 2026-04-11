@@ -2,7 +2,6 @@ package net.duhowpi.ftmsbridge.device
 
 import android.util.Log
 import net.duhowpi.ftmsbridge.ftms.FtmsConstants
-import net.duhowpi.ftmsbridge.ftms.FtmsDataParser
 import net.duhowpi.ftmsbridge.model.FitnessSample
 import kotlin.math.roundToInt
 
@@ -92,7 +91,7 @@ class BhFitnessTreadmill(deviceName: String) :
         }
 
         if (dtSec > 0.0) {
-            derivedDistanceM += sample.speedKmh * dtSec * BhFitnessFtmsDevice.METERS_PER_KMH_PER_SEC
+            derivedDistanceM += sample.speedKmh * dtSec * FitnessDevice.METERS_PER_KMH_PER_SEC
             derivedEnergyKcal += estimateEnergyDeltaKcal(sample.speedKmh, correctedIncline, dtSec)
         }
 
@@ -151,7 +150,7 @@ class BhFitnessTreadmill(deviceName: String) :
     }
 
     override fun onIConceptData(data: ByteArray) {
-        val parsed = FtmsDataParser.parseIConceptWorkoutData(data) ?: return
+        val parsed = parseIConceptWorkoutData(data) ?: return
         iConceptDistanceM = parsed.totalDistanceM
         iConceptCalories = parsed.totalEnergyKcal
         if (parsed.elapsedTimeSec > 0) {
@@ -162,6 +161,5 @@ class BhFitnessTreadmill(deviceName: String) :
         // with derived progression because this device does not keep streaming counters.
         derivedDistanceM = kotlin.math.max(derivedDistanceM, parsed.totalDistanceM.toDouble())
         derivedEnergyKcal = kotlin.math.max(derivedEnergyKcal, parsed.totalEnergyKcal.toDouble())
-        Log.d(tag, "iconcept C112: elapsed=${parsed.elapsedTimeSec}s dist=${parsed.totalDistanceM}m kcal=${parsed.totalEnergyKcal}")
     }
 }
