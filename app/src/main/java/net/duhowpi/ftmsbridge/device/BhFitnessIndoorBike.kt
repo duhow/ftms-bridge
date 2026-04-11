@@ -19,9 +19,11 @@ class BhFitnessIndoorBike(deviceName: String) :
         const val MIN_MOVING_CADENCE_RPM = 10.0
         private const val MIN_LEVEL_TORQUE_NM = 2.0
         private const val LEVEL_TORQUE_STEP_NM = 2.0
-        // Test-oriented cap to allow validation of high resistance commands.
+        // Keep a broad safety cap so derived levels remain bounded for higher-resistance bikes.
         private const val MAX_LEVEL = 100
+        // Typical cycling gross efficiency (~24%): metabolic work ≈ mechanical work / 0.24.
         private const val CYCLING_GROSS_EFFICIENCY = 0.24
+        // Empirical BH-specific mapping between decoded strides/min and crank cadence RPM.
         private const val STRIDES_TO_CADENCE_FACTOR = 2.6
         private const val TWO_PI_RADIANS = kotlin.math.PI * 2.0
     }
