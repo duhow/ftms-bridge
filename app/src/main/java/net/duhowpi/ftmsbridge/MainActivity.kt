@@ -501,7 +501,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updateScanListUI() {
-        if (stateMachine.state.hasActiveSession) return
+        if (stateMachine.state.hasActiveSession || stateMachine.state is SessionState.Stopped) return
         // Merge current scan results with known devices (previously connected) that
         // are not present in the current scan — so the user can always reconnect.
         val combined = scanResultsMap.toMutableMap()
