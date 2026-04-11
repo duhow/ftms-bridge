@@ -90,7 +90,7 @@ class BhFitnessTreadmill(deviceName: String) :
         if (declineEntry != null) {
             return declineEntry.key.toDouble()
         }
-        return rawInclination / INCLINE_SCALE
+        return (rawInclination / INCLINE_SCALE)
             .coerceIn(INCLINE_PHYSICAL_MIN_PERCENT, INCLINE_PHYSICAL_MAX_PERCENT)
     }
 
@@ -98,11 +98,16 @@ class BhFitnessTreadmill(deviceName: String) :
      * Encodes a physical inclination percentage to the raw SINT16 value expected by
      * BH Fitness treadmills in the FTMS Control Point Set Target Inclination command.
      *
-     * Uses standard FTMS encoding for control writes (SINT16 in 0.1 % units), which
-     * BH treadmills accept for both positive and negative target commands.
+     * Uses treadmill-specific encoding:
+     * - decline targets use known firmware raw codes
+     * - positive/flat targets use the inverse of [INCLINE_SCALE]
      */
     private fun toRawIncline(incline: Double): Int {
-        return (incline * 10.0).roundToInt()
+        val rounded = incline.roundToInt()
+        if (abs(incline - rounded.toDouble()) < PERCENT_ROUNDING_TOLERANCE) {
+            DECLINE_RAW[rounded]?.let { return it }
+        }
+        return (incline * INCLINE_SCALE).roundToInt()
     }
 
     companion object {
