@@ -126,7 +126,8 @@
                     android:text=""
                     app:icon="@drawable/ic_refresh"
                     app:iconSize="24dp"
-                    app:iconGravity="textCenter" />
+                    app:iconGravity="textStart"
+                    app:iconPadding="0dp" />
             </LinearLayout>
 
             <TextView
