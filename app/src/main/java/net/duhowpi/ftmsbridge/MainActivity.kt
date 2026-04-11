@@ -40,6 +40,7 @@ import net.duhowpi.ftmsbridge.data.WorkoutSample
 import net.duhowpi.ftmsbridge.data.WorkoutSession
 import net.duhowpi.ftmsbridge.databinding.ActivityMainBinding
 import net.duhowpi.ftmsbridge.device.BhFitnessFtmsDevice
+import net.duhowpi.ftmsbridge.device.DummyBike
 import net.duhowpi.ftmsbridge.device.DummyTreadmill
 import net.duhowpi.ftmsbridge.device.FitnessDevice
 import net.duhowpi.ftmsbridge.device.FtmsDevice
@@ -117,6 +118,10 @@ class MainActivity : AppCompatActivity() {
     private val isActiveTreadmill: Boolean
         get() = dummyTreadmill != null || fitnessDevice?.machineType == FtmsConstants.MachineType.TREADMILL
 
+    private val isActiveBike: Boolean
+        get() = dummyBike != null || fitnessDevice?.machineType == FtmsConstants.MachineType.INDOOR_BIKE ||
+            fitnessDevice?.machineType == FtmsConstants.MachineType.CROSS_TRAINER
+
     // 1-second elapsed-time tick: runs while recording to give a smooth per-second
     // display between BLE notifications (which arrive every ~2 s).  The counter is
     // monotonically non-decreasing: BLE-reported elapsed syncs it forward, never back.
@@ -147,6 +152,25 @@ class MainActivity : AppCompatActivity() {
             updateDashboard(sample)
             if (isRecording && currentSessionId != null) saveSample(sample)
             dummyTreadmillHandler.postDelayed(this, 2000)
+        }
+    }
+
+    // DummyBike (debug only)
+    private var dummyBike: DummyBike? = null
+    private val dummyBikeHandler = Handler(Looper.getMainLooper())
+    private val dummyBikeRunnable = object : Runnable {
+        override fun run() {
+            val dummy = dummyBike ?: return
+            val sample = dummy.generateSample()
+            val nowRunning = dummy.isMoving(sample)
+            if (nowRunning != isMachineRunning) {
+                isMachineRunning = nowRunning
+                updateMachineRunningState()
+            }
+            lastFtmsSample = sample
+            updateDashboard(sample)
+            if (isRecording && currentSessionId != null) saveSample(sample)
+            dummyBikeHandler.postDelayed(this, DummyBike.SAMPLE_INTERVAL_MS)
         }
     }
 
@@ -273,7 +297,10 @@ class MainActivity : AppCompatActivity() {
             if (isActiveTreadmill) showInclineControlDialog() else showResistanceControlDialog()
         }
         binding.cardResistance.setOnClickListener { showResistanceControlDialog() }
-        binding.lapColSpeed.setOnClickListener { showSpeedControlDialog() }
+        binding.cardPower.setOnClickListener { showResistanceControlDialog() }
+        binding.lapColSpeed.setOnClickListener {
+            if (isActiveTreadmill) showSpeedControlDialog()
+        }
         binding.lapColInclination.setOnClickListener {
             if (isActiveTreadmill) showInclineControlDialog() else showResistanceControlDialog()
         }
@@ -298,10 +325,15 @@ class MainActivity : AppCompatActivity() {
     private fun updateLiveChart() {
         if (liveSpeedPoints.isEmpty()) return
         val isTreadmill = isActiveTreadmill
+        val isBike = isActiveBike
         val durationSec = liveChartElapsedSec.coerceAtLeast(60)
-        val speedLabel = if (isTreadmill) getString(R.string.metric_speed) else getString(R.string.metric_cadence)
+        val speedLabel = when {
+            isTreadmill -> getString(R.string.metric_speed)
+            isBike -> getString(R.string.metric_power)
+            else -> getString(R.string.metric_speed)
+        }
         val secondaryLabel = if (isTreadmill) getString(R.string.metric_inclination) else getString(R.string.metric_resistance)
-        val speedColor = ContextCompat.getColor(this, R.color.metric_speed)
+        val speedColor = ContextCompat.getColor(this, if (isBike) R.color.metric_power else R.color.metric_speed)
         val secondaryColor = if (isTreadmill)
             ContextCompat.getColor(this, R.color.metric_inclination)
         else
@@ -373,6 +405,20 @@ class MainActivity : AppCompatActivity() {
         dummyTreadmillHandler.post(dummyTreadmillRunnable)
     }
 
+    private fun connectDummyBike() {
+        val dummy = DummyBike()
+        dummyBike = dummy
+        binding.rvScanResults.visibility = View.GONE
+        binding.txtScanStatus.visibility = View.GONE
+        scanAdapter.markConnected(VIRTUAL_BIKE_ADDRESS)
+        stateMachine.onConnected()
+        updateConnectionStatus()
+        stateMachine.applyMetricVisibility(dummy.machineType)
+        updateLapMetricPresentation(dummy.machineType)
+        dummyBikeHandler.removeCallbacks(dummyBikeRunnable)
+        dummyBikeHandler.post(dummyBikeRunnable)
+    }
+
     // ---- Permissions (continued) --------------------------------------------
 
     private fun getRequiredPermissions(): List<String> {
@@ -436,6 +482,16 @@ class MainActivity : AppCompatActivity() {
                 isHr = false,
                 device = null,
                 machineType = FtmsConstants.MachineType.TREADMILL.name,
+                isVirtual = true
+            )
+            scanResultsMap[VIRTUAL_BIKE_ADDRESS] = ScannedDeviceInfo(
+                name = getString(R.string.debug_virtual_bike),
+                address = VIRTUAL_BIKE_ADDRESS,
+                rssi = 0,
+                isFtms = true,
+                isHr = false,
+                device = null,
+                machineType = FtmsConstants.MachineType.INDOOR_BIKE.name,
                 isVirtual = true
             )
         }
@@ -545,6 +601,7 @@ class MainActivity : AppCompatActivity() {
             ftmsConnectionManager?.connectedDeviceAddress?.let { scanAdapter.markConnected(it) }
             hrConnectionManager?.connectedDeviceAddress?.let { scanAdapter.markConnected(it) }
             if (dummyTreadmill != null) scanAdapter.markConnected(VIRTUAL_TREADMILL_ADDRESS)
+            if (dummyBike != null) scanAdapter.markConnected(VIRTUAL_BIKE_ADDRESS)
         }
     }
 
@@ -552,7 +609,10 @@ class MainActivity : AppCompatActivity() {
 
     private fun onDeviceConnectTapped(info: ScannedDeviceInfo) {
         if (info.isVirtual) {
-            connectDummyTreadmill()
+            when (info.address) {
+                VIRTUAL_BIKE_ADDRESS -> connectDummyBike()
+                else -> connectDummyTreadmill()
+            }
             return
         }
         val device = info.device ?: run {
@@ -570,6 +630,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun onDeviceDisconnectTapped(info: ScannedDeviceInfo) {
         when {
+            info.isVirtual && info.address == VIRTUAL_BIKE_ADDRESS -> disconnectDummyBike()
             info.isVirtual -> disconnectDummyTreadmill()
             ftmsConnectionManager?.connectedDeviceAddress == info.address -> {
                 ftmsConnectionManager?.disconnect()
@@ -584,6 +645,15 @@ class MainActivity : AppCompatActivity() {
         dummyTreadmillHandler.removeCallbacks(dummyTreadmillRunnable)
         dummyTreadmill = null
         scanAdapter.markDisconnected(VIRTUAL_TREADMILL_ADDRESS)
+        stateMachine.onDisconnected()
+        updateConnectionStatus()
+        updateScanListUI()
+    }
+
+    private fun disconnectDummyBike() {
+        dummyBikeHandler.removeCallbacks(dummyBikeRunnable)
+        dummyBike = null
+        scanAdapter.markDisconnected(VIRTUAL_BIKE_ADDRESS)
         stateMachine.onDisconnected()
         updateConnectionStatus()
         updateScanListUI()
@@ -859,10 +929,11 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updateConnectionStatus() {
-        val ftmsConnected = ftmsConnectionManager?.isConnected == true || dummyTreadmill != null
+        val ftmsConnected = ftmsConnectionManager?.isConnected == true || dummyTreadmill != null || dummyBike != null
         val hrConnected = hrConnectionManager?.isConnected == true
         val hasHrDevice = hrConnectionManager != null
         val machineType = dummyTreadmill?.machineType
+            ?: dummyBike?.machineType
             ?: fitnessDevice?.machineType
             ?: FtmsConstants.MachineType.UNKNOWN
 
@@ -872,6 +943,7 @@ class MainActivity : AppCompatActivity() {
 
         binding.txtFtmsDevice.text = when {
             dummyTreadmill != null -> dummyTreadmill?.deviceName ?: getString(R.string.connected)
+            dummyBike != null -> dummyBike?.deviceName ?: getString(R.string.connected)
             ftmsConnected -> ftmsConnectionManager?.connectedDeviceName ?: getString(R.string.connected)
             else -> getString(R.string.not_connected)
         }
@@ -968,7 +1040,12 @@ class MainActivity : AppCompatActivity() {
         // Accumulate live chart data while recording
         liveChartElapsedSec = elapsedTickSec
         val isTreadmill = isActiveTreadmill
-        liveSpeedPoints.add(if (isTreadmill) sample.speedKmh.toFloat() else sample.cadenceRpm.toFloat())
+        val isBike = isActiveBike
+        liveSpeedPoints.add(when {
+            isTreadmill -> sample.speedKmh.toFloat()
+            isBike -> sample.instantaneousPowerW.toFloat()
+            else -> sample.speedKmh.toFloat()
+        })
         livePaceSecondaryPoints.add(
             if (isTreadmill) resolveDisplayIncline(sample).toFloat() else resolveDisplayResistanceLevel(sample).toFloat()
         )
@@ -1004,7 +1081,7 @@ class MainActivity : AppCompatActivity() {
     // ---- Session recording --------------------------------------------------
 
     private fun startRecording() {
-        val device: FitnessDevice = fitnessDevice ?: dummyTreadmill ?: return
+        val device: FitnessDevice = fitnessDevice ?: dummyTreadmill ?: dummyBike ?: return
         // Reset device-internal elapsed so it starts from zero at activity start, not
         // from the BLE connection time.
         device.reset()
@@ -1016,7 +1093,7 @@ class MainActivity : AppCompatActivity() {
         elapsedTickHandler.removeCallbacks(elapsedTickRunnable)
         elapsedTickHandler.postDelayed(elapsedTickRunnable, 1000)
         // Apply recording UI via state machine
-        val ftmsConnected = ftmsConnectionManager?.isConnected == true || dummyTreadmill != null
+        val ftmsConnected = ftmsConnectionManager?.isConnected == true || dummyTreadmill != null || dummyBike != null
         val hrConnected = hrConnectionManager?.isConnected == true
         val hasHrDevice = hrConnectionManager != null
         stateMachine.applyUI(ftmsConnected, hrConnected, hasHrDevice, fitnessDevice)
@@ -1047,7 +1124,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun stopRecording() {
-        val ftmsConnected = ftmsConnectionManager?.isConnected == true || dummyTreadmill != null
+        val ftmsConnected = ftmsConnectionManager?.isConnected == true || dummyTreadmill != null || dummyBike != null
         val hrConnected = hrConnectionManager?.isConnected == true
         val hasHrDevice = hrConnectionManager != null
 
@@ -1101,7 +1178,7 @@ class MainActivity : AppCompatActivity() {
      * If the device is still connected, the state immediately advances to [SessionState.Connected].
      */
     private fun returnToIdle() {
-        val ftmsConnected = ftmsConnectionManager?.isConnected == true || dummyTreadmill != null
+        val ftmsConnected = ftmsConnectionManager?.isConnected == true || dummyTreadmill != null || dummyBike != null
         val hrConnected = hrConnectionManager?.isConnected == true
         val hasHrDevice = hrConnectionManager != null
 
@@ -1330,13 +1407,18 @@ class MainActivity : AppCompatActivity() {
         val machine = fitnessDevice
         val supportsResistanceControl = machine?.machineType == FtmsConstants.MachineType.INDOOR_BIKE ||
             machine?.machineType == FtmsConstants.MachineType.CROSS_TRAINER
-        if (cm?.isConnected != true || !supportsResistanceControl) {
+        val isVirtualBike = dummyBike != null
+        if ((cm?.isConnected != true && !isVirtualBike) || (!supportsResistanceControl && !isVirtualBike)) {
             Toast.makeText(this, getString(R.string.control_not_available), Toast.LENGTH_SHORT).show()
             return
         }
-        val current = (lastFtmsSample?.let { resolveDisplayResistanceLevel(it) }
-            ?.coerceIn(RESISTANCE_MIN_LEVEL, RESISTANCE_MAX_LEVEL)
-            ?: RESISTANCE_MIN_LEVEL).toDouble()
+        val current = if (isVirtualBike) {
+            dummyBike!!.resistanceLevel.toDouble().coerceIn(RESISTANCE_MIN_LEVEL.toDouble(), RESISTANCE_MAX_LEVEL.toDouble())
+        } else {
+            (lastFtmsSample?.let { resolveDisplayResistanceLevel(it) }
+                ?.coerceIn(RESISTANCE_MIN_LEVEL, RESISTANCE_MAX_LEVEL)
+                ?: RESISTANCE_MIN_LEVEL).toDouble()
+        }
         showAdjustDialog(
             title = getString(R.string.control_set_resistance_title),
             label = getString(R.string.control_resistance_label),
@@ -1350,7 +1432,12 @@ class MainActivity : AppCompatActivity() {
             dangerPredicate = { false },
             showAdjustButtons = false
         ) { selected ->
-            sendTargetResistanceLevel(selected.roundToInt())
+            if (isVirtualBike) {
+                dummyBike?.resistanceLevel = selected.roundToInt()
+                true
+            } else {
+                sendTargetResistanceLevel(selected.roundToInt())
+            }
         }
     }
 
@@ -1584,8 +1671,10 @@ class MainActivity : AppCompatActivity() {
         super.onDestroy()
         updateHandler.removeCallbacks(scanListUpdateRunnable)
         dummyTreadmillHandler.removeCallbacks(dummyTreadmillRunnable)
+        dummyBikeHandler.removeCallbacks(dummyBikeRunnable)
         elapsedTickHandler.removeCallbacks(elapsedTickRunnable)
         dummyTreadmill = null
+        dummyBike = null
         bleScanner.stopScan()
         if (stateMachine.state.hasActiveSession) stopRecording()
         ftmsConnectionManager?.disconnect()
@@ -1830,6 +1919,9 @@ class MainActivity : AppCompatActivity() {
 
         /** Sentinel address used for the virtual (debug) treadmill in the scan list. */
         private const val VIRTUAL_TREADMILL_ADDRESS = "VIRTUAL:TREADMILL"
+
+        /** Sentinel address used for the virtual (debug) indoor bike in the scan list. */
+        private const val VIRTUAL_BIKE_ADDRESS = "VIRTUAL:BIKE"
 
         // Keys for onSaveInstanceState
         private const val KEY_SESSION_STATE = "session_state"
