@@ -100,14 +100,14 @@ class BhFitnessTreadmill(deviceName: String) :
      *
      * Uses treadmill-specific encoding:
      * - decline targets use known firmware raw codes
-     * - positive/flat targets use standard FTMS 0.1 % units
+     * - positive/flat targets use BH scale relation ([INCLINE_SCALE] / 10)
      */
     private fun toRawIncline(incline: Double): Int {
         val rounded = incline.roundToInt()
         if (abs(incline - rounded.toDouble()) < PERCENT_ROUNDING_TOLERANCE) {
             DECLINE_RAW[rounded]?.let { return it }
         }
-        return (incline * 10.0).roundToInt()
+        return (incline * (INCLINE_SCALE / 10.0)).roundToInt()
     }
 
     companion object {
