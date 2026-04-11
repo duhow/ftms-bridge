@@ -71,14 +71,20 @@ class MainActivity : AppCompatActivity() {
     private var fitnessDevice: FtmsDevice? = null
     private var heartRateSensor: HeartRateSensor? = null
 
+    private lateinit var stateMachine: SessionStateMachine
+
     private var currentSessionId: Long? = null
     private var sessionStartTime: Long = 0
     private var elapsedFallbackStartTime: Long = 0
     private var lastFallbackElapsedSec: Int = 0
-    private var isRecording = false
+    // True when the BLE machine reports belt/flywheel is physically moving.
     private var isMachineRunning = false
-    // True when the BLE machine sent a pause status (param 0x02); cleared on resume or full stop.
-    private var isMachinePaused = false
+
+    /** Convenience: true when the state machine is in [SessionState.Recording]. */
+    private val isRecording: Boolean get() = stateMachine.state is SessionState.Recording
+
+    /** Convenience: true when the state machine is in [SessionState.Paused]. */
+    private val isMachinePaused: Boolean get() = stateMachine.state is SessionState.Paused
 
     // Raw scan results map, updated on every BLE event
     private val scanResultsMap = mutableMapOf<String, ScannedDeviceInfo>()
@@ -196,6 +202,7 @@ class MainActivity : AppCompatActivity() {
         debugLogger = BtDebugLogger(BuildConfig.BT_DEBUG_LOG, this)
         hrDebugLogger = BtDebugLogger(BuildConfig.BT_DEBUG_LOG, this)
         bleScanner = BleScanner(this)
+        stateMachine = SessionStateMachine(binding, this)
 
         createDebugSampleDataIfNeeded()
 
@@ -269,7 +276,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         updateConnectionStatus()
-        resetMetrics()
+        stateMachine.resetMetrics()
     }
 
     // ---- Permissions --------------------------------------------------------
@@ -346,8 +353,9 @@ class MainActivity : AppCompatActivity() {
         binding.rvScanResults.visibility = View.GONE
         binding.txtScanStatus.visibility = View.GONE
         binding.debugVirtualDeviceRow.visibility = View.GONE
+        stateMachine.onConnected()
         updateConnectionStatus()
-        updateMetricVisibility(dummy.machineType)
+        stateMachine.applyMetricVisibility(dummy.machineType)
         dummyTreadmillHandler.removeCallbacks(dummyTreadmillRunnable)
         dummyTreadmillHandler.post(dummyTreadmillRunnable)
     }
@@ -491,7 +499,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updateScanListUI() {
-        if (isRecording) return
+        if (stateMachine.state.hasActiveSession) return
         // Merge current scan results with known devices (previously connected) that
         // are not present in the current scan — so the user can always reconnect.
         val combined = scanResultsMap.toMutableMap()
@@ -544,9 +552,11 @@ class MainActivity : AppCompatActivity() {
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) return
         ftmsConnectionManager?.disconnect()
         ftmsConnectionManager = BleConnectionManager(this, debugLogger)
+        stateMachine.onConnecting()
         ftmsConnectionManager?.connect(device, object : BleConnectionManager.ConnectionListener {
             override fun onConnected(deviceName: String) {
                 runOnUiThread {
+                    stateMachine.onConnected()
                     updateConnectionStatus()
                     scanAdapter.markConnected(device.address)
                 }
@@ -556,10 +566,12 @@ class MainActivity : AppCompatActivity() {
                 fitnessDevice = null
                 isMachineRunning = false
                 runOnUiThread {
+                    val hadSession = stateMachine.state.hasActiveSession
+                    stateMachine.onDisconnected()
                     updateConnectionStatus()
                     scanAdapter.markDisconnected(device.address)
-                    resetMetrics()
-                    if (isRecording) stopRecording()
+                    stateMachine.resetMetrics()
+                    if (hadSession) stopRecording()
                     Toast.makeText(this@MainActivity, getString(R.string.device_disconnected), Toast.LENGTH_SHORT).show()
                     updateScanListUI()
                 }
@@ -585,7 +597,7 @@ class MainActivity : AppCompatActivity() {
                     updateScanListUI()
                     binding.txtMachineType.text = fitnessDevice?.machineType?.name ?: "?"
                     binding.txtMachineType.visibility = View.VISIBLE
-                    updateMetricVisibility(fitnessDevice?.machineType ?: FtmsConstants.MachineType.UNKNOWN)
+                    stateMachine.applyMetricVisibility(fitnessDevice?.machineType ?: FtmsConstants.MachineType.UNKNOWN, fitnessDevice)
                 }
             }
 
@@ -639,30 +651,28 @@ class MainActivity : AppCompatActivity() {
             }
 
             override fun onMachineStatusChanged(opCode: Int, params: ByteArray) {
+                var isPauseEvent = false
                 val stateChanged: Boolean
                 when (opCode) {
                     FtmsConstants.MACHINE_STATUS_STARTED_OR_RESUMED -> {
                         stateChanged = !isMachineRunning || isMachinePaused
-                        isMachinePaused = false
                         isMachineRunning = true
                     }
                     FtmsConstants.MACHINE_STATUS_STOPPED_OR_PAUSED -> {
                         // params[0] == 0x01 → full stop; 0x02 → pause
-                        val isPause = (params.firstOrNull()?.toInt()?.and(0xFF) ?: 0x01) == 0x02
-                        stateChanged = isMachineRunning || (isMachinePaused != isPause)
+                        isPauseEvent = (params.firstOrNull()?.toInt()?.and(0xFF) ?: 0x01) == 0x02
+                        stateChanged = isMachineRunning || (isMachinePaused != isPauseEvent)
                         isMachineRunning = false
-                        isMachinePaused = isPause
                     }
                     FtmsConstants.MACHINE_STATUS_STOPPED_BY_SAFETY_KEY,
                     FtmsConstants.MACHINE_STATUS_RESET -> {
                         stateChanged = isMachineRunning || isMachinePaused
                         isMachineRunning = false
-                        isMachinePaused = false
                     }
                     else -> return
                 }
                 if (!stateChanged) return
-                runOnUiThread { updateMachineRunningState() }
+                runOnUiThread { updateMachineRunningState(isPauseEvent) }
             }
 
             override fun onIConceptData(data: ByteArray) {
@@ -802,17 +812,8 @@ class MainActivity : AppCompatActivity() {
         val hrConnected = hrConnectionManager?.isConnected == true
         val hasHrDevice = hrConnectionManager != null
 
-        val ftmsColor = ContextCompat.getColor(this, if (ftmsConnected) R.color.status_connected else R.color.status_disconnected)
-        val hrColor = ContextCompat.getColor(this, if (hrConnected) R.color.status_connected else R.color.status_disconnected)
-
-        binding.indicatorFtms.setColorFilter(ftmsColor)
-        binding.indicatorHr.setColorFilter(hrColor)
-        // Keep toolbar indicators in sync
-        binding.toolbarIndicatorFtms.setColorFilter(ftmsColor)
-        binding.toolbarIndicatorHr.setColorFilter(hrColor)
-        if (isRecording) {
-            binding.toolbarIndicatorHr.visibility = if (hasHrDevice) View.VISIBLE else View.GONE
-        }
+        // Delegate indicator colours and HR-row visibility to the state machine
+        stateMachine.applyConnectionIndicators(ftmsConnected, hrConnected, hasHrDevice)
 
         binding.txtFtmsDevice.text = when {
             dummyTreadmill != null -> dummyTreadmill?.deviceName ?: getString(R.string.connected)
@@ -823,9 +824,6 @@ class MainActivity : AppCompatActivity() {
         binding.txtHrDevice.text = if (hrConnected)
             hrConnectionManager?.connectedDeviceName ?: getString(R.string.connected)
         else getString(R.string.not_connected)
-
-        // Show the HR status row only once a second device has been connected/attempted
-        binding.hrStatusRow.visibility = if (hasHrDevice) View.VISIBLE else View.GONE
 
         if (!ftmsConnected) {
             binding.txtFtmsDeviceInfo.visibility = View.GONE
@@ -838,8 +836,11 @@ class MainActivity : AppCompatActivity() {
         binding.btnWorkoutStart.isEnabled = ftmsConnected
     }
 
-    /** Called whenever the machine transitions between running and stopped state. */
-    private fun updateMachineRunningState() {
+    /**
+     * Called whenever the machine transitions between running and stopped state.
+     * @param isPauseEvent true when the BLE event was a pause (not a full stop).
+     */
+    private fun updateMachineRunningState(isPauseEvent: Boolean = false) {
         when {
             isMachineRunning && !isRecording -> {
                 // Resuming from a BLE pause continues the same session; any other start begins a new one.
@@ -850,7 +851,7 @@ class MainActivity : AppCompatActivity() {
                 }
             }
             !isMachineRunning && isRecording -> {
-                if (isMachinePaused) pauseRecording() else stopRecording()
+                if (isPauseEvent) pauseRecording() else stopRecording()
             }
             // Transition from paused to fully stopped (e.g. STOP op received while paused).
             !isMachineRunning && !isRecording && !isMachinePaused && currentSessionId != null -> {
@@ -950,59 +951,12 @@ class MainActivity : AppCompatActivity() {
             .start()
     }
 
-    /**
-     * Show only the metric tiles that are relevant to [machineType].
-     * The Energy tile always shows; its label/unit switches between kcal and strides/min
-     * depending on the data received (see [updateDashboard]).
-     *
-     * Treadmill      → Speed, HR, Distance, Energy, Time, Inclination
-     * Indoor Bike    → HR, Cadence, Power, Distance, Energy, Time, Resistance
-     *                  (BH indoor bike variant hides Speed because that field is repurposed)
-     * Cross Trainer  → Speed, HR, Cadence, Power, Distance, Energy, Time, Resistance
-     * Stair Climber  → HR, Cadence, Distance, Energy, Time
-     * Unknown / disconnected → only the universal tiles (no device-specific tiles)
-     */
-    private fun updateMetricVisibility(machineType: FtmsConstants.MachineType) {
-        val isTreadmill = machineType == FtmsConstants.MachineType.TREADMILL
-        val isBike = machineType == FtmsConstants.MachineType.INDOOR_BIKE ||
-                machineType == FtmsConstants.MachineType.CROSS_TRAINER
-        val isBhIndoorBike = fitnessDevice is BhFitnessIndoorBike
-        val showSpeed = !isBhIndoorBike
-        binding.cardSpeed.visibility = if (showSpeed) View.VISIBLE else View.GONE
-        binding.rowCadencePower.visibility = if (isBike) View.VISIBLE else View.GONE
-        binding.cardInclination.visibility = if (isTreadmill) View.VISIBLE else View.GONE
-        binding.cardResistance.visibility = if (isBike) View.VISIBLE else View.GONE
-    }
-
-    private fun resetMetrics() {
-        binding.valueSpeed.text = "--"
-        binding.valueCadence.text = "--"
-        binding.valuePower.text = "--"
-        binding.valueDistance.text = "--"
-        binding.valueHeartRate.text = "--"
-        binding.valueEnergy.text = "--"
-        binding.labelEnergy.setText(R.string.metric_energy)
-        binding.unitEnergy.setText(R.string.unit_kcal)
-        binding.valueElapsedTime.text = "0:00"
-        binding.valueInclination.text = "--"
-        binding.valueResistance.text = "--"
-        binding.lapValueSpeed.text = "--"
-        binding.lapValueInclination.text = "--"
-        binding.lapValueEnergy.text = "--"
-        binding.lapUnitEnergy.setText(R.string.unit_kcal)
-        binding.lapValueHr.text = "--"
-        binding.txtMachineType.visibility = View.GONE
-        binding.txtFtmsDeviceInfo.visibility = View.GONE
-        binding.metricsSection.visibility = View.GONE
-        updateMetricVisibility(FtmsConstants.MachineType.UNKNOWN)
-    }
 
     // ---- Session recording --------------------------------------------------
 
     private fun startRecording() {
         val device: FitnessDevice = fitnessDevice ?: dummyTreadmill ?: return
-        isMachinePaused = false
-        isRecording = true
+        stateMachine.onRecordingStarted()
         sessionStartTime = System.currentTimeMillis()
         elapsedFallbackStartTime = 0L
         lastFallbackElapsedSec = 0
@@ -1016,31 +970,11 @@ class MainActivity : AppCompatActivity() {
         updateElapsedDisplay(0)
         elapsedTickHandler.removeCallbacks(elapsedTickRunnable)
         elapsedTickHandler.postDelayed(elapsedTickRunnable, 1000)
-        binding.btnWorkoutStart.visibility = View.GONE
-        // Hide device header and REC indicator; show compact status icons in toolbar instead
-        binding.deviceHeaderRow.visibility = View.GONE
-        binding.recordingIndicator.visibility = View.GONE
+        // Apply recording UI via state machine
         val ftmsConnected = ftmsConnectionManager?.isConnected == true || dummyTreadmill != null
         val hrConnected = hrConnectionManager?.isConnected == true
         val hasHrDevice = hrConnectionManager != null
-        binding.toolbarIndicatorFtms.setColorFilter(
-            ContextCompat.getColor(this, if (ftmsConnected) R.color.status_connected else R.color.status_disconnected)
-        )
-        binding.toolbarIndicatorHr.setColorFilter(
-            ContextCompat.getColor(this, if (hrConnected) R.color.status_connected else R.color.status_disconnected)
-        )
-        binding.toolbarIndicatorHr.visibility = if (hasHrDevice) View.VISIBLE else View.GONE
-        binding.toolbarStatusIcons.visibility = View.VISIBLE
-        binding.metricsSection.visibility = View.VISIBLE
-        // During recording keep only the lap card for interactive metrics (speed + incline now in lap card)
-        binding.cardSpeed.visibility = View.GONE
-        binding.cardHeartRate.visibility = View.GONE
-        binding.rowDistanceEnergy.visibility = View.GONE
-        binding.cardElapsedTime.visibility = View.GONE
-        binding.cardInclination.visibility = View.GONE
-        // Hide scan results list during workout to reduce clutter
-        binding.rvScanResults.visibility = View.GONE
-        binding.txtScanStatus.visibility = View.GONE
+        stateMachine.applyUI(ftmsConnected, hrConnected, hasHrDevice, fitnessDevice)
         // Clear live chart data
         liveSpeedPoints.clear()
         livePaceSecondaryPoints.clear()
@@ -1056,12 +990,10 @@ class MainActivity : AppCompatActivity() {
         binding.lapValueEnergy.text = "--"
         binding.lapValueHr.text = "--"
         binding.lapUnitEnergy.setText(R.string.unit_kcal)
-        // Show workout view toggle - default to lap view
-        binding.viewToggleRow.visibility = View.VISIBLE
+        // Default to lap view
         isChartViewActive = false
         binding.lapSection.visibility = View.VISIBLE
         binding.chartSection.visibility = View.GONE
-        binding.btnWorkoutStop.visibility = View.VISIBLE
         lifecycleScope.launch(Dispatchers.IO) {
             val session = WorkoutSession(
                 startTimeMs = sessionStartTime,
@@ -1077,26 +1009,24 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun stopRecording() {
-        isMachinePaused = false
-        isRecording = false
+        // Determine if we're still connected (for UI restoration after stop)
+        val ftmsConnected = ftmsConnectionManager?.isConnected == true || dummyTreadmill != null
+        val hrConnected = hrConnectionManager?.isConnected == true
+        val hasHrDevice = hrConnectionManager != null
+
+        if (ftmsConnected) {
+            stateMachine.onSessionStopped()
+        } else {
+            stateMachine.onReturnToIdle()
+        }
+
         elapsedTickHandler.removeCallbacks(elapsedTickRunnable)
         elapsedFallbackStartTime = 0L
         lastFallbackElapsedSec = 0
-        binding.btnWorkoutStart.visibility = View.VISIBLE
-        binding.recordingIndicator.visibility = View.GONE
-        binding.toolbarStatusIcons.visibility = View.GONE
-        binding.deviceHeaderRow.visibility = View.VISIBLE
-        binding.viewToggleRow.visibility = View.GONE
-        binding.lapSection.visibility = View.GONE
-        binding.chartSection.visibility = View.GONE
-        binding.btnWorkoutStop.visibility = View.GONE
-        // Restore metric cards hidden during recording
-        binding.cardHeartRate.visibility = View.VISIBLE
-        binding.rowDistanceEnergy.visibility = View.VISIBLE
-        binding.cardElapsedTime.visibility = View.VISIBLE
-        val machineType = fitnessDevice?.machineType ?: dummyTreadmill?.machineType
-            ?: FtmsConstants.MachineType.UNKNOWN
-        updateMetricVisibility(machineType)
+
+        // Apply connected or idle UI via state machine
+        stateMachine.applyUI(ftmsConnected, hrConnected, hasHrDevice, fitnessDevice)
+
         val sessionId = currentSessionId ?: return
         lifecycleScope.launch(Dispatchers.IO) {
             val session = db.sessionDao().getById(sessionId)
@@ -1112,18 +1042,17 @@ class MainActivity : AppCompatActivity() {
      * continue seamlessly. The elapsed-time ticker is stopped to freeze the display.
      */
     private fun pauseRecording() {
-        isRecording = false
+        stateMachine.onPaused()
         elapsedTickHandler.removeCallbacks(elapsedTickRunnable)
         // Keep currentSessionId, elapsedTickSec, chart data, lap data — recording UI stays visible.
     }
 
     /**
      * Resumes a previously paused recording session (BLE resume/start after a pause event).
-     * Restarts the elapsed-time ticker from the frozen value and sets [isRecording] back to true.
+     * Restarts the elapsed-time ticker from the frozen value and transitions back to Recording.
      */
     private fun resumeRecording() {
-        isMachinePaused = false
-        isRecording = true
+        stateMachine.onResumed()
         elapsedFallbackStartTime = 0L
         lastFallbackElapsedSec = 0
         elapsedTickHandler.removeCallbacks(elapsedTickRunnable)
@@ -1182,6 +1111,8 @@ class MainActivity : AppCompatActivity() {
     private fun showDebugDialog() {
         val sb = StringBuilder()
 
+        sb.appendLine("=== Session State: ${stateMachine.state.label} ===")
+        sb.appendLine()
         sb.appendLine("=== ${getString(R.string.connected)} FTMS ===")
         if (ftmsConnectionManager?.isConnected == true) {
             sb.appendLine("Name: ${ftmsConnectionManager?.connectedDeviceName}")
@@ -1483,7 +1414,7 @@ class MainActivity : AppCompatActivity() {
         elapsedTickHandler.removeCallbacks(elapsedTickRunnable)
         dummyTreadmill = null
         bleScanner.stopScan()
-        if (isRecording || isMachinePaused) stopRecording()
+        if (stateMachine.state.hasActiveSession) stopRecording()
         ftmsConnectionManager?.disconnect()
         hrConnectionManager?.disconnect()
         probeConnectionManager?.disconnect()
@@ -1493,8 +1424,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
-        outState.putBoolean(KEY_IS_RECORDING, isRecording)
-        outState.putBoolean(KEY_IS_MACHINE_PAUSED, isMachinePaused)
+        outState.putString(KEY_SESSION_STATE, stateMachine.state.label)
         outState.putLong(KEY_CURRENT_SESSION_ID, currentSessionId ?: -1L)
         outState.putInt(KEY_ELAPSED_TICK_SEC, elapsedTickSec)
         outState.putLong(KEY_SESSION_START_TIME, sessionStartTime)
@@ -1510,13 +1440,14 @@ class MainActivity : AppCompatActivity() {
 
     /**
      * Restores the recording or paused UI state after the activity is recreated (e.g. process death).
-     * Since the BLE connection is gone after a process restart, the session is treated as paused so
-     * the user can review the frozen stats and press Stop to finalise it.
+     * Since the BLE connection is gone after a process restart, the session is treated as a
+     * disconnected-with-active-session so the user can review the frozen stats and press Stop.
      */
     private fun restoreInstanceState(state: Bundle) {
-        val wasRecording = state.getBoolean(KEY_IS_RECORDING)
-        val wasPaused = state.getBoolean(KEY_IS_MACHINE_PAUSED)
-        if (!wasRecording && !wasPaused) return
+        val savedStateLabel = state.getString(KEY_SESSION_STATE) ?: return
+        val hadActiveSession = savedStateLabel == "RECORDING" || savedStateLabel == "PAUSED" ||
+                savedStateLabel.startsWith("DISCONNECTED(")
+        if (!hadActiveSession) return
 
         val savedSessionId = state.getLong(KEY_CURRENT_SESSION_ID, -1L).takeIf { it != -1L }
 
@@ -1533,33 +1464,15 @@ class MainActivity : AppCompatActivity() {
         state.getFloatArray(KEY_LIVE_PACE_POINTS)?.let { livePaceSecondaryPoints.addAll(it.toList()) }
         state.getFloatArray(KEY_LIVE_HR_POINTS)?.let { liveHrPoints.addAll(it.toList()) }
 
-        // BLE is disconnected after process death — treat as paused so the user can stop the session.
-        // Use the explicitly saved pause flag; if it was actively recording (not paused), we still
-        // treat it as paused here because there is no BLE connection to resume recording with.
-        isRecording = false
-        isMachinePaused = (wasPaused || wasRecording) && savedSessionId != null
+        // BLE is disconnected after process death — restore as Disconnected with active session
+        // so the user can press Stop to finalise.
+        val restoredState = SessionState.Disconnected(hasActiveSession = savedSessionId != null)
+        stateMachine.restoreState(restoredState)
+        stateMachine.applyUI()
 
-        // Restore recording UI (same visibility setup as startRecording, without starting the tick).
-        binding.metricsSection.visibility = View.VISIBLE
-        binding.btnWorkoutStart.visibility = View.GONE
-        binding.deviceHeaderRow.visibility = View.GONE
-        binding.recordingIndicator.visibility = View.GONE
-        binding.toolbarIndicatorFtms.setColorFilter(
-            ContextCompat.getColor(this, R.color.status_disconnected)
-        )
-        binding.toolbarIndicatorHr.visibility = View.GONE
-        binding.toolbarStatusIcons.visibility = View.VISIBLE
-        binding.cardSpeed.visibility = View.GONE
-        binding.cardHeartRate.visibility = View.GONE
-        binding.rowDistanceEnergy.visibility = View.GONE
-        binding.cardElapsedTime.visibility = View.GONE
-        binding.cardInclination.visibility = View.GONE
-        binding.rvScanResults.visibility = View.GONE
-        binding.txtScanStatus.visibility = View.GONE
-        binding.viewToggleRow.visibility = View.VISIBLE
+        // Restore chart/lap view selection
         binding.lapSection.visibility = if (!isChartViewActive) View.VISIBLE else View.GONE
         binding.chartSection.visibility = if (isChartViewActive) View.VISIBLE else View.GONE
-        binding.btnWorkoutStop.visibility = View.VISIBLE
 
         updateElapsedDisplay(elapsedTickSec)
         if (isChartViewActive) updateLiveChart()
@@ -1731,8 +1644,7 @@ class MainActivity : AppCompatActivity() {
         private const val INCLINE_DECLINE_DANGER_PERCENT = -2.0
 
         // Keys for onSaveInstanceState
-        private const val KEY_IS_RECORDING = "is_recording"
-        private const val KEY_IS_MACHINE_PAUSED = "is_machine_paused"
+        private const val KEY_SESSION_STATE = "session_state"
         private const val KEY_CURRENT_SESSION_ID = "current_session_id"
         private const val KEY_ELAPSED_TICK_SEC = "elapsed_tick_sec"
         private const val KEY_SESSION_START_TIME = "session_start_time"
