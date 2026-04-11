@@ -77,6 +77,8 @@ class MainActivity : AppCompatActivity() {
     private var lastFallbackElapsedSec: Int = 0
     private var isRecording = false
     private var isMachineRunning = false
+    // True when the BLE machine sent a pause status (param 0x02); cleared on resume or full stop.
+    private var isMachinePaused = false
 
     // Raw scan results map, updated on every BLE event
     private val scanResultsMap = mutableMapOf<String, ScannedDeviceInfo>()
@@ -199,6 +201,9 @@ class MainActivity : AppCompatActivity() {
 
         setupScanList()
         setupUI()
+
+        // Restore recording/paused UI state after process death.
+        savedInstanceState?.let { restoreInstanceState(it) }
 
         // Request permissions immediately on app start (without auto-scanning)
         requestPermissionsIfNeeded()
@@ -634,15 +639,29 @@ class MainActivity : AppCompatActivity() {
             }
 
             override fun onMachineStatusChanged(opCode: Int, params: ByteArray) {
-                val nowRunning = when (opCode) {
-                    FtmsConstants.MACHINE_STATUS_STARTED_OR_RESUMED -> true
-                    FtmsConstants.MACHINE_STATUS_STOPPED_OR_PAUSED,
+                val stateChanged: Boolean
+                when (opCode) {
+                    FtmsConstants.MACHINE_STATUS_STARTED_OR_RESUMED -> {
+                        stateChanged = !isMachineRunning || isMachinePaused
+                        isMachinePaused = false
+                        isMachineRunning = true
+                    }
+                    FtmsConstants.MACHINE_STATUS_STOPPED_OR_PAUSED -> {
+                        // params[0] == 0x01 → full stop; 0x02 → pause
+                        val isPause = (params.firstOrNull()?.toInt()?.and(0xFF) ?: 0x01) == 0x02
+                        stateChanged = isMachineRunning || (isMachinePaused != isPause)
+                        isMachineRunning = false
+                        isMachinePaused = isPause
+                    }
                     FtmsConstants.MACHINE_STATUS_STOPPED_BY_SAFETY_KEY,
-                    FtmsConstants.MACHINE_STATUS_RESET -> false
+                    FtmsConstants.MACHINE_STATUS_RESET -> {
+                        stateChanged = isMachineRunning || isMachinePaused
+                        isMachineRunning = false
+                        isMachinePaused = false
+                    }
                     else -> return
                 }
-                if (nowRunning == isMachineRunning) return
-                isMachineRunning = nowRunning
+                if (!stateChanged) return
                 runOnUiThread { updateMachineRunningState() }
             }
 
@@ -821,10 +840,22 @@ class MainActivity : AppCompatActivity() {
 
     /** Called whenever the machine transitions between running and stopped state. */
     private fun updateMachineRunningState() {
-        if (isMachineRunning && !isRecording) {
-            startRecording()
-        } else if (!isMachineRunning && isRecording) {
-            stopRecording()
+        when {
+            isMachineRunning && !isRecording -> {
+                // Resuming from a BLE pause continues the same session; any other start begins a new one.
+                if (isMachinePaused && currentSessionId != null) {
+                    resumeRecording()
+                } else {
+                    startRecording()
+                }
+            }
+            !isMachineRunning && isRecording -> {
+                if (isMachinePaused) pauseRecording() else stopRecording()
+            }
+            // Transition from paused to fully stopped (e.g. STOP op received while paused).
+            !isMachineRunning && !isRecording && !isMachinePaused && currentSessionId != null -> {
+                stopRecording()
+            }
         }
     }
 
@@ -970,6 +1001,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun startRecording() {
         val device: FitnessDevice = fitnessDevice ?: dummyTreadmill ?: return
+        isMachinePaused = false
         isRecording = true
         sessionStartTime = System.currentTimeMillis()
         elapsedFallbackStartTime = 0L
@@ -1018,6 +1050,12 @@ class MainActivity : AppCompatActivity() {
         lapStartDistanceM = 0
         lapStartTimeMs = System.currentTimeMillis()
         lapCount = 0
+        // Reset lap-view metric display so previous session values don't bleed through
+        binding.lapValueSpeed.text = "--"
+        binding.lapValueInclination.text = "--"
+        binding.lapValueEnergy.text = "--"
+        binding.lapValueHr.text = "--"
+        binding.lapUnitEnergy.setText(R.string.unit_kcal)
         // Show workout view toggle - default to lap view
         binding.viewToggleRow.visibility = View.VISIBLE
         isChartViewActive = false
@@ -1039,6 +1077,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun stopRecording() {
+        isMachinePaused = false
         isRecording = false
         elapsedTickHandler.removeCallbacks(elapsedTickRunnable)
         elapsedFallbackStartTime = 0L
@@ -1065,6 +1104,30 @@ class MainActivity : AppCompatActivity() {
             Log.i(tag, "Session stopped: $sessionId")
         }
         currentSessionId = null
+    }
+
+    /**
+     * Pauses the current recording session in response to a BLE pause event.
+     * The session ID and all accumulated data are kept intact so [resumeRecording] can
+     * continue seamlessly. The elapsed-time ticker is stopped to freeze the display.
+     */
+    private fun pauseRecording() {
+        isRecording = false
+        elapsedTickHandler.removeCallbacks(elapsedTickRunnable)
+        // Keep currentSessionId, elapsedTickSec, chart data, lap data — recording UI stays visible.
+    }
+
+    /**
+     * Resumes a previously paused recording session (BLE resume/start after a pause event).
+     * Restarts the elapsed-time ticker from the frozen value and sets [isRecording] back to true.
+     */
+    private fun resumeRecording() {
+        isMachinePaused = false
+        isRecording = true
+        elapsedFallbackStartTime = 0L
+        lastFallbackElapsedSec = 0
+        elapsedTickHandler.removeCallbacks(elapsedTickRunnable)
+        elapsedTickHandler.postDelayed(elapsedTickRunnable, 1000)
     }
 
     private fun saveSample(sample: FitnessSample) {
@@ -1420,7 +1483,7 @@ class MainActivity : AppCompatActivity() {
         elapsedTickHandler.removeCallbacks(elapsedTickRunnable)
         dummyTreadmill = null
         bleScanner.stopScan()
-        if (isRecording) stopRecording()
+        if (isRecording || isMachinePaused) stopRecording()
         ftmsConnectionManager?.disconnect()
         hrConnectionManager?.disconnect()
         probeConnectionManager?.disconnect()
@@ -1428,7 +1491,79 @@ class MainActivity : AppCompatActivity() {
         hrDebugLogger.close()
     }
 
-    // ---- Device filtering ---------------------------------------------------
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putBoolean(KEY_IS_RECORDING, isRecording)
+        outState.putBoolean(KEY_IS_MACHINE_PAUSED, isMachinePaused)
+        outState.putLong(KEY_CURRENT_SESSION_ID, currentSessionId ?: -1L)
+        outState.putInt(KEY_ELAPSED_TICK_SEC, elapsedTickSec)
+        outState.putLong(KEY_SESSION_START_TIME, sessionStartTime)
+        outState.putBoolean(KEY_IS_CHART_VIEW_ACTIVE, isChartViewActive)
+        outState.putInt(KEY_LAP_COUNT, lapCount)
+        outState.putInt(KEY_LAP_START_DISTANCE_M, lapStartDistanceM)
+        outState.putLong(KEY_LAP_START_TIME_MS, lapStartTimeMs)
+        outState.putFloatArray(KEY_LIVE_SPEED_POINTS, liveSpeedPoints.toFloatArray())
+        outState.putFloatArray(KEY_LIVE_PACE_POINTS, livePaceSecondaryPoints.toFloatArray())
+        outState.putFloatArray(KEY_LIVE_HR_POINTS, liveHrPoints.toFloatArray())
+        outState.putInt(KEY_LIVE_CHART_ELAPSED, liveChartElapsedSec)
+    }
+
+    /**
+     * Restores the recording or paused UI state after the activity is recreated (e.g. process death).
+     * Since the BLE connection is gone after a process restart, the session is treated as paused so
+     * the user can review the frozen stats and press Stop to finalise it.
+     */
+    private fun restoreInstanceState(state: Bundle) {
+        val wasRecording = state.getBoolean(KEY_IS_RECORDING)
+        val wasPaused = state.getBoolean(KEY_IS_MACHINE_PAUSED)
+        if (!wasRecording && !wasPaused) return
+
+        val savedSessionId = state.getLong(KEY_CURRENT_SESSION_ID, -1L).takeIf { it != -1L }
+
+        // Restore data fields
+        currentSessionId = savedSessionId
+        elapsedTickSec = state.getInt(KEY_ELAPSED_TICK_SEC)
+        sessionStartTime = state.getLong(KEY_SESSION_START_TIME)
+        isChartViewActive = state.getBoolean(KEY_IS_CHART_VIEW_ACTIVE)
+        lapCount = state.getInt(KEY_LAP_COUNT)
+        lapStartDistanceM = state.getInt(KEY_LAP_START_DISTANCE_M)
+        lapStartTimeMs = state.getLong(KEY_LAP_START_TIME_MS)
+        liveChartElapsedSec = state.getInt(KEY_LIVE_CHART_ELAPSED)
+        state.getFloatArray(KEY_LIVE_SPEED_POINTS)?.let { liveSpeedPoints.addAll(it.toList()) }
+        state.getFloatArray(KEY_LIVE_PACE_POINTS)?.let { livePaceSecondaryPoints.addAll(it.toList()) }
+        state.getFloatArray(KEY_LIVE_HR_POINTS)?.let { liveHrPoints.addAll(it.toList()) }
+
+        // BLE is disconnected after process death — treat as paused so the user can stop the session.
+        // Use the explicitly saved pause flag; if it was actively recording (not paused), we still
+        // treat it as paused here because there is no BLE connection to resume recording with.
+        isRecording = false
+        isMachinePaused = (wasPaused || wasRecording) && savedSessionId != null
+
+        // Restore recording UI (same visibility setup as startRecording, without starting the tick).
+        binding.metricsSection.visibility = View.VISIBLE
+        binding.btnWorkoutStart.visibility = View.GONE
+        binding.deviceHeaderRow.visibility = View.GONE
+        binding.recordingIndicator.visibility = View.GONE
+        binding.toolbarIndicatorFtms.setColorFilter(
+            ContextCompat.getColor(this, R.color.status_disconnected)
+        )
+        binding.toolbarIndicatorHr.visibility = View.GONE
+        binding.toolbarStatusIcons.visibility = View.VISIBLE
+        binding.cardSpeed.visibility = View.GONE
+        binding.cardHeartRate.visibility = View.GONE
+        binding.rowDistanceEnergy.visibility = View.GONE
+        binding.cardElapsedTime.visibility = View.GONE
+        binding.cardInclination.visibility = View.GONE
+        binding.rvScanResults.visibility = View.GONE
+        binding.txtScanStatus.visibility = View.GONE
+        binding.viewToggleRow.visibility = View.VISIBLE
+        binding.lapSection.visibility = if (!isChartViewActive) View.VISIBLE else View.GONE
+        binding.chartSection.visibility = if (isChartViewActive) View.VISIBLE else View.GONE
+        binding.btnWorkoutStop.visibility = View.VISIBLE
+
+        updateElapsedDisplay(elapsedTickSec)
+        if (isChartViewActive) updateLiveChart()
+    }
 
     /**
      * Adds BLE devices that are already bonded to this phone (via the OS bonded-devices
@@ -1594,6 +1729,21 @@ class MainActivity : AppCompatActivity() {
         private const val SPEED_DANGER_KMH = 20.0
         private const val INCLINE_DANGER_PERCENT = 12.0
         private const val INCLINE_DECLINE_DANGER_PERCENT = -2.0
+
+        // Keys for onSaveInstanceState
+        private const val KEY_IS_RECORDING = "is_recording"
+        private const val KEY_IS_MACHINE_PAUSED = "is_machine_paused"
+        private const val KEY_CURRENT_SESSION_ID = "current_session_id"
+        private const val KEY_ELAPSED_TICK_SEC = "elapsed_tick_sec"
+        private const val KEY_SESSION_START_TIME = "session_start_time"
+        private const val KEY_IS_CHART_VIEW_ACTIVE = "is_chart_view_active"
+        private const val KEY_LAP_COUNT = "lap_count"
+        private const val KEY_LAP_START_DISTANCE_M = "lap_start_distance_m"
+        private const val KEY_LAP_START_TIME_MS = "lap_start_time_ms"
+        private const val KEY_LIVE_SPEED_POINTS = "live_speed_points"
+        private const val KEY_LIVE_PACE_POINTS = "live_pace_points"
+        private const val KEY_LIVE_HR_POINTS = "live_hr_points"
+        private const val KEY_LIVE_CHART_ELAPSED = "live_chart_elapsed"
 
         /** Device name prefixes that identify non-fitness BLE peripherals. */
         private val IGNORED_DEVICE_PREFIXES = listOf(
