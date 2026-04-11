@@ -73,7 +73,8 @@ class BhFitnessTreadmill(deviceName: String) :
 
     private fun getIncline(sample: FitnessSample): Double {
         val incline = sample.inclinationPercent
-        // Already-corrected physical values are whole-percent steps in the expected range.
+        // Already-corrected physical values are whole-percent (or very near whole-percent)
+        // steps in the expected range.
         if (incline in INCLINE_PHYSICAL_MIN_PERCENT..INCLINE_PHYSICAL_MAX_PERCENT &&
             abs(incline - incline.roundToInt().toDouble()) < WHOLE_PERCENT_TOLERANCE
         ) {
@@ -89,7 +90,7 @@ class BhFitnessTreadmill(deviceName: String) :
         if (declineEntry != null) {
             return declineEntry.key.toDouble()
         }
-        return (rawInclination / INCLINE_SCALE)
+        return rawInclination / INCLINE_SCALE
             .coerceIn(INCLINE_PHYSICAL_MIN_PERCENT, INCLINE_PHYSICAL_MAX_PERCENT)
     }
 
