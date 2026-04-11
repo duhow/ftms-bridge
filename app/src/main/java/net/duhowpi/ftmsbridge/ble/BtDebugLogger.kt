@@ -22,6 +22,9 @@ class BtDebugLogger(val enabled: Boolean, private val context: Context) {
     private var sessionFile: File? = null
     private var sessionWriter: PrintWriter? = null
 
+    // Track all files created during this app run
+    private val currentRunFiles = mutableListOf<File>()
+
     // Deduplication: last payload logged per UUID — suppress repeated identical NOTIFY packets
     private val lastNotifyData = HashMap<String, ByteArray>()
 
@@ -41,6 +44,7 @@ class BtDebugLogger(val enabled: Boolean, private val context: Context) {
                 Log.e(tag, "Failed to open global log", e)
                 null
             }
+            appLogFile?.let { currentRunFiles.add(it) }
             Log.i(tag, "Global debug log: ${appLogFile.absolutePath}")
         } else {
             appLogFile = null
@@ -62,6 +66,7 @@ class BtDebugLogger(val enabled: Boolean, private val context: Context) {
                 it.println("# Started: ${Date()}")
                 it.println("# ---")
             }
+            sessionFile?.let { currentRunFiles.add(it) }
             logMessage("Session started for $deviceName ($deviceAddress)")
             Log.i(tag, "Session log: ${sessionFile?.absolutePath}")
         } catch (e: Exception) {
@@ -115,6 +120,7 @@ class BtDebugLogger(val enabled: Boolean, private val context: Context) {
 
     fun getSessionFile(): File? = sessionFile
     fun getAppLogFile(): File? = appLogFile
+    fun getCurrentSessionFiles(): List<File> = currentRunFiles.filter { it.exists() }
 
     companion object {
         fun getAllLogFiles(context: Context): List<File> {

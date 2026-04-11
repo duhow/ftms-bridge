@@ -247,7 +247,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         binding.btnWorkoutStart.setOnClickListener {
-            if (isRecording) stopRecording() else startRecording()
+            if (!isRecording) startRecording()
         }
 
         binding.btnWorkoutStop.setOnClickListener { stopRecording() }
@@ -616,6 +616,7 @@ class MainActivity : AppCompatActivity() {
             override fun onHeartRateData(data: ByteArray) {
                 lastHeartRateBpm = FtmsDataParser.parseHeartRate(data)
                 runOnUiThread {
+                    if (!isRecording) return@runOnUiThread
                     binding.valueHeartRate.text = if (lastHeartRateBpm > 0) "$lastHeartRateBpm" else "--"
                     animateBeat(binding.indicatorHr)
                     animateBeat(binding.toolbarIndicatorHr)
@@ -689,6 +690,7 @@ class MainActivity : AppCompatActivity() {
                 val hr = heartRateSensor?.onDataReceived(data) ?: FtmsDataParser.parseHeartRate(data)
                 lastHeartRateBpm = hr
                 runOnUiThread {
+                    if (!isRecording) return@runOnUiThread
                     binding.valueHeartRate.text = if (hr > 0) "$hr" else "--"
                     animateBeat(binding.indicatorHr)
                     animateBeat(binding.toolbarIndicatorHr)
@@ -843,6 +845,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updateDashboard(sample: FitnessSample) {
+        // Freeze the display when the session has stopped; don't update with live BLE data.
+        if (!isRecording) return
+
         // Prefer device-reported elapsed time; fall back to wall-clock when recording.
         // BH Fitness devices either omit the elapsed-time field entirely or always send 0.
         val elapsedSec = if (sample.elapsedTimeSec > 0) {
@@ -872,32 +877,23 @@ class MainActivity : AppCompatActivity() {
         binding.valueInclination.text = "${sample.inclinationPercent.roundToInt()}"
         binding.valueResistance.text = if (sample.resistanceLevel > 0) "${sample.resistanceLevel}" else "--"
 
-        // During recording the elapsed display is driven by the 1 s tick handler; we
-        // only sync the tick counter here (taking the max so it never goes backwards).
-        // Outside of recording we just show whatever the device reports.
-        if (isRecording) {
-            if (elapsedSec > elapsedTickSec) {
-                elapsedTickSec = elapsedSec
-                updateElapsedDisplay(elapsedTickSec)
-            }
-        } else {
-            val minutes = elapsedSec / 60
-            val seconds = elapsedSec % 60
-            binding.valueElapsedTime.text = String.format("%d:%02d", minutes, seconds)
+        // Elapsed display is driven by the 1 s tick handler; sync the tick counter here
+        // (taking the max so it never goes backwards).
+        if (elapsedSec > elapsedTickSec) {
+            elapsedTickSec = elapsedSec
+            updateElapsedDisplay(elapsedTickSec)
         }
 
         // Accumulate live chart data while recording
-        if (isRecording) {
-            liveChartElapsedSec = elapsedTickSec
-            val isTreadmill = isActiveTreadmill
-            liveSpeedPoints.add(if (isTreadmill) sample.speedKmh.toFloat() else sample.cadenceRpm.toFloat())
-            livePaceSecondaryPoints.add(
-                if (isTreadmill) sample.inclinationPercent.toFloat() else sample.resistanceLevel.toFloat()
-            )
-            liveHrPoints.add(sample.heartRateBpm.toFloat())
-            if (isChartViewActive) updateLiveChart()
-            updateLapView(sample)
-        }
+        liveChartElapsedSec = elapsedTickSec
+        val isTreadmill = isActiveTreadmill
+        liveSpeedPoints.add(if (isTreadmill) sample.speedKmh.toFloat() else sample.cadenceRpm.toFloat())
+        livePaceSecondaryPoints.add(
+            if (isTreadmill) sample.inclinationPercent.toFloat() else sample.resistanceLevel.toFloat()
+        )
+        liveHrPoints.add(sample.heartRateBpm.toFloat())
+        if (isChartViewActive) updateLiveChart()
+        updateLapView(sample)
     }
 
     /** Updates the elapsed-time display in both the metric card and the lap-view total. */
@@ -988,7 +984,7 @@ class MainActivity : AppCompatActivity() {
         updateElapsedDisplay(0)
         elapsedTickHandler.removeCallbacks(elapsedTickRunnable)
         elapsedTickHandler.postDelayed(elapsedTickRunnable, 1000)
-        binding.btnWorkoutStart.text = getString(R.string.stop_session)
+        binding.btnWorkoutStart.visibility = View.GONE
         // Hide device header and REC indicator; show compact status icons in toolbar instead
         binding.deviceHeaderRow.visibility = View.GONE
         binding.recordingIndicator.visibility = View.GONE
@@ -1047,7 +1043,7 @@ class MainActivity : AppCompatActivity() {
         elapsedTickHandler.removeCallbacks(elapsedTickRunnable)
         elapsedFallbackStartTime = 0L
         lastFallbackElapsedSec = 0
-        binding.btnWorkoutStart.text = getString(R.string.start_session)
+        binding.btnWorkoutStart.visibility = View.VISIBLE
         binding.recordingIndicator.visibility = View.GONE
         binding.toolbarStatusIcons.visibility = View.GONE
         binding.deviceHeaderRow.visibility = View.VISIBLE
@@ -1154,7 +1150,7 @@ class MainActivity : AppCompatActivity() {
         sb.appendLine()
         sb.appendLine("=== ${getString(R.string.log_files)} ===")
         sb.appendLine(getString(R.string.debug_log_location))
-        val logFiles = BtDebugLogger.getAllLogFiles(this)
+        val logFiles = debugLogger.getCurrentSessionFiles()
         if (logFiles.isEmpty()) {
             sb.appendLine(getString(R.string.no_log_files))
         } else {
