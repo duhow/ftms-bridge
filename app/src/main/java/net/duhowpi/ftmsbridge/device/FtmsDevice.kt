@@ -50,10 +50,29 @@ open class FtmsDevice(
         getSupportedDeviceName()?.containsMatchIn(name) == true
 
     companion object {
+        /**
+         * Registry of known specific device constructors, tried in order before the generic
+         * fallback. Each entry is a constructor reference that accepts the device name.
+         *
+         * To add support for a new brand or model, add its constructor here — no other
+         * factory code needs to change. Each class defines its own name pattern and machine type.
+         */
+        private val DEVICE_REGISTRY: List<(String) -> FtmsDevice> = listOf(
+            ::BhFitnessTreadmill,
+            ::BhFitnessIndoorBike,
+            ::BhFitnessVerticalBike,
+        )
+
         fun createFromCharacteristics(
             deviceName: String,
             characteristics: List<UUID>
         ): FtmsDevice {
+            // Try each registered device class by name, using its own matchesDevice logic.
+            val matched = DEVICE_REGISTRY.map { it(deviceName) }
+                .firstOrNull { it.matchesDevice(deviceName) }
+            if (matched != null) return matched
+
+            // Fall back to generic FTMS device with type derived from advertised characteristics.
             val type = when {
                 characteristics.contains(FtmsConstants.TREADMILL_DATA_UUID) ->
                     FtmsConstants.MachineType.TREADMILL
@@ -66,17 +85,7 @@ open class FtmsDevice(
                     FtmsConstants.MachineType.STAIR_CLIMBER
                 else -> FtmsConstants.MachineType.UNKNOWN
             }
-
-            return if (BhFitnessFtmsDevice.getSupportedDeviceName().containsMatchIn(deviceName)) {
-                when (type) {
-                    FtmsConstants.MachineType.TREADMILL -> BhFitnessTreadmill(deviceName)
-                    FtmsConstants.MachineType.INDOOR_BIKE -> BhFitnessIndoorBike(deviceName)
-                    FtmsConstants.MachineType.CROSS_TRAINER -> BhFitnessVerticalBike(deviceName)
-                    else -> FtmsDevice(deviceName, type)
-                }
-            } else {
-                FtmsDevice(deviceName, type)
-            }
+            return FtmsDevice(deviceName, type)
         }
     }
 }
