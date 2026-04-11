@@ -9,6 +9,7 @@ class BhFitnessTreadmill(deviceName: String) :
     BhFitnessFtmsDevice(deviceName, FtmsConstants.MachineType.TREADMILL) {
 
     private val tag = "BhFitnessTreadmill"
+    override fun getSupportedDeviceName(): Regex = Regex("^T01_\\d{5}$")
 
     // Last values received from the iConcept 0xC112 workout-counter notification.
     // C112 fires only once at session start on this device model, so elapsed time,

@@ -18,6 +18,9 @@ abstract class BhFitnessFtmsDevice(
     machineType: FtmsConstants.MachineType
 ) : FtmsDevice(deviceName, machineType) {
 
+    /** Called when a BH Fitness iConcept proprietary notification arrives. */
+    open fun onIConceptData(data: ByteArray) {}
+
     /**
      * Parses the BH Fitness iConcept proprietary 0xC112 notification packet.
      *
@@ -47,29 +50,7 @@ abstract class BhFitnessFtmsDevice(
         return FitnessSample(elapsedTimeSec = elapsedTimeSec, totalDistanceM = distanceM, totalEnergyKcal = calories)
     }
 
-    /**
-     * Returns the [Regex] defined in the companion object so the instance-level
-     * [matchesDevice] inherited from [FtmsDevice] works correctly.
-     */
-    override fun getSupportedDeviceName(): Regex = Companion.getSupportedDeviceName()
-
     companion object {
         private const val TAG = "BhFitnessFtmsDevice"
-
-        /**
-         * Returns a [Regex] that matches any BH Fitness or iConcept device name.
-         *
-         * The pattern covers all known name variants:
-         * - Names starting with "BH" (e.g. "BH Fitness T01")
-         * - Names containing "bhfitness" or "bh fitness"
-         * - Names containing "i.concept"
-         * - iConcept short-code names (e.g. "B01_479D7", "C01_12DB5")
-         *
-         * Usage: `getSupportedDeviceName().containsMatchIn(advertisedName)`
-         */
-        fun getSupportedDeviceName(): Regex = Regex(
-            "(?:^bh|bhfitness|bh fitness|i\\.concept|^[a-z]\\d{2}_[0-9a-f]{5}$)",
-            RegexOption.IGNORE_CASE
-        )
     }
 }

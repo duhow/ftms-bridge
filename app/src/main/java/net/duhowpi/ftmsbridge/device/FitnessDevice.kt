@@ -13,9 +13,6 @@ interface FitnessDevice {
     fun onFeaturesReceived(data: ByteArray)
     fun onDataReceived(data: ByteArray): FitnessSample?
 
-    /** Called when a BH Fitness iConcept proprietary notification arrives. */
-    fun onIConceptData(data: ByteArray) {}
-
     /**
      * Encodes a physical inclination percentage into the raw SINT16 value to send in a
      * Fitness Machine Control Point Set Target Inclination command (opcode 0x03).

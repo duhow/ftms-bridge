@@ -30,6 +30,7 @@ class BhFitnessIndoorBike(deviceName: String) :
     override fun isMoving(sample: FitnessSample): Boolean =
         sample.cadenceRpm > MIN_MOVING_CADENCE_RPM || sample.instantaneousPowerW > MIN_MOVING_POWER_W
 
+    override fun getSupportedDeviceName(): Regex = Regex("^B01_\\d{5}$")
     override fun hidesSpeed(): Boolean = true
 
     private var lastSampleTimestampMs: Long = 0L

@@ -39,6 +39,7 @@ import net.duhowpi.ftmsbridge.data.AppDatabase
 import net.duhowpi.ftmsbridge.data.WorkoutSample
 import net.duhowpi.ftmsbridge.data.WorkoutSession
 import net.duhowpi.ftmsbridge.databinding.ActivityMainBinding
+import net.duhowpi.ftmsbridge.device.BhFitnessFtmsDevice
 import net.duhowpi.ftmsbridge.device.DummyTreadmill
 import net.duhowpi.ftmsbridge.device.FitnessDevice
 import net.duhowpi.ftmsbridge.device.FtmsDevice
@@ -715,7 +716,7 @@ class MainActivity : AppCompatActivity() {
             }
 
             override fun onIConceptData(data: ByteArray) {
-                fitnessDevice?.onIConceptData(data)
+                (fitnessDevice as? BhFitnessFtmsDevice)?.onIConceptData(data)
             }
         })
     }
