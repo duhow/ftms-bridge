@@ -1,4 +1,9 @@
 Add user-facing changes for the next release here.
+- Metrics (speed, calories, timer, etc.) now freeze when the session is stopped instead of continuing to update
+- Removed the redundant "Stop Session" button from the workout row; only the bottom Stop button stops a session
+- Fixed scan/refresh button icon not being centered (had extra space on the right)
+- Debug log export now shows only files from the current app session, not all historical logs
+- Reduced spacing between metric cards so values and units fit better; added visual separation between value and unit label
 - Colorful metric cards with icons for speed, heart rate, distance, energy, cadence, power, time, inclination, and resistance
 - LAP/CHART workout view toggle shown during active recording
 - LAP view with progress bar showing 1km circuit progress, lap time, and lap count
