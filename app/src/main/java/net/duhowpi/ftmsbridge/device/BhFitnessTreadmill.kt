@@ -9,7 +9,8 @@ class BhFitnessTreadmill(deviceName: String) :
     BhFitnessFtmsDevice(deviceName, FtmsConstants.MachineType.TREADMILL) {
 
     private val tag = "BhFitnessTreadmill"
-    override fun getSupportedDeviceName(): Regex = Regex("^T01_\\d{5}$")
+    // BH treadmills advertise names like T01_07D57 (5 hex chars after underscore).
+    override fun getSupportedDeviceName(): Regex = Regex("^T01_[0-9A-Fa-f]{5}$")
     override val shouldCalculateDistanceInApp: Boolean = true
     override val shouldCalculateEnergyInApp: Boolean = true
 
