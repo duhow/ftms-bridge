@@ -69,17 +69,17 @@ class BhFitnessTreadmill(deviceName: String) :
         toRawIncline(physicalPercent)
 
     override fun getDisplayIncline(sample: FitnessSample): Double {
-        val incline = sample.inclinationPercent
-        // Safety net: if a raw-encoded FTMS value leaks into UI path, decode it.
-        // Example raw leak: 180 (device raw) would otherwise display as 180%, while the
-        // physical inclination should be 180 / 62.5 = 2.88% (~3%). UI values above 30%
-        // are treated as leaked raw device codes for this treadmill family.
-        return if (incline > INCLINE_UI_MAX_ABS_PERCENT) getIncline(sample) else incline
+        return getIncline(sample)
     }
 
     private fun getIncline(sample: FitnessSample): Double {
+        val incline = sample.inclinationPercent
+        if (incline in INCLINE_PHYSICAL_MIN_PERCENT..INCLINE_PHYSICAL_MAX_PERCENT) {
+            return incline
+        }
+
         // Recover the raw INT16 device value (FTMS parses inclinationPercent = rawDevice * 0.1).
-        val rawInclination = (sample.inclinationPercent * 10).toInt()
+        val rawInclination = (incline * 10).toInt()
 
         // If the raw value matches one of the known decline codes, return the exact physical
         // percent from the map key (avoids floating-point imprecision of the inverse formula).
@@ -123,8 +123,9 @@ class BhFitnessTreadmill(deviceName: String) :
         /** FTMS encoding factor for positive incline: raw = physicalPercent * 10. */
         const val FTMS_INCLINE_ENCODING_MULTIPLIER = 10.0
 
-        /** Upper bound for sane UI incline percentages from this treadmill family. */
-        const val INCLINE_UI_MAX_ABS_PERCENT = 30.0
+        /** Physical incline range for BH treadmill UI percentages. */
+        const val INCLINE_PHYSICAL_MIN_PERCENT = -3.0
+        const val INCLINE_PHYSICAL_MAX_PERCENT = 15.0
 
         /** Mapping from negative physical percent to device raw value required by firmware. */
         val DECLINE_RAW: Map<Int, Int> = mapOf(
