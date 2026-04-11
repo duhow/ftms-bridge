@@ -1,1 +1,7 @@
 Add user-facing changes for the next release here.
+- Fixed BH Fitness treadmill incline/decline commands sending wrong value to device
+- Fixed BH Fitness treadmill distance and calories display showing 0 when device reports none
+- Fixed BH treadmills with hex model IDs (e.g. T01_07D57) not applying incline and distance corrections
+- Fixed BH incline display for low positive grades and restored negative incline control commands
+- Fixed BH indoor/vertical bike detection for hex model IDs (B01_/C01_)
+- Fixed BH treadmill incline control writes using wrong scale (targets now match selected % again)

@@ -3,37 +3,30 @@ package net.duhowpi.ftmsbridge.device
 import android.util.Log
 import net.duhowpi.ftmsbridge.ftms.FtmsConstants
 import net.duhowpi.ftmsbridge.model.FitnessSample
+import kotlin.math.abs
 import kotlin.math.roundToInt
 
 class BhFitnessTreadmill(deviceName: String) :
     BhFitnessFtmsDevice(deviceName, FtmsConstants.MachineType.TREADMILL) {
 
     private val tag = "BhFitnessTreadmill"
-    override fun getSupportedDeviceName(): Regex = Regex("^T01_\\d{5}$")
+    // BH treadmills advertise names like T01_07D57 (5 hex chars after underscore).
+    override fun getSupportedDeviceName(): Regex = Regex("^T01_[0-9A-Fa-f]{5}$")
+    override val shouldCalculateDistanceInApp: Boolean = true
+    override val shouldCalculateEnergyInApp: Boolean = true
 
-    // Last values received from the iConcept 0xC112 workout-counter notification.
-    // C112 fires only once at session start on this device model, so elapsed time,
-    // distance, and energy continue from derived packet-delta estimates.
-    @Volatile private var iConceptDistanceM: Int = 0
-    @Volatile private var iConceptCalories: Int = 0
-    @Volatile private var lastSampleTimestampMs: Long = 0L
+    // Treadmill-specific session accumulators.
+    // Distance and energy are tracked via the shared BhFitnessFtmsDevice accumulators.
+    // Elapsed time requires its own anchor because C112 fires only once at session start.
     @Volatile private var hasWorkoutStartAnchor: Boolean = false
     @Volatile private var derivedElapsedSec: Double = 0.0
-    @Volatile private var derivedDistanceM: Double = 0.0
-    @Volatile private var derivedEnergyKcal: Double = 0.0
 
     // Elapsed time, distance, and calories are always 0 in the FTMS packet; the real
     // values come from the iConcept 0xC112 notification and are merged here.
     @Synchronized
     override fun onDataReceived(data: ByteArray): FitnessSample? {
         val sample = super.onDataReceived(data) ?: return null
-        val nowMs = sample.timestampMs
-        val dtSec = if (lastSampleTimestampMs > 0L) {
-            ((nowMs - lastSampleTimestampMs).coerceAtLeast(0L)) / 1000.0
-        } else {
-            0.0
-        }
-        lastSampleTimestampMs = nowMs
+        val dtSec = sampleDtSec(sample.timestampMs)
 
         if (dtSec > 0.0 && hasWorkoutStartAnchor) {
             derivedElapsedSec += dtSec
@@ -49,12 +42,12 @@ class BhFitnessTreadmill(deviceName: String) :
         val correctedIncline = getIncline(sample)
 
         if (dtSec > 0.0) {
-            derivedDistanceM += sample.speedKmh * dtSec * FitnessDevice.METERS_PER_KMH_PER_SEC
-            derivedEnergyKcal += estimateEnergyDeltaKcal(sample.speedKmh, correctedIncline, dtSec)
+            accumulateDistance(sample.speedKmh, dtSec)
+            accumulateEnergy(sample.speedKmh, correctedIncline, dtSec)
         }
 
-        val distanceM = kotlin.math.round(derivedDistanceM).toInt()
-        val energyKcal = kotlin.math.round(derivedEnergyKcal).toInt()
+        val distanceM = getAccumulatedDistanceM()
+        val energyKcal = getAccumulatedEnergyKcal()
 
         Log.d(tag, "treadmill: speed=%.2f km/h incl=%.1f%% elapsed=${elapsedSec}s dist=${distanceM}m kcal=${energyKcal}"
             .format(sample.speedKmh, correctedIncline))
@@ -70,23 +63,26 @@ class BhFitnessTreadmill(deviceName: String) :
     /**
      * Encodes a physical inclination percentage to the raw SINT16 value expected by
      * BH Fitness treadmills in the FTMS Control Point Set Target Inclination command.
-     *
-     * Positive incline uses standard FTMS encoding (0.1 % units):
-     *   raw = physicalPercent * 10   → +1 % = 10, +5 % = 50
-     *
-     * Decline uses hardcoded values that exactly match what the device reports in
-     * its own Treadmill Data notifications (confirmed from captured device logs):
-     *   -1 % → 450  (device reads back (450-500)/62.5 = -0.8 % → displays -1 %)
-     *   -2 % → 380  (device reads back (380-500)/62.5 = -1.9 % → displays -2 %)
-     *   -3 % → 320  (device reads back (320-500)/62.5 = -2.9 % → displays -3 %)
-     *
-     * The inverse formula (pct × 62.5 + 500) gives 438/375/313, which are NOT the
-     * values the device firmware expects — static values are required.
      */
+    override fun encodeTargetInclineRaw(physicalPercent: Double): Int =
+        toRawIncline(physicalPercent)
 
-    fun getIncline(sample: FitnessSample): Double {
+    override fun getDisplayIncline(sample: FitnessSample): Double {
+        return getIncline(sample)
+    }
+
+    private fun getIncline(sample: FitnessSample): Double {
+        val incline = sample.inclinationPercent
+        // Already-corrected physical values are whole-percent steps in the expected
+        // range, with a small ±0.05 % rounding tolerance.
+        if (incline in INCLINE_PHYSICAL_MIN_PERCENT..INCLINE_PHYSICAL_MAX_PERCENT &&
+            abs(incline - incline.roundToInt().toDouble()) < PERCENT_ROUNDING_TOLERANCE
+        ) {
+            return incline
+        }
+
         // Recover the raw INT16 device value (FTMS parses inclinationPercent = rawDevice * 0.1).
-        val rawInclination = (sample.inclinationPercent * 10).toInt()
+        val rawInclination = (incline * 10.0).roundToInt()
 
         // If the raw value matches one of the known decline codes, return the exact physical
         // percent from the map key (avoids floating-point imprecision of the inverse formula).
@@ -95,21 +91,30 @@ class BhFitnessTreadmill(deviceName: String) :
             return declineEntry.key.toDouble()
         }
         return rawInclination / INCLINE_SCALE
+            .coerceIn(INCLINE_PHYSICAL_MIN_PERCENT, INCLINE_PHYSICAL_MAX_PERCENT)
     }
 
-    fun toRawIncline(incline: Double): Int {
-        if (incline < 0) {
-            // Use explicit mapping for the discrete decline steps the device expects.
-            // Map keys: -3 -> 320, -2 -> 380, -1 -> 450.
-            val key = incline.roundToInt().coerceIn(-3, -1)
-            return DECLINE_RAW[key] ?: 450
-        }
-        return (incline * INCLINE_SCALE).roundToInt()
+    /**
+     * Encodes a physical inclination percentage to the raw SINT16 value expected by
+     * BH Fitness treadmills in the FTMS Control Point Set Target Inclination command.
+     *
+     * Uses standard FTMS encoding for control writes (SINT16 in 0.1 % units), which
+     * BH treadmills accept for both positive and negative target commands.
+     */
+    private fun toRawIncline(incline: Double): Int {
+        return (incline * 10.0).roundToInt()
     }
 
     companion object {
         /** BH Fitness treadmill inclination scale factor: raw / 62.5 = physical %. */
         const val INCLINE_SCALE = 62.5
+
+        /** Tolerance (in incline %) used to treat near-integer values as whole-percent steps. */
+        private const val PERCENT_ROUNDING_TOLERANCE = 0.05
+
+        /** Physical incline range for BH treadmill UI percentages. */
+        const val INCLINE_PHYSICAL_MIN_PERCENT = -3.0
+        const val INCLINE_PHYSICAL_MAX_PERCENT = 15.0
 
         /** Mapping from negative physical percent to device raw value required by firmware. */
         val DECLINE_RAW: Map<Int, Int> = mapOf(
@@ -120,31 +125,29 @@ class BhFitnessTreadmill(deviceName: String) :
     }
 
     /**
-     * Resets the derived elapsed-time accumulator so that the timer reported in
-     * subsequent samples starts from zero.  Called at recording start to align the
-     * in-app timer with the user's activity start rather than the BLE connect time.
+     * Resets all session accumulators so the timer and counters start from zero on the
+     * next recording.  Called at recording start to align the in-app timer with the
+     * user's activity start rather than the BLE connect time.
      */
     @Synchronized
     override fun reset() {
         derivedElapsedSec = 0.0
-        lastSampleTimestampMs = 0L
         // Keep hasWorkoutStartAnchor = true so the timer resumes counting immediately
         // from the next FTMS packet without waiting for a new C112 signal (which will
         // not arrive again because this device only sends C112 once per session).
         hasWorkoutStartAnchor = true
+        resetAccumulators()
     }
 
     override fun onIConceptData(data: ByteArray) {
         val parsed = parseIConceptWorkoutData(data) ?: return
-        iConceptDistanceM = parsed.totalDistanceM
-        iConceptCalories = parsed.totalEnergyKcal
         if (parsed.elapsedTimeSec > 0) {
             derivedElapsedSec = kotlin.math.max(derivedElapsedSec, parsed.elapsedTimeSec.toDouble())
             hasWorkoutStartAnchor = true
         }
         // Use iConcept snapshot as lower-bound baseline if present, then continue
         // with derived progression because this device does not keep streaming counters.
-        derivedDistanceM = kotlin.math.max(derivedDistanceM, parsed.totalDistanceM.toDouble())
-        derivedEnergyKcal = kotlin.math.max(derivedEnergyKcal, parsed.totalEnergyKcal.toDouble())
+        accumulatedDistanceM = kotlin.math.max(accumulatedDistanceM, parsed.totalDistanceM.toDouble())
+        accumulatedEnergyKcal = kotlin.math.max(accumulatedEnergyKcal, parsed.totalEnergyKcal.toDouble())
     }
 }

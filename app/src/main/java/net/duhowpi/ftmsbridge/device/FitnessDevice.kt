@@ -9,6 +9,18 @@ interface FitnessDevice {
     val deviceName: String
     val machineType: FtmsConstants.MachineType
     val capabilities: FtmsCapabilities?
+    /**
+     * True when this device family does not provide reliable FTMS total-distance counters
+     * and the app/device layer must derive distance from speed × time.
+     */
+    val shouldCalculateDistanceInApp: Boolean
+        get() = false
+    /**
+     * True when this device family does not provide reliable FTMS total-energy counters
+     * and the app/device layer must derive kcal values.
+     */
+    val shouldCalculateEnergyInApp: Boolean
+        get() = false
 
     fun onFeaturesReceived(data: ByteArray)
     fun onDataReceived(data: ByteArray): FitnessSample?
@@ -32,6 +44,30 @@ interface FitnessDevice {
      * (e.g. BH Fitness treadmill, DummyTreadmill) should override this.
      */
     fun reset() {}
+
+    /**
+     * Computes the distance delta (in metres) travelled at [speedKmh] over [dtSec] seconds.
+     *
+     * This is the inverse of `speedKmh = distanceDeltaM / dtSec * 3.6`.  Provided as a
+     * named helper so device subclasses that derive their own distance (because the device
+     * always reports 0 in FTMS packets) can call it instead of duplicating the conversion.
+     *
+     * Returns 0 when [dtSec] ≤ 0 or [speedKmh] ≤ 0.
+     */
+    fun computeDistanceDeltaM(speedKmh: Double, dtSec: Double): Double {
+        if (dtSec <= 0.0 || speedKmh <= 0.0) return 0.0
+        return speedKmh * dtSec * METERS_PER_KMH_PER_SEC
+    }
+
+    /**
+     * Returns the display-ready inclination percentage for the given [sample].
+     *
+     * Default: returns [FitnessSample.inclinationPercent] directly.
+     * Devices that apply proprietary incline correction in [onDataReceived] (e.g. BH Fitness
+     * treadmill) already return a corrected sample, so the default pass-through is sufficient;
+     * the override hook is provided for any future device that may need post-processing here.
+     */
+    fun getDisplayIncline(sample: FitnessSample): Double = sample.inclinationPercent
 
     /**
      * Returns `true` when the machine is actively moving based on the given [sample].

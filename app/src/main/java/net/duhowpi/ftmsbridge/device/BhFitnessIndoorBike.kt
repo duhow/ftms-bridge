@@ -30,11 +30,8 @@ class BhFitnessIndoorBike(deviceName: String) :
     override fun isMoving(sample: FitnessSample): Boolean =
         sample.cadenceRpm > MIN_MOVING_CADENCE_RPM || sample.instantaneousPowerW > MIN_MOVING_POWER_W
 
-    override fun getSupportedDeviceName(): Regex = Regex("^B01_\\d{5}$")
+    override fun getSupportedDeviceName(): Regex = Regex("^B01_[0-9A-Fa-f]{5}$")
 
-    private var lastSampleTimestampMs: Long = 0L
-    private var cumulativeDistanceM: Double = 0.0
-    private var cumulativeEnergyKcal: Double = 0.0
     private var hasAcceptedBaseline: Boolean = false
     private var lastAcceptedSpeedKmh: Double = 0.0
     private var lastAcceptedCadenceRpm: Double = 0.0
@@ -81,8 +78,9 @@ class BhFitnessIndoorBike(deviceName: String) :
     override fun onDataReceived(data: ByteArray): FitnessSample? {
         val sample = super.onDataReceived(data) ?: return null
         val nowMs = sample.timestampMs
-        val dtSec = if (lastSampleTimestampMs > 0L) {
-            val rawDeltaMs = nowMs - lastSampleTimestampMs
+        // Log a warning for negative time deltas before advancing the shared timestamp.
+        if (lastAccumulatorTimestampMs > 0L) {
+            val rawDeltaMs = nowMs - lastAccumulatorTimestampMs
             if (rawDeltaMs < 0L) {
                 val absDeltaSec = kotlin.math.abs(rawDeltaMs) / 1000.0
                 Log.w(
@@ -90,11 +88,8 @@ class BhFitnessIndoorBike(deviceName: String) :
                     "Negative sample delta ${rawDeltaMs}ms (~${"%.3f".format(absDeltaSec)}s); treating as 0 (clock adjustment?)"
                 )
             }
-            rawDeltaMs.coerceAtLeast(0L) / 1000.0
-        } else {
-            0.0
         }
-        lastSampleTimestampMs = nowMs
+        val dtSec = sampleDtSec(nowMs)
 
         val rawSpeedKmh = sample.speedKmh
         val rawCadenceRpm = sample.cadenceRpm
@@ -142,19 +137,18 @@ class BhFitnessIndoorBike(deviceName: String) :
         val derivedLevel = deriveResistanceLevel(filteredCadenceRpm, sample.instantaneousPowerW)
 
         if (dtSec > 0.0) {
-            cumulativeDistanceM += syntheticSpeedKmh * dtSec * FitnessDevice.METERS_PER_KMH_PER_SEC
+            accumulateDistance(syntheticSpeedKmh, dtSec)
             val nonNegativePowerW = sample.instantaneousPowerW.coerceAtLeast(0).toDouble()
-            val energyDeltaKcal = (nonNegativePowerW * dtSec) / FitnessDevice.JOULES_PER_KCAL
-            cumulativeEnergyKcal += energyDeltaKcal
+            accumulateEnergyDelta((nonNegativePowerW * dtSec) / FitnessDevice.JOULES_PER_KCAL)
         }
 
         return sample.copy(
             speedKmh = 0.0,
             averageSpeedKmh = 0.0,
             cadenceRpm = filteredCadenceRpm,
-            totalDistanceM = kotlin.math.round(cumulativeDistanceM).toInt(),
+            totalDistanceM = getAccumulatedDistanceM(),
             stridesPerMin = strides,
-            totalEnergyKcal = kotlin.math.round(cumulativeEnergyKcal).toInt(),
+            totalEnergyKcal = getAccumulatedEnergyKcal(),
             resistanceLevel = derivedLevel,
             energyPerHourKcal = 0,
             energyPerMinuteKcal = 0,

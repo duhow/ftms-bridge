@@ -335,7 +335,7 @@ class MainActivity : AppCompatActivity() {
         // txtLapCount (total elapsed) is updated exclusively by updateElapsedDisplay / elapsedTickRunnable
         // Inline metrics row inside the lap card
         binding.lapValueSpeed.text = String.format("%.1f", sample.speedKmh)
-        binding.lapValueInclination.text = "${sample.inclinationPercent.roundToInt()}"
+        binding.lapValueInclination.text = "${resolveDisplayIncline(sample).roundToInt()}"
         if (sample.stridesPerMin > 0) {
             binding.lapValueEnergy.text = String.format("%.1f", sample.stridesPerMin)
             binding.lapUnitEnergy.setText(R.string.unit_per_min)
@@ -946,7 +946,7 @@ class MainActivity : AppCompatActivity() {
             binding.valueEnergy.text = "${sample.totalEnergyKcal}"
         }
 
-        binding.valueInclination.text = "${sample.inclinationPercent.roundToInt()}"
+        binding.valueInclination.text = "${resolveDisplayIncline(sample).roundToInt()}"
         binding.valueResistance.text = if (sample.resistanceLevel > 0) "${sample.resistanceLevel}" else "--"
 
         // Elapsed display is driven by the 1 s tick handler; sync the tick counter here
@@ -961,7 +961,7 @@ class MainActivity : AppCompatActivity() {
         val isTreadmill = isActiveTreadmill
         liveSpeedPoints.add(if (isTreadmill) sample.speedKmh.toFloat() else sample.cadenceRpm.toFloat())
         livePaceSecondaryPoints.add(
-            if (isTreadmill) sample.inclinationPercent.toFloat() else sample.resistanceLevel.toFloat()
+            if (isTreadmill) resolveDisplayIncline(sample).toFloat() else sample.resistanceLevel.toFloat()
         )
         liveHrPoints.add(sample.heartRateBpm.toFloat())
         if (isChartViewActive) updateLiveChart()
@@ -1297,7 +1297,7 @@ class MainActivity : AppCompatActivity() {
             return
         }
         // Round current incline to nearest integer so the seekbar starts on a whole-% step.
-        val current = (lastFtmsSample?.inclinationPercent?.roundToInt()?.toDouble()
+        val current = (lastFtmsSample?.let { resolveDisplayIncline(it) }?.roundToInt()?.toDouble()
             ?: INCLINE_DEFAULT_PERCENT).coerceIn(INCLINE_MIN_PERCENT, INCLINE_MAX_PERCENT)
         showAdjustDialog(
             title = getString(R.string.control_set_incline_title),
@@ -1442,6 +1442,10 @@ class MainActivity : AppCompatActivity() {
             .array()
         return cm.sendControlPoint(payload)
     }
+
+    /** Returns the display-ready inclination for [sample], delegating to the active device. */
+    private fun resolveDisplayIncline(sample: FitnessSample): Double =
+        fitnessDevice?.getDisplayIncline(sample) ?: sample.inclinationPercent
 
     private fun calculateFallbackElapsedSec(sampleTimestampMs: Long): Int {
         val deltaMs = sampleTimestampMs - elapsedFallbackStartTime
