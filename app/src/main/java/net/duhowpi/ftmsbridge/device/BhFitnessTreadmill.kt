@@ -10,6 +10,8 @@ class BhFitnessTreadmill(deviceName: String) :
 
     private val tag = "BhFitnessTreadmill"
     override fun getSupportedDeviceName(): Regex = Regex("^T01_\\d{5}$")
+    override val shouldCalculateDistanceInApp: Boolean = true
+    override val shouldCalculateEnergyInApp: Boolean = true
 
     // Treadmill-specific session accumulators.
     // Distance and energy are tracked via the shared BhFitnessFtmsDevice accumulators.
@@ -65,6 +67,8 @@ class BhFitnessTreadmill(deviceName: String) :
      */
     override fun encodeTargetInclineRaw(physicalPercent: Double): Int =
         toRawIncline(physicalPercent)
+
+    override fun getDisplayIncline(sample: FitnessSample): Double = sample.inclinationPercent
 
     fun getIncline(sample: FitnessSample): Double {
         // Recover the raw INT16 device value (FTMS parses inclinationPercent = rawDevice * 0.1).

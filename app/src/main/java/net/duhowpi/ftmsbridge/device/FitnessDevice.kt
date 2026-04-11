@@ -9,6 +9,18 @@ interface FitnessDevice {
     val deviceName: String
     val machineType: FtmsConstants.MachineType
     val capabilities: FtmsCapabilities?
+    /**
+     * True when this device family does not provide reliable FTMS total-distance counters
+     * and the app/device layer must derive distance from speed × time.
+     */
+    val shouldCalculateDistanceInApp: Boolean
+        get() = false
+    /**
+     * True when this device family does not provide reliable FTMS total-energy counters
+     * and the app/device layer must derive kcal values.
+     */
+    val shouldCalculateEnergyInApp: Boolean
+        get() = false
 
     fun onFeaturesReceived(data: ByteArray)
     fun onDataReceived(data: ByteArray): FitnessSample?
