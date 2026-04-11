@@ -39,7 +39,7 @@ import net.duhowpi.ftmsbridge.data.AppDatabase
 import net.duhowpi.ftmsbridge.data.WorkoutSample
 import net.duhowpi.ftmsbridge.data.WorkoutSession
 import net.duhowpi.ftmsbridge.databinding.ActivityMainBinding
-import net.duhowpi.ftmsbridge.device.BhFitnessIndoorBike
+import net.duhowpi.ftmsbridge.device.BhFitnessFtmsDevice
 import net.duhowpi.ftmsbridge.device.DummyTreadmill
 import net.duhowpi.ftmsbridge.device.FitnessDevice
 import net.duhowpi.ftmsbridge.device.FtmsDevice
@@ -652,14 +652,7 @@ class MainActivity : AppCompatActivity() {
                     sample.copy(heartRateBpm = lastHeartRateBpm) else sample
                 lastFtmsSample = mergedSample
                 // Detect machine running state for devices without machine-status updates.
-                // BH indoor bikes do not provide a meaningful speed field, so use cadence/power.
-                val isBhIndoorBike = fitnessDevice is BhFitnessIndoorBike
-                val nowRunning = if (isBhIndoorBike) {
-                    mergedSample.cadenceRpm > BhFitnessIndoorBike.MIN_MOVING_CADENCE_RPM ||
-                            mergedSample.instantaneousPowerW > BhFitnessIndoorBike.MIN_MOVING_POWER_W
-                } else {
-                    mergedSample.speedKmh > 0.1
-                }
+                val nowRunning = fitnessDevice?.isMoving(mergedSample) ?: (mergedSample.speedKmh > 0.1)
                 if (nowRunning != isMachineRunning) {
                     isMachineRunning = nowRunning
                     runOnUiThread { updateMachineRunningState() }
@@ -723,7 +716,7 @@ class MainActivity : AppCompatActivity() {
             }
 
             override fun onIConceptData(data: ByteArray) {
-                fitnessDevice?.onIConceptData(data)
+                (fitnessDevice as? BhFitnessFtmsDevice)?.onIConceptData(data)
             }
         })
     }
@@ -901,7 +894,7 @@ class MainActivity : AppCompatActivity() {
                 if (isPauseEvent) pauseRecording() else stopRecording()
             }
             // Transition from paused to fully stopped (e.g. STOP op received while paused).
-            !isMachineRunning && !isRecording && !isMachinePaused && currentSessionId != null -> {
+            else -> {
                 stopRecording()
             }
         }
@@ -1003,17 +996,13 @@ class MainActivity : AppCompatActivity() {
 
     private fun startRecording() {
         val device: FitnessDevice = fitnessDevice ?: dummyTreadmill ?: return
-        stateMachine.onRecordingStarted()
-        sessionStartTime = System.currentTimeMillis()
-        elapsedFallbackStartTime = 0L
-        lastFallbackElapsedSec = 0
-        lastSavedSampleMs = 0
-        lastSavedSampleData = null
         // Reset device-internal elapsed so it starts from zero at activity start, not
         // from the BLE connection time.
-        device.resetElapsedTime()
+        device.reset()
+        resetSessionData()
+        stateMachine.onRecordingStarted()
+        sessionStartTime = System.currentTimeMillis()
         // Reset and start the 1-second tick so the elapsed display counts smoothly.
-        elapsedTickSec = 0
         updateElapsedDisplay(0)
         elapsedTickHandler.removeCallbacks(elapsedTickRunnable)
         elapsedTickHandler.postDelayed(elapsedTickRunnable, 1000)
@@ -1022,15 +1011,8 @@ class MainActivity : AppCompatActivity() {
         val hrConnected = hrConnectionManager?.isConnected == true
         val hasHrDevice = hrConnectionManager != null
         stateMachine.applyUI(ftmsConnected, hrConnected, hasHrDevice, fitnessDevice)
-        // Clear live chart data
-        liveSpeedPoints.clear()
-        livePaceSecondaryPoints.clear()
-        liveHrPoints.clear()
-        liveChartElapsedSec = 0
-        // Reset lap tracking
-        lapStartDistanceM = 0
+        // Anchor lap start time to the actual session start (resetSessionData sets it to 0)
         lapStartTimeMs = System.currentTimeMillis()
-        lapCount = 0
         // Reset lap-view metric display so previous session values don't bleed through
         binding.lapValueSpeed.text = "--"
         binding.lapValueInclination.text = "--"
@@ -1095,6 +1077,8 @@ class MainActivity : AppCompatActivity() {
         elapsedTickSec = 0
         elapsedFallbackStartTime = 0L
         lastFallbackElapsedSec = 0
+        lastSavedSampleMs = 0
+        lastSavedSampleData = null
         lastHeartRateBpm = 0
         lastFtmsSample = null
     }

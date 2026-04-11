@@ -1,11 +1,12 @@
 package net.duhowpi.ftmsbridge.device
 
 import net.duhowpi.ftmsbridge.ftms.FtmsConstants
-import net.duhowpi.ftmsbridge.ftms.FtmsDataParser
 import net.duhowpi.ftmsbridge.model.FitnessSample
 
 class BhFitnessVerticalBike(deviceName: String) :
-    FtmsDevice(deviceName, FtmsConstants.MachineType.CROSS_TRAINER) {
+    BhFitnessFtmsDevice(deviceName, FtmsConstants.MachineType.CROSS_TRAINER) {
+
+    override fun getSupportedDeviceName(): Regex = Regex("^C01_\\d{5}$")
 
     // BH Fitness vertical bikes (e.g. C01_XXXXX) advertise the FTMS Cross Trainer
     // characteristic (0x2ACE) instead of Indoor Bike (0x2AD2).  The iConcept
@@ -31,7 +32,7 @@ class BhFitnessVerticalBike(deviceName: String) :
     }
 
     override fun onIConceptData(data: ByteArray) {
-        val parsed = FtmsDataParser.parseIConceptWorkoutData(data) ?: return
+        val parsed = parseIConceptWorkoutData(data) ?: return
         iConceptElapsedSec = parsed.elapsedTimeSec
         iConceptDistanceM = parsed.totalDistanceM
         iConceptCalories = parsed.totalEnergyKcal

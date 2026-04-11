@@ -4,7 +4,6 @@ import android.util.Log
 import android.view.View
 import androidx.core.content.ContextCompat
 import net.duhowpi.ftmsbridge.databinding.ActivityMainBinding
-import net.duhowpi.ftmsbridge.device.BhFitnessIndoorBike
 import net.duhowpi.ftmsbridge.device.FitnessDevice
 import net.duhowpi.ftmsbridge.ftms.FtmsConstants
 
@@ -315,8 +314,7 @@ class SessionStateMachine(
         val isTreadmill = machineType == FtmsConstants.MachineType.TREADMILL
         val isBike = machineType == FtmsConstants.MachineType.INDOOR_BIKE ||
                 machineType == FtmsConstants.MachineType.CROSS_TRAINER
-        val isBhIndoorBike = fitnessDevice is BhFitnessIndoorBike
-        val showSpeed = !isBhIndoorBike
+        val showSpeed = !isBike
         binding.cardSpeed.visibility = if (showSpeed) View.VISIBLE else View.GONE
         binding.rowCadencePower.visibility = if (isBike) View.VISIBLE else View.GONE
         binding.cardInclination.visibility = if (isTreadmill) View.VISIBLE else View.GONE

@@ -5,7 +5,7 @@ import net.duhowpi.ftmsbridge.ftms.FtmsConstants
 import net.duhowpi.ftmsbridge.model.FitnessSample
 
 class BhFitnessIndoorBike(deviceName: String) :
-    FtmsDevice(deviceName, FtmsConstants.MachineType.INDOOR_BIKE) {
+    BhFitnessFtmsDevice(deviceName, FtmsConstants.MachineType.INDOOR_BIKE) {
 
     companion object {
         private const val TAG = "BhFitnessIndoorBike"
@@ -13,9 +13,6 @@ class BhFitnessIndoorBike(deviceName: String) :
         private const val MAX_VALID_CADENCE_RPM = 220.0
         private const val MAX_SPEED_STEP_PER_SEC = 20.0
         private const val MAX_CADENCE_STEP_PER_SEC = 80.0
-        // km/h → m/s conversion factor.
-        private const val METERS_PER_KMH_PER_SEC = 1.0 / 3.6
-        private const val JOULES_PER_KCAL = 4184.0
         private const val STRIDES_ENCODING_FACTOR = 100.0
         // Empirical movement thresholds from B01_17384 packet captures.
         const val MIN_MOVING_POWER_W = 5
@@ -29,6 +26,11 @@ class BhFitnessIndoorBike(deviceName: String) :
     private fun stridesFromEnergy(energyField: Int): Double {
         return if (energyField > 0) energyField / STRIDES_ENCODING_FACTOR else 0.0
     }
+
+    override fun isMoving(sample: FitnessSample): Boolean =
+        sample.cadenceRpm > MIN_MOVING_CADENCE_RPM || sample.instantaneousPowerW > MIN_MOVING_POWER_W
+
+    override fun getSupportedDeviceName(): Regex = Regex("^B01_\\d{5}$")
 
     private var lastSampleTimestampMs: Long = 0L
     private var cumulativeDistanceM: Double = 0.0
@@ -140,9 +142,9 @@ class BhFitnessIndoorBike(deviceName: String) :
         val derivedLevel = deriveResistanceLevel(filteredCadenceRpm, sample.instantaneousPowerW)
 
         if (dtSec > 0.0) {
-            cumulativeDistanceM += syntheticSpeedKmh * dtSec * METERS_PER_KMH_PER_SEC
+            cumulativeDistanceM += syntheticSpeedKmh * dtSec * FitnessDevice.METERS_PER_KMH_PER_SEC
             val nonNegativePowerW = sample.instantaneousPowerW.coerceAtLeast(0).toDouble()
-            val energyDeltaKcal = (nonNegativePowerW * dtSec) / JOULES_PER_KCAL
+            val energyDeltaKcal = (nonNegativePowerW * dtSec) / FitnessDevice.JOULES_PER_KCAL
             cumulativeEnergyKcal += energyDeltaKcal
         }
 

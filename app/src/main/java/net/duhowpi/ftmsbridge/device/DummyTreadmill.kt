@@ -51,19 +51,13 @@ class DummyTreadmill : FitnessDevice {
 
     /**
      * Resets accumulated state (elapsed time, distance, energy) to zero.
-     * Useful when the virtual treadmill session is restarted without creating a new instance.
+     * Called by [MainActivity.startRecording] via [FitnessDevice.reset].
      */
-    fun reset() {
+    override fun reset() {
         elapsedSec = 0
         distanceM = 0.0
         energyKcal = 0.0
     }
-
-    /**
-     * Resets all accumulated session state so the next recording starts from zero.
-     * Called by [MainActivity.startRecording] via [FitnessDevice.resetElapsedTime].
-     */
-    override fun resetElapsedTime() = reset()
 
     override fun onFeaturesReceived(data: ByteArray) {}
     override fun onDataReceived(data: ByteArray): FitnessSample? = generateSample()
