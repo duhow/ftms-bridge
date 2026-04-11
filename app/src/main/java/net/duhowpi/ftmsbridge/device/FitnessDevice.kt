@@ -34,6 +34,16 @@ interface FitnessDevice {
     fun reset() {}
 
     /**
+     * Returns the display-ready inclination percentage for the given [sample].
+     *
+     * Default: returns [FitnessSample.inclinationPercent] directly.
+     * Devices that apply proprietary incline correction in [onDataReceived] (e.g. BH Fitness
+     * treadmill) already return a corrected sample, so the default pass-through is sufficient;
+     * the override hook is provided for any future device that may need post-processing here.
+     */
+    fun getDisplayIncline(sample: FitnessSample): Double = sample.inclinationPercent
+
+    /**
      * Returns `true` when the machine is actively moving based on the given [sample].
      *
      * Default: speed > 0.1 km/h.

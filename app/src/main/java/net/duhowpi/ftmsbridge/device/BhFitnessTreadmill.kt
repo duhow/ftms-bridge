@@ -71,18 +71,11 @@ class BhFitnessTreadmill(deviceName: String) :
      * Encodes a physical inclination percentage to the raw SINT16 value expected by
      * BH Fitness treadmills in the FTMS Control Point Set Target Inclination command.
      *
-     * Positive incline uses standard FTMS encoding (0.1 % units):
-     *   raw = physicalPercent * 10   → +1 % = 10, +5 % = 50
-     *
-     * Decline uses hardcoded values that exactly match what the device reports in
-     * its own Treadmill Data notifications (confirmed from captured device logs):
-     *   -1 % → 450  (device reads back (450-500)/62.5 = -0.8 % → displays -1 %)
-     *   -2 % → 380  (device reads back (380-500)/62.5 = -1.9 % → displays -2 %)
-     *   -3 % → 320  (device reads back (320-500)/62.5 = -2.9 % → displays -3 %)
-     *
-     * The inverse formula (pct × 62.5 + 500) gives 438/375/313, which are NOT the
-     * values the device firmware expects — static values are required.
+     * Delegates to [toRawIncline] which handles both positive (standard x10) and
+     * decline (hardcoded DECLINE_RAW map) cases.
      */
+    override fun encodeTargetInclineRaw(physicalPercent: Double): Int =
+        toRawIncline(physicalPercent)
 
     fun getIncline(sample: FitnessSample): Double {
         // Recover the raw INT16 device value (FTMS parses inclinationPercent = rawDevice * 0.1).
@@ -97,6 +90,22 @@ class BhFitnessTreadmill(deviceName: String) :
         return rawInclination / INCLINE_SCALE
     }
 
+    /**
+     * Encodes a physical inclination percentage to the raw SINT16 value expected by
+     * BH Fitness treadmills in the FTMS Control Point Set Target Inclination command.
+     *
+     * Positive incline uses standard FTMS encoding (0.1 % units):
+     *   raw = physicalPercent * 10   → +1 % = 10, +5 % = 50
+     *
+     * Decline uses hardcoded values that exactly match what the device reports in
+     * its own Treadmill Data notifications (confirmed from captured device logs):
+     *   -1 % → 450  (device reads back (450-500)/62.5 = -0.8 % → displays -1 %)
+     *   -2 % → 380  (device reads back (380-500)/62.5 = -1.9 % → displays -2 %)
+     *   -3 % → 320  (device reads back (320-500)/62.5 = -2.9 % → displays -3 %)
+     *
+     * The inverse formula (pct × 62.5 + 500) gives 438/375/313, which are NOT the
+     * values the device firmware expects — static values are required.
+     */
     fun toRawIncline(incline: Double): Int {
         if (incline < 0) {
             // Use explicit mapping for the discrete decline steps the device expects.
@@ -104,7 +113,7 @@ class BhFitnessTreadmill(deviceName: String) :
             val key = incline.roundToInt().coerceIn(-3, -1)
             return DECLINE_RAW[key] ?: 450
         }
-        return (incline * INCLINE_SCALE).roundToInt()
+        return (incline * 10.0).roundToInt()
     }
 
     companion object {
