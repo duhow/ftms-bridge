@@ -1467,7 +1467,7 @@ class MainActivity : AppCompatActivity() {
 
         // BLE is disconnected after process death — restore as Disconnected with active session
         // so the user can press Stop to finalise.
-        val restoredState = SessionState.Disconnected(hasActiveSession = savedSessionId != null)
+        val restoredState = SessionState.Disconnected(sessionActive = savedSessionId != null)
         stateMachine.restoreState(restoredState)
         stateMachine.applyUI()
 

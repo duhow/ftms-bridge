@@ -37,10 +37,10 @@ sealed class SessionState {
 
     /**
      * Device disconnected unexpectedly.
-     * If [hasActiveSession] is true, the session data is kept so the user can press Stop
+     * If [sessionActive] is true, the session data is kept so the user can press Stop
      * to finalise it.
      */
-    data class Disconnected(val hasActiveSession: Boolean = false) : SessionState()
+    data class Disconnected(val sessionActive: Boolean = false) : SessionState()
 
     // -- Convenience queries --------------------------------------------------
 
@@ -51,7 +51,7 @@ sealed class SessionState {
     /** True when the workout is in progress (Recording or Paused). */
     val hasActiveSession: Boolean
         get() = this is Recording || this is Paused ||
-                (this is Disconnected && this.hasActiveSession)
+                (this is Disconnected && this.sessionActive)
 
     /** True when data should be saved from BLE notifications. */
     val isSavingData: Boolean
@@ -65,7 +65,7 @@ sealed class SessionState {
             is Connected -> "CONNECTED"
             is Recording -> "RECORDING"
             is Paused -> "PAUSED"
-            is Disconnected -> if (this.hasActiveSession) "DISCONNECTED_SESSION" else "DISCONNECTED"
+            is Disconnected -> if (this.sessionActive) "DISCONNECTED_SESSION" else "DISCONNECTED"
         }
 
     companion object {
@@ -76,8 +76,8 @@ sealed class SessionState {
             "CONNECTED" -> Connected
             "RECORDING" -> Recording
             "PAUSED" -> Paused
-            "DISCONNECTED_SESSION" -> Disconnected(hasActiveSession = true)
-            "DISCONNECTED" -> Disconnected(hasActiveSession = false)
+            "DISCONNECTED_SESSION" -> Disconnected(sessionActive = true)
+            "DISCONNECTED" -> Disconnected(sessionActive = false)
             else -> null
         }
     }

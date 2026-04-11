@@ -62,7 +62,7 @@ class SessionStateMachine(
     /** Transition to [SessionState.Disconnected]. */
     fun onDisconnected() {
         val hadSession = state.hasActiveSession
-        transition(SessionState.Disconnected(hasActiveSession = hadSession))
+        transition(SessionState.Disconnected(sessionActive = hadSession))
     }
 
     /** Transition back to [SessionState.Idle] (e.g. after user dismisses a disconnected session). */
@@ -94,7 +94,7 @@ class SessionStateMachine(
             is SessionState.Connected -> applyConnectedUI(ftmsConnected, hrConnected, hasHrDevice, fitnessDevice)
             is SessionState.Recording -> applyRecordingUI(ftmsConnected, hrConnected, hasHrDevice)
             is SessionState.Paused -> applyPausedUI(ftmsConnected, hrConnected, hasHrDevice)
-            is SessionState.Disconnected -> applyDisconnectedUI((state as SessionState.Disconnected).hasActiveSession)
+            is SessionState.Disconnected -> applyDisconnectedUI((state as SessionState.Disconnected).sessionActive)
         }
     }
 
