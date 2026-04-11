@@ -70,9 +70,9 @@ class BhFitnessTreadmill(deviceName: String) :
         return (incline * INCLINE_SCALE).roundToInt().toShort()
     }
 
-    private fun getIncline(sample: FitnessSample): Double {
+    override fun getIncline(sample: FitnessSample): Double {
         val incline = sample.inclinationPercent
-        val decline = DECLINE_RAW.entries.find { it.value == incline }
+        val decline = DECLINE_RAW.entries.find { it.value == incline.roundToInt() }
         if (decline != null) {
             return decline.key.toDouble()
         }
