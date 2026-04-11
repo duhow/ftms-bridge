@@ -6,7 +6,7 @@ import net.duhowpi.ftmsbridge.model.FitnessSample
 class BhFitnessVerticalBike(deviceName: String) :
     BhFitnessFtmsDevice(deviceName, FtmsConstants.MachineType.CROSS_TRAINER) {
 
-    override fun getSupportedDeviceName(): Regex = Regex("^C01_\\d{5}$")
+    override fun getSupportedDeviceName(): Regex = Regex("^C01_[0-9A-Fa-f]{5}$")
 
     // BH Fitness vertical bikes (e.g. C01_XXXXX) advertise the FTMS Cross Trainer
     // characteristic (0x2ACE) instead of Indoor Bike (0x2AD2).  The iConcept
