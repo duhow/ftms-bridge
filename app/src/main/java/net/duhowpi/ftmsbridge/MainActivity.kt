@@ -503,7 +503,8 @@ class MainActivity : AppCompatActivity() {
         updateHandler.removeCallbacks(scanListUpdateRunnable)
         addBondedDevicesToList()
         updateScanListUI() // final refresh
-        binding.txtScanStatus.text = getString(R.string.devices_found, scanResultsMap.values.count { !it.isVirtual })
+        val realCount = scanResultsMap.values.count { !it.isVirtual }
+        binding.txtScanStatus.text = getString(R.string.devices_found, realCount)
         // Stop spinning and restore static icon
         (binding.btnScan.icon as? Animatable)?.stop()
         binding.btnScan.setIconResource(R.drawable.ic_refresh)
@@ -518,11 +519,12 @@ class MainActivity : AppCompatActivity() {
             if (!combined.containsKey(addr)) combined[addr] = info
         }
         val list = combined.values.toList()
+        val realCount = scanResultsMap.values.count { !it.isVirtual }
         runOnUiThread {
             binding.txtScanStatus.text = if (bleScanner.isScanning)
-                "${getString(R.string.scanning_active)} ${scanResultsMap.values.count { !it.isVirtual }}"
+                "${getString(R.string.scanning_active)} $realCount"
             else
-                getString(R.string.devices_found, scanResultsMap.values.count { !it.isVirtual })
+                getString(R.string.devices_found, realCount)
             if (list.isNotEmpty()) {
                 binding.rvScanResults.visibility = View.VISIBLE
                 binding.txtScanStatus.visibility = View.VISIBLE
@@ -542,7 +544,10 @@ class MainActivity : AppCompatActivity() {
             connectDummyTreadmill()
             return
         }
-        val device = info.device ?: return
+        val device = info.device ?: run {
+            Log.w(tag, "onDeviceConnectTapped: null device for non-virtual entry ${info.address}")
+            return
+        }
         // Save device info so it remains accessible for reconnect after scanning stops
         knownDevicesMap[info.address] = info
         when {
