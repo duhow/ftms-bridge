@@ -16,3 +16,4 @@ Add user-facing changes for the next release here.
 - Fixed indoor bike kcal formula to derive metabolic energy from power with cycling efficiency
 - Updated indoor bike resistance command scaling factor from 6.25 to 10
 - Updated indoor bike resistance UI mapping to match bike console levels (1–22, app offset corrected)
+- Recalibrated indoor bike resistance control mapping to better match requested app levels on bike console

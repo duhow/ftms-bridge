@@ -1486,7 +1486,7 @@ class MainActivity : AppCompatActivity() {
         val clamped = level.coerceIn(RESISTANCE_MIN_LEVEL, RESISTANCE_MAX_LEVEL)
         val isIndoorBike = fitnessDevice?.machineType == FtmsConstants.MachineType.INDOOR_BIKE
         val deviceLevel = if (isIndoorBike) {
-            (clamped + INDOOR_BIKE_RESISTANCE_DISPLAY_OFFSET).coerceAtMost(RESISTANCE_DEVICE_MAX_LEVEL)
+            (clamped + INDOOR_BIKE_RESISTANCE_COMMAND_OFFSET).coerceAtMost(RESISTANCE_DEVICE_MAX_LEVEL)
         } else {
             clamped
         }
@@ -1828,8 +1828,10 @@ class MainActivity : AppCompatActivity() {
         private const val RESISTANCE_MIN_LEVEL = 1
         private const val RESISTANCE_MAX_LEVEL = 22
         private const val INDOOR_BIKE_RESISTANCE_DISPLAY_OFFSET = 1
-        // Device-level command ceiling includes +1 offset relative to user-visible 1..22 range.
-        private const val RESISTANCE_DEVICE_MAX_LEVEL = RESISTANCE_MAX_LEVEL + INDOOR_BIKE_RESISTANCE_DISPLAY_OFFSET
+        // Indoor bike command offset is empirically calibrated from device logs.
+        private const val INDOOR_BIKE_RESISTANCE_COMMAND_OFFSET = 5
+        // Device-level command ceiling includes command offset relative to user-visible 1..22 range.
+        private const val RESISTANCE_DEVICE_MAX_LEVEL = RESISTANCE_MAX_LEVEL + INDOOR_BIKE_RESISTANCE_COMMAND_OFFSET
         // BH indoor-bike firmware expects FTMS target resistance encoded with this scale.
         private const val RESISTANCE_LEVEL_MULTIPLIER = 10.0
 
