@@ -651,10 +651,11 @@ class MainActivity : AppCompatActivity() {
             }
 
             override fun onMachineStatusChanged(opCode: Int, params: ByteArray) {
-                var isPauseEvent = false
+                val isPauseEvent: Boolean
                 val stateChanged: Boolean
                 when (opCode) {
                     FtmsConstants.MACHINE_STATUS_STARTED_OR_RESUMED -> {
+                        isPauseEvent = false
                         stateChanged = !isMachineRunning || isMachinePaused
                         isMachineRunning = true
                     }
@@ -666,6 +667,7 @@ class MainActivity : AppCompatActivity() {
                     }
                     FtmsConstants.MACHINE_STATUS_STOPPED_BY_SAFETY_KEY,
                     FtmsConstants.MACHINE_STATUS_RESET -> {
+                        isPauseEvent = false
                         stateChanged = isMachineRunning || isMachinePaused
                         isMachineRunning = false
                     }
@@ -1445,9 +1447,8 @@ class MainActivity : AppCompatActivity() {
      */
     private fun restoreInstanceState(state: Bundle) {
         val savedStateLabel = state.getString(KEY_SESSION_STATE) ?: return
-        val hadActiveSession = savedStateLabel == "RECORDING" || savedStateLabel == "PAUSED" ||
-                savedStateLabel.startsWith("DISCONNECTED(")
-        if (!hadActiveSession) return
+        val savedState = SessionState.fromLabel(savedStateLabel) ?: return
+        if (!savedState.hasActiveSession) return
 
         val savedSessionId = state.getLong(KEY_CURRENT_SESSION_ID, -1L).takeIf { it != -1L }
 

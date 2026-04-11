@@ -65,6 +65,20 @@ sealed class SessionState {
             is Connected -> "CONNECTED"
             is Recording -> "RECORDING"
             is Paused -> "PAUSED"
-            is Disconnected -> if (this.hasActiveSession) "DISCONNECTED(session)" else "DISCONNECTED"
+            is Disconnected -> if (this.hasActiveSession) "DISCONNECTED_SESSION" else "DISCONNECTED"
         }
+
+    companion object {
+        /** Reconstructs a [SessionState] from its persisted [label]. */
+        fun fromLabel(label: String): SessionState? = when (label) {
+            "IDLE" -> Idle
+            "CONNECTING" -> Connecting
+            "CONNECTED" -> Connected
+            "RECORDING" -> Recording
+            "PAUSED" -> Paused
+            "DISCONNECTED_SESSION" -> Disconnected(hasActiveSession = true)
+            "DISCONNECTED" -> Disconnected(hasActiveSession = false)
+            else -> null
+        }
+    }
 }
