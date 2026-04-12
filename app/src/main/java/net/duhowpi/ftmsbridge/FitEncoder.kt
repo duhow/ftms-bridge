@@ -224,16 +224,18 @@ internal object FitEncoder {
         buf.defMsg(3, GLOBAL_LAP, listOf(
             Triple(253, 4, BT_UINT32), // timestamp
             Triple(2,   4, BT_UINT32), // start_time
-            Triple(7,   4, BT_UINT32), // total_elapsed_time  (ms)
-            Triple(8,   4, BT_UINT32), // total_timer_time    (ms)
-            Triple(9,   4, BT_UINT32), // total_distance      (cm)
+            Triple(7,   4, BT_UINT32), // total_elapsed_time  (ms, scale=1000 → s)
+            Triple(8,   4, BT_UINT32), // total_timer_time    (ms, scale=1000 → s)
+            Triple(9,   4, BT_UINT32), // total_distance      (cm, scale=100 → m)
             Triple(11,  2, BT_UINT16), // total_calories
-            Triple(13,  2, BT_UINT16), // avg_speed           (mm/s)
+            Triple(13,  2, BT_UINT16), // avg_speed           (mm/s, scale=1000 → m/s)
             Triple(14,  2, BT_UINT16), // max_speed           (mm/s)
             Triple(15,  1, BT_UINT8),  // avg_heart_rate      (bpm)
             Triple(16,  1, BT_UINT8),  // max_heart_rate
             Triple(17,  1, BT_UINT8),  // avg_cadence         (rpm)
             Triple(19,  2, BT_UINT16), // avg_power           (W)
+            Triple(20,  2, BT_UINT16), // max_power           (W)
+            Triple(24,  1, BT_ENUM),   // lap_trigger
             Triple(0,   1, BT_ENUM),   // event
             Triple(1,   1, BT_ENUM)    // event_type
         ))
@@ -245,6 +247,7 @@ internal object FitEncoder {
             val avgSpeedMmS: Int, val maxSpeedMmS: Int,
             val avgHr: Int, val maxHr: Int,
             val avgCadence: Int, val avgPower: Int,
+            val maxPower: Int,
             val calories: Int?, val isLast: Boolean
         )
 
@@ -269,12 +272,14 @@ internal object FitEncoder {
             val lapMaxHr = lapSamples.maxOfOrNull { it.heartRateBpm } ?: 0
             val lapAvgCad = if (cadS.isNotEmpty()) cadS.map { it.cadenceRpm }.average().toInt() else 0
             val lapAvgPwr = if (pwrS.isNotEmpty()) pwrS.map { it.instantaneousPowerW }.average().toInt() else 0
+            val lapMaxPwr = lapSamples.maxOfOrNull { it.instantaneousPowerW } ?: 0
             return LapInfo(
                 startTs = fitTs(lapStartTsMs), endTs = fitTs(lapEndTsMs),
                 elapsedMs = lapElapsedMs, distCm = lapDistCm,
                 avgSpeedMmS = lapAvgSpeedMmS, maxSpeedMmS = lapMaxSpeedMmS,
                 avgHr = lapAvgHr, maxHr = lapMaxHr,
                 avgCadence = lapAvgCad, avgPower = lapAvgPwr,
+                maxPower = lapMaxPwr,
                 calories = null, isLast = isLast
             )
         }
@@ -313,8 +318,10 @@ internal object FitEncoder {
             buf.u8(if (maxHr > 0) maxHr.coerceIn(1, 254) else INVALID_UINT8)
             buf.u8(if (avgCadence > 0) avgCadence.coerceIn(1, 254) else INVALID_UINT8)
             buf.u16(if (avgPower > 0) avgPower.coerceIn(1, 65534) else INVALID_UINT16)
+            buf.u16(INVALID_UINT16)  // max_power not tracked in fallback
+            buf.u8(7)   // lap_trigger = session_end
             buf.u8(9)  // event = lap
-            buf.u8(EVENT_TYPE_STOP)
+            buf.u8(EVENT_TYPE_STOP_ALL)
         } else {
             lapList.forEachIndexed { i, lap ->
                 buf.u8(3)
@@ -328,12 +335,16 @@ internal object FitEncoder {
                 buf.u8(if (lap.maxHr > 0) lap.maxHr.coerceIn(1, 254) else INVALID_UINT8)
                 buf.u8(if (lap.avgCadence > 0) lap.avgCadence.coerceIn(1, 254) else INVALID_UINT8)
                 buf.u16(if (lap.avgPower > 0) lap.avgPower.coerceIn(1, 65534) else INVALID_UINT16)
+                buf.u16(if (lap.maxPower > 0) lap.maxPower.coerceIn(1, 65534) else INVALID_UINT16)
+                buf.u8(if (lap.isLast) 7 else 1)  // lap_trigger: session_end or distance
                 buf.u8(9)  // event = lap
                 buf.u8(if (lap.isLast) EVENT_TYPE_STOP_ALL else EVENT_TYPE_STOP)
             }
         }
 
         // ── Local 4: session ────────────────────────────────────────────────
+        val numLapsWritten = if (lapList.isEmpty()) 1 else lapList.size
+
         buf.defMsg(4, GLOBAL_SESSION, listOf(
             Triple(253, 4, BT_UINT32), // timestamp
             Triple(2,   4, BT_UINT32), // start_time
@@ -350,7 +361,11 @@ internal object FitEncoder {
             Triple(16,  1, BT_UINT8),  // avg_heart_rate
             Triple(17,  1, BT_UINT8),  // max_heart_rate
             Triple(18,  1, BT_UINT8),  // avg_cadence
-            Triple(20,  2, BT_UINT16)  // avg_power
+            Triple(20,  2, BT_UINT16), // avg_power
+            Triple(21,  2, BT_UINT16), // max_power
+            Triple(25,  2, BT_UINT16), // first_lap_index
+            Triple(26,  2, BT_UINT16), // num_laps
+            Triple(28,  1, BT_ENUM)    // trigger
         ))
         buf.u8(4)
         buf.u32(endTs)
@@ -362,13 +377,17 @@ internal object FitEncoder {
         buf.u8(sport)
         buf.u8(subSport)
         buf.u8(8)  // event = session
-        buf.u8(EVENT_TYPE_STOP)
+        buf.u8(EVENT_TYPE_STOP_ALL)
         buf.u16(if (avgSpeedMmS > 0) avgSpeedMmS.coerceIn(0, 65534) else INVALID_UINT16)
         buf.u16(if (maxSpeedMmS > 0) maxSpeedMmS.coerceIn(0, 65534) else INVALID_UINT16)
         buf.u8(if (avgHr > 0) avgHr.coerceIn(1, 254) else INVALID_UINT8)
         buf.u8(if (maxHr > 0) maxHr.coerceIn(1, 254) else INVALID_UINT8)
         buf.u8(if (avgCadence > 0) avgCadence.coerceIn(1, 254) else INVALID_UINT8)
         buf.u16(if (avgPower > 0) avgPower.coerceIn(1, 65534) else INVALID_UINT16)
+        buf.u16(if (maxPower > 0) maxPower.coerceIn(1, 65534) else INVALID_UINT16)
+        buf.u16(0)               // first_lap_index = 0
+        buf.u16(numLapsWritten)  // num_laps
+        buf.u8(0)                // trigger = activity_end
 
         // ── Local 5: activity ───────────────────────────────────────────────
         buf.defMsg(5, GLOBAL_ACTIVITY, listOf(
