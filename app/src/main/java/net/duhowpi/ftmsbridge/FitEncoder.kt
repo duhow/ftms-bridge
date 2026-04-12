@@ -233,7 +233,7 @@ internal object FitEncoder {
             Triple(15,  1, BT_UINT8),  // avg_heart_rate      (bpm)
             Triple(16,  1, BT_UINT8),  // max_heart_rate
             Triple(17,  1, BT_UINT8),  // avg_cadence         (rpm)
-            Triple(21,  2, BT_UINT16), // avg_power           (W)
+            Triple(19,  2, BT_UINT16), // avg_power           (W)
             Triple(0,   1, BT_ENUM),   // event
             Triple(1,   1, BT_ENUM)    // event_type
         ))
@@ -337,20 +337,20 @@ internal object FitEncoder {
         buf.defMsg(4, GLOBAL_SESSION, listOf(
             Triple(253, 4, BT_UINT32), // timestamp
             Triple(2,   4, BT_UINT32), // start_time
-            Triple(5,   4, BT_UINT32), // total_elapsed_time
-            Triple(6,   4, BT_UINT32), // total_timer_time
-            Triple(7,   4, BT_UINT32), // total_distance
-            Triple(9,   2, BT_UINT16), // total_calories
-            Triple(11,  1, BT_ENUM),   // sport
-            Triple(12,  1, BT_ENUM),   // sub_sport
+            Triple(7,   4, BT_UINT32), // total_elapsed_time (ms, scale=1000 → s)
+            Triple(8,   4, BT_UINT32), // total_timer_time   (ms, scale=1000 → s)
+            Triple(9,   4, BT_UINT32), // total_distance     (cm, scale=100 → m)
+            Triple(11,  2, BT_UINT16), // total_calories
+            Triple(5,   1, BT_ENUM),   // sport
+            Triple(6,   1, BT_ENUM),   // sub_sport
             Triple(0,   1, BT_ENUM),   // event
             Triple(1,   1, BT_ENUM),   // event_type
-            Triple(16,  2, BT_UINT16), // avg_speed (mm/s)
-            Triple(17,  2, BT_UINT16), // max_speed
-            Triple(18,  1, BT_UINT8),  // avg_heart_rate
-            Triple(19,  1, BT_UINT8),  // max_heart_rate
-            Triple(21,  1, BT_UINT8),  // avg_cadence
-            Triple(24,  2, BT_UINT16)  // avg_power
+            Triple(14,  2, BT_UINT16), // avg_speed (mm/s, scale=1000 → m/s)
+            Triple(15,  2, BT_UINT16), // max_speed
+            Triple(16,  1, BT_UINT8),  // avg_heart_rate
+            Triple(17,  1, BT_UINT8),  // max_heart_rate
+            Triple(18,  1, BT_UINT8),  // avg_cadence
+            Triple(20,  2, BT_UINT16)  // avg_power
         ))
         buf.u8(4)
         buf.u32(endTs)
