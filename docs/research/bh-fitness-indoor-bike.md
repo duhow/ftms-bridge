@@ -176,20 +176,36 @@ immediately return on the next packet). To reduce dashboard/export artifacts:
 - Single-step deltas above a time-scaled limit are treated as outliers and ignored.
 - The last accepted value is kept for that packet.
 
-### Resistance level derivation (console level 1..11)
+### Resistance level derivation (console level 1..22)
 
 This bike does not set FTMS bit 5 (Resistance Level). In all observed `0x0F54` packets,
 bytes at offsets `18–19` are non-zero and vary with workout load despite FTMS elapsed
 time not being reported by this device.
 
-For the B01_17384 capture, these bytes tracked the console “level” changes. The app now
-derives a resistance level `1..11` from estimated crank torque:
+The app derives a resistance level `1..22` from estimated crank torque:
 
 - `torqueNm = powerW / angularVelocityRadPerSec`
 - `angularVelocityRadPerSec = cadenceRpm * 2π / 60`
-- map torque bands to integer levels and clamp to `1..11` while pedaling
+- map torque bands to integer levels and clamp to `1..22` while pedaling
 
 When cadence/power indicate idle, level is `0` and the tile shows `--`.
+
+### Resistance control commands
+
+Resistance is set via FTMS control-point opcode `0x04` (Set Target Resistance Level)
+with a SINT16 payload (resolution 0.1, i.e. value `70` = 7.0 resistance units).
+
+Captured sessions revealed an incorrect +5 offset was being applied, sending
+a level 5 steps higher than selected (e.g. selecting level 7 sent resistance 12.0).
+The app now uses a static lookup table (`BhFitnessIndoorBike.RESISTANCE_LEVEL_TABLE`)
+that maps UI level N directly to `N × 10`:
+
+| UI level | Encoded value | FTMS resistance |
+|----------|--------------|-----------------|
+| 1        | 10           | 1.0             |
+| 7        | 70           | 7.0             |
+| 10       | 100          | 10.0            |
+| 22       | 220          | 22.0            |
 
 ---
 
@@ -200,7 +216,7 @@ When cadence/power indicate idle, level is `0` and the tile shows `--`.
 - `speedKmh = 0.0` in UI/output for indoor bike to avoid duplicating stride-derived value
 - `averageSpeedKmh = 0.0` — not present but zeroed for safety
 - `cadenceRpm` with outlier filtering
-- `resistanceLevel` derived as bike level (1..11) from power+cadence torque estimate
+- `resistanceLevel` derived as bike level (1..22) from power+cadence torque estimate
 - `totalDistanceM` by integrating filtered speed over packet interval
 - `stridesPerMin = totalEnergyKcal / 100.0` — stride counter
 - `totalEnergyKcal` by integrating power over packet interval

@@ -40,6 +40,7 @@ import net.duhowpi.ftmsbridge.data.WorkoutSample
 import net.duhowpi.ftmsbridge.data.WorkoutSession
 import net.duhowpi.ftmsbridge.databinding.ActivityMainBinding
 import net.duhowpi.ftmsbridge.device.BhFitnessFtmsDevice
+import net.duhowpi.ftmsbridge.device.BhFitnessIndoorBike
 import net.duhowpi.ftmsbridge.device.DummyBike
 import net.duhowpi.ftmsbridge.device.DummyTreadmill
 import net.duhowpi.ftmsbridge.device.FitnessDevice
@@ -1568,14 +1569,13 @@ class MainActivity : AppCompatActivity() {
         val cm = ftmsConnectionManager ?: return false
         val clamped = level.coerceIn(RESISTANCE_MIN_LEVEL, RESISTANCE_MAX_LEVEL)
         val isIndoorBike = fitnessDevice?.machineType == FtmsConstants.MachineType.INDOOR_BIKE
-        val deviceLevel = if (isIndoorBike) {
-            clamped + FtmsConstants.INDOOR_BIKE_RESISTANCE_COMMAND_OFFSET
+        val encoded = if (isIndoorBike) {
+            BhFitnessIndoorBike.RESISTANCE_LEVEL_TABLE[clamped - 1]
         } else {
-            clamped
+            (clamped * FtmsConstants.RESISTANCE_LEVEL_MULTIPLIER).roundToInt()
         }
-        val encoded = (deviceLevel * FtmsConstants.RESISTANCE_LEVEL_MULTIPLIER).roundToInt()
         if (!isEncodableAsSint16(encoded)) {
-            Log.w(tag, "Encoded resistance out of range: level=$clamped, deviceLevel=$deviceLevel, encoded=$encoded")
+            Log.w(tag, "Encoded resistance out of range: level=$clamped, encoded=$encoded")
             return false
         }
         val payload = ByteBuffer.allocate(3)
