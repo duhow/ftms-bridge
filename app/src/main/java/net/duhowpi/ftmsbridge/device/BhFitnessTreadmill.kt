@@ -3,7 +3,6 @@ package net.duhowpi.ftmsbridge.device
 import android.util.Log
 import net.duhowpi.ftmsbridge.ftms.FtmsConstants
 import net.duhowpi.ftmsbridge.model.FitnessSample
-import kotlin.math.abs
 import kotlin.math.roundToInt
 
 class BhFitnessTreadmill(deviceName: String) :
@@ -39,7 +38,20 @@ class BhFitnessTreadmill(deviceName: String) :
             kotlin.math.round(derivedElapsedSec).toInt()
         }
 
-        val correctedIncline = getIncline(sample)
+        val correctedIncline = run {
+            val rawIncline = sample.inclinationPercent
+            // FtmsDataParser applied ×0.1 to the raw SINT16, so recover the original raw to check
+            // BH-specific decline encodings (320/380/450 for −3/−2/−1%).
+            val rawValue = (rawIncline * 10).roundToInt()
+            val decline = DECLINE_RAW.entries.find { it.value == rawValue }
+            if (decline != null) {
+                decline.key.toDouble()
+            } else {
+                // Positive incline: device uses proprietary scale (raw = physical% × INCLINE_SCALE).
+                // FtmsDataParser already divided by 10, so undo the remaining factor.
+                (rawIncline / (INCLINE_SCALE / 10.0)).roundToInt().toDouble()
+            }
+        }
 
         if (dtSec > 0.0) {
             accumulateDistance(sample.speedKmh, dtSec)
@@ -72,27 +84,9 @@ class BhFitnessTreadmill(deviceName: String) :
         return (incline * 10.0).roundToInt().toShort()
     }
 
-    override fun getIncline(sample: FitnessSample): Double {
-        val incline = sample.inclinationPercent
-        // FtmsDataParser already applied the FTMS resolution (raw * 0.1), so recover the
-        // original raw sint16 to look up BH-specific decline encodings.
-        val rawValue = (incline * 10).roundToInt()
-        val decline = DECLINE_RAW.entries.find { it.value == rawValue }
-        if (decline != null) {
-            return decline.key.toDouble()
-        }
-
-        // Positive incline: device uses a proprietary scale (raw = physical% × INCLINE_SCALE).
-        // FtmsDataParser already divided by 10, so undo the remaining factor.
-        return (incline / (INCLINE_SCALE / 10.0)).roundToInt().toDouble()
-    }
-
     companion object {
         /** BH Fitness treadmill inclination scale factor: raw / 62.5 = physical %. */
         const val INCLINE_SCALE = 62.5
-
-        /** Tolerance (in incline %) used to treat near-integer values as whole-percent steps. */
-        private const val PERCENT_ROUNDING_TOLERANCE = 0.05
 
         /** Physical incline range for BH treadmill UI percentages. */
         const val INCLINE_STEP = 1.0
