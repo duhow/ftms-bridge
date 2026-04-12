@@ -38,7 +38,6 @@ android {
         versionName getGitVersionName()
 
         buildConfigField "String", "PROJECT_AUTHOR", "\"duhow\""
-        buildConfigField "boolean", "BT_DEBUG_LOG", "true"
     }
 
     buildTypes {

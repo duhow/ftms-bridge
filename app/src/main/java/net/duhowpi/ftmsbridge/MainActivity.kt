@@ -224,8 +224,8 @@ class MainActivity : AppCompatActivity() {
         setSupportActionBar(binding.toolbar)
 
         db = AppDatabase.getInstance(this)
-        debugLogger = BtDebugLogger(BuildConfig.BT_DEBUG_LOG, this)
-        hrDebugLogger = BtDebugLogger(BuildConfig.BT_DEBUG_LOG, this)
+        debugLogger = BtDebugLogger(BuildConfig.DEBUG, this)
+        hrDebugLogger = BtDebugLogger(BuildConfig.DEBUG, this)
         bleScanner = BleScanner(this)
         stateMachine = SessionStateMachine(binding, this)
 
@@ -474,7 +474,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun startScanning() {
         scanResultsMap.clear()
-        if (BuildConfig.BT_DEBUG_LOG) {
+        if (BuildConfig.DEBUG) {
             scanResultsMap[VIRTUAL_TREADMILL_ADDRESS] = ScannedDeviceInfo(
                 name = getString(R.string.debug_virtual_treadmill),
                 address = VIRTUAL_TREADMILL_ADDRESS,
@@ -1333,7 +1333,7 @@ class MainActivity : AppCompatActivity() {
             if (logFiles.size > 10) sb.appendLine("… +${logFiles.size - 10} more")
         }
         sb.appendLine()
-        sb.appendLine("Debug mode: ${BuildConfig.BT_DEBUG_LOG}")
+        sb.appendLine("Debug mode: ${BuildConfig.DEBUG}")
 
         val scrollView = ScrollView(this).apply {
             val tv = TextView(this@MainActivity).apply {
@@ -1835,12 +1835,12 @@ class MainActivity : AppCompatActivity() {
 
     /**
      * Seeds two fake workout sessions (treadmill + indoor bike) with realistic sample data
-     * when running in debug mode ([BuildConfig.BT_DEBUG_LOG] == true) and the database is empty.
+     * when running in debug mode ([BuildConfig.DEBUG] == true) and the database is empty.
      * This allows testing the Workout History and Detail views without a real device.
      * Only runs once: subsequent launches skip seeding because sessions already exist.
      */
     private fun createDebugSampleDataIfNeeded() {
-        if (!BuildConfig.BT_DEBUG_LOG) return
+        if (!BuildConfig.DEBUG) return
         lifecycleScope.launch(Dispatchers.IO) {
             if (db.sessionDao().getAll().isNotEmpty()) return@launch
             val now = System.currentTimeMillis()
