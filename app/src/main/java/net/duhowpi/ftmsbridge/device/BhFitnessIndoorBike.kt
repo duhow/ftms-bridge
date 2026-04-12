@@ -21,6 +21,19 @@ class BhFitnessIndoorBike(deviceName: String) :
         private const val LEVEL_TORQUE_STEP_NM = 2.0
         // Raw internal ceiling for torque-derived level values before UI display offset is applied.
         private const val MAX_LEVEL = 23
+
+        // Static encoded-value lookup table for resistance control commands.
+        // Index 0 = UI level 1, index 21 = UI level 22.
+        // Encoded values are the SINT16 payload sent via control-point opcode 0x04
+        // (FTMS "Set Target Resistance Level", resolution 0.1).
+        // Captured sessions showed the previous formula applied an incorrect +5 offset,
+        // causing the bike to run at a higher resistance than selected.
+        // This table maps UI level N directly to resistance N.0 in FTMS units (N × 10).
+        val RESISTANCE_LEVEL_TABLE = intArrayOf(
+             10,  20,  30,  40,  50,  60,  70,  80,  90, 100,
+            110, 120, 130, 140, 150, 160, 170, 180, 190, 200,
+            210, 220
+        )
         // Typical cycling gross efficiency (~24%): metabolic work ≈ mechanical work / 0.24.
         private const val CYCLING_GROSS_EFFICIENCY = 0.24
         // Empirical BH-specific mapping between decoded strides/min and crank cadence RPM.
