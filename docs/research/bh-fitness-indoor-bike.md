@@ -176,17 +176,17 @@ immediately return on the next packet). To reduce dashboard/export artifacts:
 - Single-step deltas above a time-scaled limit are treated as outliers and ignored.
 - The last accepted value is kept for that packet.
 
-### Resistance level derivation (console level 1..22)
+### Resistance level derivation (console level 1..12)
 
 This bike does not set FTMS bit 5 (Resistance Level). In all observed `0x0F54` packets,
 bytes at offsets `18–19` are non-zero and vary with workout load despite FTMS elapsed
 time not being reported by this device.
 
-The app derives a resistance level `1..22` from estimated crank torque:
+The app derives a resistance level `1..12` from estimated crank torque:
 
 - `torqueNm = powerW / angularVelocityRadPerSec`
 - `angularVelocityRadPerSec = cadenceRpm * 2π / 60`
-- map torque bands to integer levels and clamp to `1..22` while pedaling
+- map torque bands to integer levels and clamp to `1..12` while pedaling
 
 When cadence/power indicate idle, level is `0` and the tile shows `--`.
 
@@ -195,17 +195,29 @@ When cadence/power indicate idle, level is `0` and the tile shows `--`.
 Resistance is set via FTMS control-point opcode `0x04` (Set Target Resistance Level)
 with a SINT16 payload (resolution 0.1, i.e. value `70` = 7.0 resistance units).
 
-Captured sessions revealed an incorrect +5 offset was being applied, sending
-a level 5 steps higher than selected (e.g. selecting level 7 sent resistance 12.0).
-The app now uses a static lookup table (`BhFitnessIndoorBike.RESISTANCE_LEVEL_TABLE`)
+The app uses a static lookup table (`BhFitnessIndoorBike.RESISTANCE_LEVEL_TABLE`)
 that maps UI level N directly to `N × 10`:
 
-| UI level | Encoded value | FTMS resistance |
-|----------|--------------|-----------------|
-| 1        | 10           | 1.0             |
-| 7        | 70           | 7.0             |
-| 10       | 100          | 10.0            |
-| 22       | 220          | 22.0            |
+| UI level | Encoded value | FTMS resistance | Low byte (hex) |
+|----------|--------------|-----------------|----------------|
+| 1        | 10           | 1.0             | 0x0A           |
+| 6        | 60           | 6.0             | 0x3C           |
+| 12       | 120          | 12.0            | 0x78           |
+
+#### Byte-range constraint (max level 12)
+
+The BH indoor bike firmware reads the SINT16 resistance value but processes only the
+**low byte as a signed 8-bit integer** (range −128..127).  FTMS values are encoded as
+`N × 10`, so:
+
+- Levels 1–12 → encoded 10–120 → low byte 0x0A–0x78 → **bit 7 clear** → positive
+  signed byte → firmware receives and applies the intended resistance correctly.
+- Levels 13–22 → encoded 130–220 → low byte 0x82–0xDC → **bit 7 set** → firmware
+  interprets as a negative signed byte (−126..−36) → clamps to zero / minimum
+  resistance, regardless of what the control-point success response says.
+
+This is why the UI slider is limited to **1–12**: any higher level is silently ignored
+by the bike and produces a mismatch between the selected level and actual resistance.
 
 ---
 
@@ -216,7 +228,7 @@ that maps UI level N directly to `N × 10`:
 - `speedKmh = 0.0` in UI/output for indoor bike to avoid duplicating stride-derived value
 - `averageSpeedKmh = 0.0` — not present but zeroed for safety
 - `cadenceRpm` with outlier filtering
-- `resistanceLevel` derived as bike level (1..22) from power+cadence torque estimate
+- `resistanceLevel` derived as bike level (1..12) from power+cadence torque estimate
 - `totalDistanceM` by integrating filtered speed over packet interval
 - `stridesPerMin = totalEnergyKcal / 100.0` — stride counter
 - `totalEnergyKcal` by integrating power over packet interval

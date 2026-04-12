@@ -19,20 +19,24 @@ class BhFitnessIndoorBike(deviceName: String) :
         const val MIN_MOVING_CADENCE_RPM = 10.0
         private const val MIN_LEVEL_TORQUE_NM = 2.0
         private const val LEVEL_TORQUE_STEP_NM = 2.0
-        // Raw internal ceiling for torque-derived level values before UI display offset is applied.
-        private const val MAX_LEVEL = 23
+        // Maximum torque-derived resistance level the app will report for this bike.
+        // Capped at 12 because the BH indoor bike firmware reads only the low byte of
+        // the FTMS SINT16 resistance payload as a signed 8-bit integer: values 10–120
+        // (levels 1–12, low byte 0x0A–0x78) are positive and handled correctly, while
+        // values ≥ 128 (level 13+, low byte ≥ 0x80) have bit 7 set, which the firmware
+        // interprets as a negative number and clamps to near-zero resistance.
+        private const val MAX_LEVEL = 12
 
         // Static encoded-value lookup table for resistance control commands.
-        // Index 0 = UI level 1, index 21 = UI level 22.
+        // Index 0 = UI level 1, index 11 = UI level 12.
         // Encoded values are the SINT16 payload sent via control-point opcode 0x04
         // (FTMS "Set Target Resistance Level", resolution 0.1).
-        // Captured sessions showed the previous formula applied an incorrect +5 offset,
-        // causing the bike to run at a higher resistance than selected.
-        // This table maps UI level N directly to resistance N.0 in FTMS units (N × 10).
+        // Each entry is N × 10, keeping the low byte in the range 0x0A–0x78 (10–120)
+        // so that bit 7 of the low byte is never set and the firmware parses the
+        // command correctly regardless of whether it treats the byte as signed or unsigned.
         val RESISTANCE_LEVEL_TABLE = intArrayOf(
              10,  20,  30,  40,  50,  60,  70,  80,  90, 100,
-            110, 120, 130, 140, 150, 160, 170, 180, 190, 200,
-            210, 220
+            110, 120
         )
         // Typical cycling gross efficiency (~24%): metabolic work ≈ mechanical work / 0.24.
         private const val CYCLING_GROSS_EFFICIENCY = 0.24
@@ -135,8 +139,8 @@ class BhFitnessIndoorBike(deviceName: String) :
     //  Distance         — always 0; derive cumulatively from synthetic speed + time.
     //  Total Energy     — derive cumulatively from power + time.
     //  Resistance Level — FTMS resistance flag is absent in observed packets; derive
-    //                     bike level (1..23 raw) from torque estimated via power+cadence.
-    //                     UI applies an offset and treats 0 as unavailable, so users see 1..22.
+    //                     bike level (1..12) from torque estimated via power+cadence.
+    //                     0 means idle/not pedaling and the UI tile shows "--".
     //
     //  Reliable fields: cadenceRpm, instantaneousPowerW, heartRateBpm.
     //  Some sessions show occasional one-packet speed/cadence spikes. To avoid

@@ -485,6 +485,6 @@ class BleConnectionManager(
 
     companion object {
         private const val RESISTANCE_LOG_MIN_LEVEL = 1
-        private const val RESISTANCE_LOG_MAX_LEVEL = 22
+        private const val RESISTANCE_LOG_MAX_LEVEL = 12
     }
 }

@@ -1917,9 +1917,10 @@ class MainActivity : AppCompatActivity() {
         private const val INCLINE_DANGER_PERCENT = 12.0
         private const val INCLINE_DECLINE_DANGER_PERCENT = -2.0
         private const val RESISTANCE_MIN_LEVEL = 1
-        private const val RESISTANCE_MAX_LEVEL = 22
-        // Display-only offset for parsed resistance telemetry; command offset is in FtmsConstants.
-        private const val INDOOR_BIKE_RESISTANCE_DISPLAY_OFFSET = 1
+        private const val RESISTANCE_MAX_LEVEL = 12
+        // No display offset: torque-derived level 1..12 maps directly to UI level 1..12.
+        // Level 0 means not pedaling (the UI tile shows "--").
+        private const val INDOOR_BIKE_RESISTANCE_DISPLAY_OFFSET = 0
         private const val DUMMY_RESISTANCE_BASE_LEVEL = 3
         private const val DUMMY_RESISTANCE_WAVE_AMPLITUDE = 5
 
