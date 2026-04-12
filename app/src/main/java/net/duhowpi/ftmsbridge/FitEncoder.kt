@@ -157,10 +157,9 @@ internal object FitEncoder {
         ((speedKmh / 3.6) * 1000.0).roundToInt().coerceIn(0, 65534)
 
     private fun softwareVersionCode(versionName: String): Int {
-        val parts = Regex("""\d+""").findAll(versionName)
-            .map { it.value.toIntOrNull() ?: 0 }
-            .take(3)
-            .toList()
+        // Parse only the base semver (major.minor.patch), ignoring pre-release/build metadata
+        val base = versionName.substringBefore('-')
+        val parts = base.split('.').map { it.toIntOrNull() ?: 0 }
         if (parts.isEmpty()) return 1
         val major = parts.getOrElse(0) { 0 }
         val minor = parts.getOrElse(1) { 0 }
@@ -220,6 +219,13 @@ internal object FitEncoder {
             "STAIR_CLIMBER" -> FitSubSport.STAIR_CLIMBING.value
             else            -> FitSubSport.GENERIC.value
         }
+
+        // Activity feature flags: determine which metrics are relevant per machine type
+        val hasCadence    = session.machineType != "TREADMILL"
+        val hasPower      = session.machineType == "INDOOR_BIKE"
+        val hasGrade      = session.machineType == "TREADMILL" || session.machineType == "CROSS_TRAINER"
+        val hasResistance = session.machineType == "INDOOR_BIKE"
+        val hasCycles     = session.machineType == "INDOOR_BIKE" || session.machineType == "CROSS_TRAINER"
 
         // Derive summary stats from sample data (accurate even if session fields are unset)
         val hrSamples  = samples.filter { it.heartRateBpm > 0 }
@@ -325,18 +331,19 @@ internal object FitEncoder {
         buf.u8(1); buf.u32(startTs); buf.u8(EVENT_TIMER); buf.u8(EVENT_TYPE_START); buf.u32(0L)
 
         // ── Local 2: record ─────────────────────────────────────────────────
-        buf.defMsg(2, GLOBAL_RECORD, listOf(
+        val recordFields = mutableListOf(
             Triple(253, 4, BT_UINT32),  // timestamp
             Triple(6,   2, BT_UINT16),  // speed        (mm/s; scale=1000 → m/s)
-            Triple(4,   1, BT_UINT8),   // cadence      (rpm)
-            Triple(7,   2, BT_UINT16),  // power        (W)
-            Triple(3,   1, BT_UINT8),   // heart_rate   (bpm)
-            Triple(5,   4, BT_UINT32),  // distance     (cm;  scale=100 → m)
-            Triple(9,   2, BT_SINT16),  // grade        (scale=100 → %)
-            Triple(10,  1, BT_UINT8),   // resistance
-            Triple(19,  4, BT_UINT32),  // total_cycles
-            Triple(33,  2, BT_UINT16)   // calories
-        ))
+        )
+        if (hasCadence)    recordFields.add(Triple(4,  1, BT_UINT8))   // cadence (rpm)
+        if (hasPower)      recordFields.add(Triple(7,  2, BT_UINT16))  // power (W)
+        recordFields.add(Triple(3,  1, BT_UINT8))                      // heart_rate (bpm)
+        recordFields.add(Triple(5,  4, BT_UINT32))                     // distance (cm; scale=100 → m)
+        if (hasGrade)      recordFields.add(Triple(9,  2, BT_SINT16))  // grade (scale=100 → %)
+        if (hasResistance) recordFields.add(Triple(10, 1, BT_UINT8))   // resistance
+        if (hasCycles)     recordFields.add(Triple(19, 4, BT_UINT32))  // total_cycles
+        recordFields.add(Triple(33, 2, BT_UINT16))                     // calories
+        buf.defMsg(2, GLOBAL_RECORD, recordFields)
 
         var prevRaw: WorkoutSample? = null
         var prevEmitted: WorkoutSample? = null
@@ -385,13 +392,13 @@ internal object FitEncoder {
             buf.u8(2)
             buf.u32(ts)
             buf.u16(speedMmS)
-            buf.u8(cad)
-            buf.u16(pwr)
+            if (hasCadence)    buf.u8(cad)
+            if (hasPower)      buf.u16(pwr)
             buf.u8(hr)
             buf.u32(distCm)
-            buf.s16(grade)
-            buf.u8(resist)
-            buf.u32(sampleCycles)
+            if (hasGrade)      buf.s16(grade)
+            if (hasResistance) buf.u8(resist)
+            if (hasCycles)     buf.u32(sampleCycles)
             buf.u16(sampleCalories)
         }
 
@@ -399,28 +406,37 @@ internal object FitEncoder {
         buf.u8(1); buf.u32(endTs); buf.u8(EVENT_TIMER); buf.u8(EVENT_TYPE_STOP_ALL); buf.u32(0L)
 
         // ── Local 3: lap ────────────────────────────────────────────────────
-        buf.defMsg(3, GLOBAL_LAP, listOf(
+        val lapFields = mutableListOf(
             Triple(253, 4, BT_UINT32), // timestamp
             Triple(2,   4, BT_UINT32), // start_time
             Triple(7,   4, BT_UINT32), // total_elapsed_time  (ms, scale=1000 → s)
             Triple(8,   4, BT_UINT32), // total_timer_time    (ms, scale=1000 → s)
             Triple(9,   4, BT_UINT32), // total_distance      (cm, scale=100 → m)
-            Triple(10,  4, BT_UINT32), // total_cycles
+        )
+        if (hasCycles) lapFields.add(Triple(10, 4, BT_UINT32)) // total_cycles
+        lapFields.addAll(listOf(
             Triple(11,  2, BT_UINT16), // total_calories
             Triple(13,  2, BT_UINT16), // avg_speed           (mm/s, scale=1000 → m/s)
             Triple(14,  2, BT_UINT16), // max_speed           (mm/s)
             Triple(15,  1, BT_UINT8),  // avg_heart_rate      (bpm)
             Triple(16,  1, BT_UINT8),  // max_heart_rate
-            Triple(17,  1, BT_UINT8),  // avg_cadence         (rpm)
-            Triple(19,  2, BT_UINT16), // avg_power           (W)
-            Triple(20,  2, BT_UINT16), // max_power           (W)
+        ))
+        if (hasCadence) lapFields.add(Triple(17, 1, BT_UINT8))   // avg_cadence (rpm)
+        if (hasPower) {
+            lapFields.add(Triple(19, 2, BT_UINT16)) // avg_power (W)
+            lapFields.add(Triple(20, 2, BT_UINT16)) // max_power (W)
+        }
+        lapFields.addAll(listOf(
             Triple(24,  1, BT_ENUM),   // lap_trigger
             Triple(25,  1, BT_ENUM),   // sport
             Triple(39,  1, BT_ENUM),   // sub_sport
-            Triple(41,  4, BT_UINT32), // total_work          (J)
+        ))
+        if (hasPower) lapFields.add(Triple(41, 4, BT_UINT32)) // total_work (J)
+        lapFields.addAll(listOf(
             Triple(0,   1, BT_ENUM),   // event
             Triple(1,   1, BT_ENUM)    // event_type
         ))
+        buf.defMsg(3, GLOBAL_LAP, lapFields)
 
         // Build per-km laps from sample data, plus final partial lap
         val lapList = mutableListOf<LapInfo>()
@@ -510,19 +526,21 @@ internal object FitEncoder {
             buf.u32(elapsedMs)
             buf.u32(elapsedMs)
             buf.u32(totalDistCm)
-            buf.u32(totalCycles.coerceIn(0L, 0xFFFFFFFEL))
+            if (hasCycles) buf.u32(totalCycles.coerceIn(0L, 0xFFFFFFFEL))
             buf.u16(totalCals ?: INVALID_UINT16)
             buf.u16(if (avgSpeedMmS > 0) avgSpeedMmS else INVALID_UINT16)
             buf.u16(if (maxSpeedMmS > 0) maxSpeedMmS else INVALID_UINT16)
             buf.u8(if (avgHr > 0) avgHr.coerceIn(1, 254) else INVALID_UINT8)
             buf.u8(if (maxHr > 0) maxHr.coerceIn(1, 254) else INVALID_UINT8)
-            buf.u8(if (avgCadence > 0) avgCadence.coerceIn(1, 254) else INVALID_UINT8)
-            buf.u16(if (avgPower > 0) avgPower.coerceIn(1, 65534) else INVALID_UINT16)
-            buf.u16(if (maxPower > 0) maxPower.coerceIn(1, 65534) else INVALID_UINT16)
+            if (hasCadence) buf.u8(if (avgCadence > 0) avgCadence.coerceIn(1, 254) else INVALID_UINT8)
+            if (hasPower) {
+                buf.u16(if (avgPower > 0) avgPower.coerceIn(1, 65534) else INVALID_UINT16)
+                buf.u16(if (maxPower > 0) maxPower.coerceIn(1, 65534) else INVALID_UINT16)
+            }
             buf.u8(LAP_TRIGGER_SESSION_END)
             buf.u8(sport)
             buf.u8(subSport)
-            buf.u32(totalWorkJ.coerceIn(0L, 0xFFFFFFFEL))
+            if (hasPower) buf.u32(totalWorkJ.coerceIn(0L, 0xFFFFFFFEL))
             buf.u8(EVENT_LAP)
             buf.u8(EVENT_TYPE_STOP_ALL)
         } else {
@@ -533,19 +551,21 @@ internal object FitEncoder {
                 buf.u32(lap.elapsedMs)
                 buf.u32(lap.elapsedMs)
                 buf.u32(lap.distCm)
-                buf.u32(lap.totalCycles.coerceIn(0L, 0xFFFFFFFEL))
+                if (hasCycles) buf.u32(lap.totalCycles.coerceIn(0L, 0xFFFFFFFEL))
                 buf.u16(lap.calories?.coerceIn(0, 65534) ?: INVALID_UINT16)
                 buf.u16(if (lap.avgSpeedMmS > 0) lap.avgSpeedMmS else INVALID_UINT16)
                 buf.u16(if (lap.maxSpeedMmS > 0) lap.maxSpeedMmS else INVALID_UINT16)
                 buf.u8(if (lap.avgHr > 0) lap.avgHr.coerceIn(1, 254) else INVALID_UINT8)
                 buf.u8(if (lap.maxHr > 0) lap.maxHr.coerceIn(1, 254) else INVALID_UINT8)
-                buf.u8(if (lap.avgCadence > 0) lap.avgCadence.coerceIn(1, 254) else INVALID_UINT8)
-                buf.u16(if (lap.avgPower > 0) lap.avgPower.coerceIn(1, 65534) else INVALID_UINT16)
-                buf.u16(if (lap.maxPower > 0) lap.maxPower.coerceIn(1, 65534) else INVALID_UINT16)
+                if (hasCadence) buf.u8(if (lap.avgCadence > 0) lap.avgCadence.coerceIn(1, 254) else INVALID_UINT8)
+                if (hasPower) {
+                    buf.u16(if (lap.avgPower > 0) lap.avgPower.coerceIn(1, 65534) else INVALID_UINT16)
+                    buf.u16(if (lap.maxPower > 0) lap.maxPower.coerceIn(1, 65534) else INVALID_UINT16)
+                }
                 buf.u8(if (lap.isLast) LAP_TRIGGER_SESSION_END else LAP_TRIGGER_DISTANCE)
                 buf.u8(sport)
                 buf.u8(subSport)
-                buf.u32(lap.totalWorkJ.coerceIn(0L, 0xFFFFFFFEL))
+                if (hasPower) buf.u32(lap.totalWorkJ.coerceIn(0L, 0xFFFFFFFEL))
                 buf.u8(EVENT_LAP)
                 buf.u8(if (lap.isLast) EVENT_TYPE_STOP_ALL else EVENT_TYPE_STOP)
             }
@@ -554,13 +574,15 @@ internal object FitEncoder {
         // ── Local 4: session ────────────────────────────────────────────────
         val numLapsWritten = if (lapList.isEmpty()) 1 else lapList.size
 
-        buf.defMsg(4, GLOBAL_SESSION, listOf(
+        val sessionFields = mutableListOf(
             Triple(253, 4, BT_UINT32), // timestamp
             Triple(2,   4, BT_UINT32), // start_time
             Triple(7,   4, BT_UINT32), // total_elapsed_time (ms, scale=1000 → s)
             Triple(8,   4, BT_UINT32), // total_timer_time   (ms, scale=1000 → s)
             Triple(9,   4, BT_UINT32), // total_distance     (cm, scale=100 → m)
-            Triple(10,  4, BT_UINT32), // total_cycles
+        )
+        if (hasCycles) sessionFields.add(Triple(10, 4, BT_UINT32)) // total_cycles
+        sessionFields.addAll(listOf(
             Triple(11,  2, BT_UINT16), // total_calories
             Triple(5,   1, BT_ENUM),   // sport
             Triple(6,   1, BT_ENUM),   // sub_sport
@@ -570,22 +592,27 @@ internal object FitEncoder {
             Triple(15,  2, BT_UINT16), // max_speed
             Triple(16,  1, BT_UINT8),  // avg_heart_rate
             Triple(17,  1, BT_UINT8),  // max_heart_rate
-            Triple(18,  1, BT_UINT8),  // avg_cadence
-            Triple(20,  2, BT_UINT16), // avg_power
-            Triple(21,  2, BT_UINT16), // max_power
+        ))
+        if (hasCadence) sessionFields.add(Triple(18, 1, BT_UINT8))   // avg_cadence
+        if (hasPower) {
+            sessionFields.add(Triple(20, 2, BT_UINT16)) // avg_power
+            sessionFields.add(Triple(21, 2, BT_UINT16)) // max_power
+        }
+        sessionFields.addAll(listOf(
             Triple(25,  2, BT_UINT16), // first_lap_index
             Triple(26,  2, BT_UINT16), // num_laps
             Triple(28,  1, BT_ENUM),   // trigger
-            Triple(48,  4, BT_UINT32), // total_work (J)
-            Triple(59,  4, BT_UINT32)  // total_moving_time (ms)
         ))
+        if (hasPower) sessionFields.add(Triple(48, 4, BT_UINT32)) // total_work (J)
+        sessionFields.add(Triple(59, 4, BT_UINT32)) // total_moving_time (ms)
+        buf.defMsg(4, GLOBAL_SESSION, sessionFields)
         buf.u8(4)
         buf.u32(endTs)
         buf.u32(startTs)
         buf.u32(elapsedMs)
         buf.u32(elapsedMs)
         buf.u32(totalDistCm)
-        buf.u32(totalCycles.coerceIn(0L, 0xFFFFFFFEL))
+        if (hasCycles) buf.u32(totalCycles.coerceIn(0L, 0xFFFFFFFEL))
         buf.u16(totalCals ?: INVALID_UINT16)
         buf.u8(sport)
         buf.u8(subSport)
@@ -595,13 +622,15 @@ internal object FitEncoder {
         buf.u16(if (maxSpeedMmS > 0) maxSpeedMmS else INVALID_UINT16)
         buf.u8(if (avgHr > 0) avgHr.coerceIn(1, 254) else INVALID_UINT8)
         buf.u8(if (maxHr > 0) maxHr.coerceIn(1, 254) else INVALID_UINT8)
-        buf.u8(if (avgCadence > 0) avgCadence.coerceIn(1, 254) else INVALID_UINT8)
-        buf.u16(if (avgPower > 0) avgPower.coerceIn(1, 65534) else INVALID_UINT16)
-        buf.u16(if (maxPower > 0) maxPower.coerceIn(1, 65534) else INVALID_UINT16)
+        if (hasCadence) buf.u8(if (avgCadence > 0) avgCadence.coerceIn(1, 254) else INVALID_UINT8)
+        if (hasPower) {
+            buf.u16(if (avgPower > 0) avgPower.coerceIn(1, 65534) else INVALID_UINT16)
+            buf.u16(if (maxPower > 0) maxPower.coerceIn(1, 65534) else INVALID_UINT16)
+        }
         buf.u16(0)               // first_lap_index = 0
         buf.u16(numLapsWritten)  // num_laps
         buf.u8(SESSION_TRIGGER_ACTIVITY_END)
-        buf.u32(totalWorkJ.coerceIn(0L, 0xFFFFFFFEL))
+        if (hasPower) buf.u32(totalWorkJ.coerceIn(0L, 0xFFFFFFFEL))
         buf.u32(elapsedMs)
 
         // ── Local 5: activity ───────────────────────────────────────────────
