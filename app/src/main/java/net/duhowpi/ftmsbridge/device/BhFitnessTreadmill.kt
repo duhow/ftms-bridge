@@ -93,7 +93,7 @@ class BhFitnessTreadmill(deviceName: String) :
         // Negative (decline) values require BH-proprietary firmware-specific raw values.
         if (rounded in DECLINE_RAW) return DECLINE_RAW[rounded]!!.toShort()
         // 1% special case: FTMS raw=10 is silently ignored; use proprietary scale.
-        if (rounded == 1) return (incline * INCLINE_SCALE).roundToInt().toShort()
+        if (rounded == 1) return (incline * 12.0).roundToInt().toShort()
         // All other values (0%, 2%–16%): standard FTMS encoding ×10.
         return (incline * 10.0).roundToInt().toShort()
     }
