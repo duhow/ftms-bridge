@@ -72,12 +72,17 @@ class BhFitnessTreadmill(deviceName: String) :
 
     override fun getIncline(sample: FitnessSample): Double {
         val incline = sample.inclinationPercent
-        val decline = DECLINE_RAW.entries.find { it.value == incline.roundToInt() }
+        // FtmsDataParser already applied the FTMS resolution (raw * 0.1), so recover the
+        // original raw sint16 to look up BH-specific decline encodings.
+        val rawValue = (incline * 10).roundToInt()
+        val decline = DECLINE_RAW.entries.find { it.value == rawValue }
         if (decline != null) {
             return decline.key.toDouble()
         }
 
-        return (incline / INCLINE_SCALE).roundToInt().toDouble()
+        // Positive incline: device uses standard FTMS encoding (0.1 % per raw unit), so
+        // inclinationPercent is already the physical percentage — no further scaling needed.
+        return incline
     }
 
     companion object {
