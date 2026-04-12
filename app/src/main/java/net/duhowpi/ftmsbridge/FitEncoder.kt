@@ -113,18 +113,18 @@ internal object FitEncoder {
         val elapsedMs = endMs - session.startTimeMs
 
         val sport: Int = when (session.machineType) {
-            "TREADMILL"     -> 1   // running
-            "INDOOR_BIKE"   -> 2   // cycling
-            "CROSS_TRAINER" -> 4   // fitness_equipment
-            "STAIR_CLIMBER" -> 4   // fitness_equipment
-            else            -> 0
+            "TREADMILL"     -> FitSport.RUNNING.value
+            "INDOOR_BIKE"   -> FitSport.CYCLING.value
+            "CROSS_TRAINER" -> FitSport.FITNESS_EQUIPMENT.value
+            "STAIR_CLIMBER" -> FitSport.FITNESS_EQUIPMENT.value
+            else            -> FitSport.GENERIC.value
         }
         val subSport: Int = when (session.machineType) {
-            "TREADMILL"     -> 1   // treadmill
-            "INDOOR_BIKE"   -> 6   // indoor_cycling
-            "CROSS_TRAINER" -> 14  // elliptical
-            "STAIR_CLIMBER" -> 15  // stair_climbing
-            else            -> 0
+            "TREADMILL"     -> FitSubSport.TREADMILL.value
+            "INDOOR_BIKE"   -> FitSubSport.INDOOR_CYCLING.value
+            "CROSS_TRAINER" -> FitSubSport.ELLIPTICAL.value
+            "STAIR_CLIMBER" -> FitSubSport.STAIR_CLIMBING.value
+            else            -> FitSubSport.GENERIC.value
         }
 
         // Derive summary stats from sample data (accurate even if session fields are unset)
