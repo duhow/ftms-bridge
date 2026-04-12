@@ -1570,7 +1570,13 @@ class MainActivity : AppCompatActivity() {
         val clamped = level.coerceIn(RESISTANCE_MIN_LEVEL, RESISTANCE_MAX_LEVEL)
         val isIndoorBike = fitnessDevice?.machineType == FtmsConstants.MachineType.INDOOR_BIKE
         val encoded = if (isIndoorBike) {
-            BhFitnessIndoorBike.RESISTANCE_LEVEL_TABLE[clamped - 1]
+            // clamped is in RESISTANCE_MIN_LEVEL..RESISTANCE_MAX_LEVEL (1..22),
+            // so index clamped-1 is always within the 22-entry table bounds.
+            BhFitnessIndoorBike.RESISTANCE_LEVEL_TABLE
+                .getOrNull(clamped - 1) ?: run {
+                Log.w(tag, "Resistance level $clamped out of table range")
+                return false
+            }
         } else {
             (clamped * FtmsConstants.RESISTANCE_LEVEL_MULTIPLIER).roundToInt()
         }
