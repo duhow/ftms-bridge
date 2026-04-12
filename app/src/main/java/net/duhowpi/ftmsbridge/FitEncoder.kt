@@ -181,7 +181,7 @@ internal object FitEncoder {
             if (deltaSec <= 0.0) continue
 
             val avgCadence = ((prev.cadenceRpm + cur.cadenceRpm) / 2.0).coerceAtLeast(0.0)
-            val avgPower = ((prev.instantaneousPowerW + cur.instantaneousPowerW) / 2.0).coerceAtLeast(0) / 2.0
+            val avgPower = ((prev.instantaneousPowerW + cur.instantaneousPowerW) / 2.0).coerceAtLeast(0.0) / 2.0
 
             totalCycles += (avgCadence / 60.0) * deltaSec
             totalWorkJ += avgPower * deltaSec
@@ -348,7 +348,7 @@ internal object FitEncoder {
                 val deltaSec = ((sample.timestampMs - prev.timestampMs).coerceAtLeast(0L)) / 1000.0
                 if (deltaSec > 0.0) {
                     val avgCad = ((prev.cadenceRpm + sample.cadenceRpm) / 2.0).coerceAtLeast(0.0)
-                    val avgPwr = ((prev.instantaneousPowerW + sample.instantaneousPowerW) / 2.0).coerceAtLeast(0) / 2.0
+                    val avgPwr = ((prev.instantaneousPowerW + sample.instantaneousPowerW) / 2.0).coerceAtLeast(0.0) / 2.0
                     cumulativeCycles += (avgCad / 60.0) * deltaSec
                     cumulativeWorkJ += avgPwr * deltaSec
                 }
