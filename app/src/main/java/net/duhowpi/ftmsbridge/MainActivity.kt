@@ -1140,8 +1140,28 @@ class MainActivity : AppCompatActivity() {
 
         val sessionId = currentSessionId ?: return
         lifecycleScope.launch(Dispatchers.IO) {
-            val session = db.sessionDao().getById(sessionId)
-            session?.let { it.endTimeMs = System.currentTimeMillis(); db.sessionDao().update(it) }
+            val session = db.sessionDao().getById(sessionId) ?: return@launch
+            session.endTimeMs = System.currentTimeMillis()
+
+            val samples = db.sampleDao().getAllBySession(sessionId)
+            if (samples.isNotEmpty()) {
+                session.totalDistanceM = samples.maxOf { it.totalDistanceM }
+                session.totalEnergyKcal = samples.maxOf { it.totalEnergyKcal }
+                session.totalElapsedTimeSec = samples.maxOf { it.elapsedTimeSec }
+                val speedSamples = samples.filter { it.speedKmh > 0 }
+                if (speedSamples.isNotEmpty()) session.avgSpeedKmh = speedSamples.map { it.speedKmh }.average()
+                session.maxSpeedKmh = samples.maxOf { it.speedKmh }
+                val cadenceSamples = samples.filter { it.cadenceRpm > 0 }
+                if (cadenceSamples.isNotEmpty()) session.avgCadenceRpm = cadenceSamples.map { it.cadenceRpm }.average()
+                val powerSamples = samples.filter { it.instantaneousPowerW > 0 }
+                if (powerSamples.isNotEmpty()) session.avgPowerW = powerSamples.map { it.instantaneousPowerW }.average().toInt()
+                session.maxPowerW = samples.maxOf { it.instantaneousPowerW }
+                val hrSamples = samples.filter { it.heartRateBpm > 0 }
+                if (hrSamples.isNotEmpty()) session.avgHeartRateBpm = hrSamples.map { it.heartRateBpm }.average().toInt()
+                session.maxHeartRateBpm = samples.maxOf { it.heartRateBpm }
+            }
+
+            db.sessionDao().update(session)
             Log.i(tag, "Session stopped: $sessionId")
         }
         currentSessionId = null
