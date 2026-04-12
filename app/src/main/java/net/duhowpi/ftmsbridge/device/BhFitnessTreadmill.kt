@@ -79,11 +79,11 @@ class BhFitnessTreadmill(deviceName: String) :
      * Encoding rules (do NOT change without hardware testing all cases):
      *
      *  - Negative (decline) values: device firmware silently ignores standard FTMS negative
-     *    encoding; BH-proprietary DECLINE_RAW values must be used instead.
+     *    encoding; BH-proprietary DECLINE_RAW values don't work either. NEEDS REVIEW.
      *
      *  - 1% positive: standard FTMS raw=10 falls below the device's minimum effective step
-     *    and is silently treated as 0% by the firmware.  The proprietary scale value
-     *    (round(1 x INCLINE_SCALE) = 63) is the only value accepted as 1%.
+     *    and is silently treated as 0% by the firmware. Use FTMS encoding with a small increase
+     *    (raw = physical 1% + 0.2 x 10 - send 12 instead of 10).
      *
      *  - 0% and 2%-16%: standard FTMS encoding (raw = physical% x 10) works correctly.
      *    Do NOT switch these to xINCLINE_SCALE — doing so breaks them on the device.
