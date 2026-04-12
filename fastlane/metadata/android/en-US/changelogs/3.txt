@@ -15,3 +15,4 @@
 - Fixed indoor bike kcal formula to derive metabolic energy from power with cycling efficiency
 - Fixed indoor bike resistance control calibration so selected levels better match bike console values
 - Fixed indoor bike resistance level sending value stronger than selected; replaced formula with static lookup table mapping UI level N to resistance N
+- Improved FIT export sport and sub-sport mapping for better compatibility with other apps
