@@ -40,14 +40,14 @@ class BhFitnessTreadmill(deviceName: String) :
 
         val correctedIncline = run {
             val rawIncline = sample.inclinationPercent
-            // FtmsDataParser applied ×0.1 to the raw SINT16, so recover the original raw to check
+            // FtmsDataParser applied x0.1 to the raw SINT16, so recover the original raw to check
             // BH-specific decline encodings (320/380/450 for −3/−2/−1%).
             val rawValue = (rawIncline * 10).roundToInt()
             val decline = DECLINE_RAW.entries.find { it.value == rawValue }
             if (decline != null) {
                 decline.key.toDouble()
             } else {
-                // Positive incline: device uses proprietary scale (raw = physical% × INCLINE_SCALE).
+                // Positive incline: device uses proprietary scale (raw = physical% x INCLINE_SCALE).
                 // FtmsDataParser already divided by 10, so undo the remaining factor.
                 (rawIncline / (INCLINE_SCALE / 10.0)).roundToInt().toDouble()
             }
@@ -83,18 +83,19 @@ class BhFitnessTreadmill(deviceName: String) :
      *
      *  - 1% positive: standard FTMS raw=10 falls below the device's minimum effective step
      *    and is silently treated as 0% by the firmware.  The proprietary scale value
-     *    (round(1 × INCLINE_SCALE) = 63) is the only value accepted as 1%.
+     *    (round(1 x INCLINE_SCALE) = 63) is the only value accepted as 1%.
      *
-     *  - 0% and 2%–16%: standard FTMS encoding (raw = physical% × 10) works correctly.
-     *    Do NOT switch these to ×INCLINE_SCALE — doing so breaks them on the device.
+     *  - 0% and 2%-16%: standard FTMS encoding (raw = physical% x 10) works correctly.
+     *    Do NOT switch these to xINCLINE_SCALE — doing so breaks them on the device.
      */
     override fun encodeTargetInclineRaw(incline: Double): Short {
         val rounded = incline.roundToInt()
+        // TODO FIX, THE NEGATIVE IMPLEMENTATION DOES NOT WORK. POSITIVE VALUES ARE CORRECT.
         // Negative (decline) values require BH-proprietary firmware-specific raw values.
         if (rounded in DECLINE_RAW) return DECLINE_RAW[rounded]!!.toShort()
-        // 1% special case: FTMS raw=10 is silently ignored; use proprietary scale.
+        // 1% special case: FTMS raw=10 is silently ignored to 0%; increment slightly.
         if (rounded == 1) return (incline * 12.0).roundToInt().toShort()
-        // All other values (0%, 2%–16%): standard FTMS encoding ×10.
+        // All other values (0%, 2%-16%): standard FTMS encoding x10.
         return (incline * 10.0).roundToInt().toShort()
     }
 
