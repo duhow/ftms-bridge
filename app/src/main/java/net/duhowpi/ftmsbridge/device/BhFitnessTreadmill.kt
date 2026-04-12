@@ -3,7 +3,6 @@ package net.duhowpi.ftmsbridge.device
 import android.util.Log
 import net.duhowpi.ftmsbridge.ftms.FtmsConstants
 import net.duhowpi.ftmsbridge.model.FitnessSample
-import kotlin.math.abs
 import kotlin.math.roundToInt
 
 class BhFitnessTreadmill(deviceName: String) :
@@ -39,7 +38,20 @@ class BhFitnessTreadmill(deviceName: String) :
             kotlin.math.round(derivedElapsedSec).toInt()
         }
 
-        val correctedIncline = getIncline(sample)
+        val correctedIncline = run {
+            val rawIncline = sample.inclinationPercent
+            // FtmsDataParser applied x0.1 to the raw SINT16, so recover the original raw to check
+            // BH-specific decline encodings (320/380/450 for −3/−2/−1%).
+            val rawValue = (rawIncline * 10).roundToInt()
+            val decline = DECLINE_RAW.entries.find { it.value == rawValue }
+            if (decline != null) {
+                decline.key.toDouble()
+            } else {
+                // Positive incline: device uses proprietary scale (raw = physical% x INCLINE_SCALE).
+                // FtmsDataParser already divided by 10, so undo the remaining factor.
+                (rawIncline / (INCLINE_SCALE / 10.0)).roundToInt().toDouble()
+            }
+        }
 
         if (dtSec > 0.0) {
             accumulateDistance(sample.speedKmh, dtSec)
@@ -63,29 +75,33 @@ class BhFitnessTreadmill(deviceName: String) :
     /**
      * Encodes a physical inclination percentage to the raw SINT16 value expected by
      * BH Fitness treadmills in the FTMS Control Point Set Target Inclination command.
+     *
+     * Encoding rules (do NOT change without hardware testing all cases):
+     *
+     *  - Negative (decline) values: device firmware silently ignores standard FTMS negative
+     *    encoding; BH-proprietary DECLINE_RAW values don't work either. NEEDS REVIEW.
+     *
+     *  - 1% positive: standard FTMS raw=10 falls below the device's minimum effective step
+     *    and is silently treated as 0% by the firmware. Use FTMS encoding with a small increase
+     *    (raw = physical 1% + 0.2 x 10 - send 12 instead of 10).
+     *
+     *  - 0% and 2%-16%: standard FTMS encoding (raw = physical% x 10) works correctly.
+     *    Do NOT switch these to xINCLINE_SCALE — doing so breaks them on the device.
      */
     override fun encodeTargetInclineRaw(incline: Double): Short {
         val rounded = incline.roundToInt()
-        if (rounded in DECLINE_RAW.keys){ return DECLINE_RAW[rounded]!!.toShort() }
-        return (incline * INCLINE_SCALE).roundToInt().toShort()
-    }
-
-    override fun getIncline(sample: FitnessSample): Double {
-        val incline = sample.inclinationPercent
-        val decline = DECLINE_RAW.entries.find { it.value == incline.roundToInt() }
-        if (decline != null) {
-            return decline.key.toDouble()
-        }
-
-        return (incline / INCLINE_SCALE).roundToInt().toDouble()
+        // TODO FIX, THE NEGATIVE IMPLEMENTATION DOES NOT WORK. POSITIVE VALUES ARE CORRECT.
+        // Negative (decline) values require BH-proprietary firmware-specific raw values.
+        if (rounded in DECLINE_RAW) return DECLINE_RAW[rounded]!!.toShort()
+        // 1% special case: FTMS raw=10 is silently ignored to 0%; increment slightly.
+        if (rounded == 1) return (incline * 12.0).roundToInt().toShort()
+        // All other values (0%, 2%-16%): standard FTMS encoding x10.
+        return (incline * 10.0).roundToInt().toShort()
     }
 
     companion object {
         /** BH Fitness treadmill inclination scale factor: raw / 62.5 = physical %. */
         const val INCLINE_SCALE = 62.5
-
-        /** Tolerance (in incline %) used to treat near-integer values as whole-percent steps. */
-        private const val PERCENT_ROUNDING_TOLERANCE = 0.05
 
         /** Physical incline range for BH treadmill UI percentages. */
         const val INCLINE_STEP = 1.0

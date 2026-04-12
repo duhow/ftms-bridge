@@ -380,7 +380,7 @@ class MainActivity : AppCompatActivity() {
         }
         val displayResistanceLevel = resolveDisplayResistanceLevel(sample)
         binding.lapValueInclination.text = when {
-            isTreadmill -> "${resolveDisplayIncline(sample).roundToInt()}"
+            isTreadmill -> "${(fitnessDevice?.getIncline(sample) ?: sample.inclinationPercent).roundToInt()}"
             displayResistanceLevel > 0 -> "$displayResistanceLevel"
             else -> "--"
         }
@@ -1027,7 +1027,7 @@ class MainActivity : AppCompatActivity() {
         binding.unitEnergy.setText(R.string.unit_kcal)
         binding.valueEnergy.text = "${sample.totalEnergyKcal}"
 
-        binding.valueInclination.text = "${resolveDisplayIncline(sample).roundToInt()}"
+        binding.valueInclination.text = "${(fitnessDevice?.getIncline(sample) ?: sample.inclinationPercent).roundToInt()}"
         val displayResistanceLevel = resolveDisplayResistanceLevel(sample)
         binding.valueResistance.text = if (displayResistanceLevel > 0) "$displayResistanceLevel" else "--"
 
@@ -1048,7 +1048,7 @@ class MainActivity : AppCompatActivity() {
             else -> sample.speedKmh.toFloat()
         })
         livePaceSecondaryPoints.add(
-            if (isTreadmill) resolveDisplayIncline(sample).toFloat() else resolveDisplayResistanceLevel(sample).toFloat()
+            if (isTreadmill) (fitnessDevice?.getIncline(sample) ?: sample.inclinationPercent).toFloat() else resolveDisplayResistanceLevel(sample).toFloat()
         )
         liveHrPoints.add(sample.heartRateBpm.toFloat())
         if (isChartViewActive) updateLiveChart()
@@ -1384,7 +1384,7 @@ class MainActivity : AppCompatActivity() {
             return
         }
         // Round current incline to nearest integer so the seekbar starts on a whole-% step.
-        val current = (lastFtmsSample?.let { resolveDisplayIncline(it) }?.roundToInt()?.toDouble()
+        val current = (lastFtmsSample?.let { fitnessDevice?.getIncline(it) ?: it.inclinationPercent }?.roundToInt()?.toDouble()
             ?: INCLINE_DEFAULT_PERCENT).coerceIn(INCLINE_MIN_PERCENT, INCLINE_MAX_PERCENT)
         showAdjustDialog(
             title = getString(R.string.control_set_incline_title),
@@ -1591,10 +1591,6 @@ class MainActivity : AppCompatActivity() {
             .array()
         return cm.sendControlPoint(payload)
     }
-
-    /** Returns the display-ready inclination for [sample], delegating to the active device. */
-    private fun resolveDisplayIncline(sample: FitnessSample): Double =
-        fitnessDevice?.getIncline(sample) ?: sample.inclinationPercent
 
     /** Returns the display-ready resistance level for [sample]. */
     private fun resolveDisplayResistanceLevel(sample: FitnessSample): Int {
