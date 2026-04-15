@@ -149,64 +149,30 @@ class BleConnectionManager(
     }
 
     /**
-     * Sends proprietary iConcept speed commands to the write channels C101 and C102.
+     * Sends a speed command to the iConcept proprietary write channel C101.
      *
-     * BH Fitness treadmills return "Op Code Not Supported" (0x80 0x02 0x02) when Set Target
-     * Speed (FTMS opcode 0x02) is written to the FTMS control point 0x2AD9.  The speed
-     * control is likely routed through the iConcept proprietary service instead.
+     * BH Fitness treadmills do not implement FTMS Set Target Speed (opcode 0x02) on 0x2AD9
+     * and return "Op Code Not Supported" (0x80 0x02 0x02).  The confirmed working channel
+     * is C101 with a raw 2-byte UINT16 little-endian value encoding speed in 0.1 km/h units
+     * (speed × 10).  The device acknowledges with a C112 notification (0xF1 0x0F …).
      *
-     * This probe sends three candidate encodings to each available write channel so we can
-     * observe which format the firmware accepts:
+     * C102 and all other encodings (ASCII UART, opcode-prefixed 3-byte) were tested and
+     * either rejected (GATT_INVALID_ATTRIBUTE_LENGTH, status=13) or caused disconnection.
      *
-     *   1. **ASCII UART** – `[SETSPD:XXX]` where XXX = speed × 10, zero-padded to 3 digits.
-     *      Matches the underlying UART protocol described in research notes.
-     *   2. **Binary ×10** – raw UINT16 LE (speed × 10, 2 bytes).
-     *   3. **Binary opcode+×10** – [0x02, speedLow, speedHigh] mirroring the FTMS opcode
-     *      layout but with ×10 units on the proprietary channel.
-     *
-     * Each attempt is labelled in the debug log so the effective encoding can be identified
-     * from the captured log.
-     *
-     * Returns true when at least one write was enqueued.
+     * Returns true when the write was enqueued successfully.
      */
-    fun sendIConceptSpeedProbe(speedKmh: Double): Boolean {
+    fun sendIConceptSpeed(speedKmh: Double): Boolean {
         if (!isConnected) return false
-        val speedX10 = (speedKmh * 10.0).roundToInt()
-        val speedLow = (speedX10 and 0xFF).toByte()
-        val speedHigh = ((speedX10 shr 8) and 0xFF).toByte()
-        var probesSent = false
-
-        listOf(
-            iConceptWriteChar1 to "C101",
-            iConceptWriteChar2 to "C102"
-        ).forEach { (char, label) ->
-            if (char == null) return@forEach
-
-            // Probe 1: ASCII UART format matching the underlying [SETSPD:XXX] protocol.
-            // The field is 3 decimal digits (0.1 km/h steps, max 999 = 99.9 km/h).
-            val speedX10Clamped = speedX10.coerceIn(0, 999)
-            val asciiCmd = "[SETSPD:%03d]".format(speedX10Clamped)
-            val asciiBytes = asciiCmd.toByteArray(Charsets.US_ASCII)
-            debugLogger.logMessage("iConcept speed probe $label ASCII: $asciiCmd (${asciiBytes.joinToString(" ") { "%02X".format(it) }})")
-            enqueueOp(GattOp.WriteChar(char, asciiBytes))
-
-            // Probe 2: raw UINT16 LE, speed in 0.1 km/h units.
-            val rawUint16 = byteArrayOf(speedLow, speedHigh)
-            debugLogger.logMessage("iConcept speed probe $label UINT16-×10: ${rawUint16.joinToString(" ") { "%02X".format(it) }} ($speedX10)")
-            enqueueOp(GattOp.WriteChar(char, rawUint16))
-
-            // Probe 3: opcode-prefixed binary, mirroring FTMS layout with ×10 units.
-            val opcodePrefix = byteArrayOf(0x02, speedLow, speedHigh)
-            debugLogger.logMessage("iConcept speed probe $label opcode+UINT16-×10: ${opcodePrefix.joinToString(" ") { "%02X".format(it) }}")
-            enqueueOp(GattOp.WriteChar(char, opcodePrefix))
-
-            probesSent = true
+        val char = iConceptWriteChar1 ?: run {
+            debugLogger.logMessage("iConcept speed: C101 not available")
+            return false
         }
-
-        if (!probesSent) {
-            debugLogger.logMessage("iConcept speed probe: no write chars available (C101=${iConceptWriteChar1 != null}, C102=${iConceptWriteChar2 != null})")
-        }
-        return probesSent
+        val speedX10 = (speedKmh * 10.0).roundToInt().coerceIn(0, 0xFFFF)
+        val data = byteArrayOf((speedX10 and 0xFF).toByte(), ((speedX10 shr 8) and 0xFF).toByte())
+        val dataHex = data.joinToString(" ") { "%02X".format(it) }
+        debugLogger.logMessage("iConcept speed C101: $dataHex ($speedX10 = ${"%.1f".format(speedKmh)} km/h)")
+        enqueueOp(GattOp.WriteChar(char, data))
+        return true
     }
 
     private fun enqueueOp(op: GattOp) {

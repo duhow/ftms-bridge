@@ -1560,6 +1560,15 @@ class MainActivity : AppCompatActivity() {
     private fun sendTargetSpeedKmh(speedKmh: Double): Boolean {
         val cm = ftmsConnectionManager ?: return false
         val clamped = speedKmh.coerceIn(SPEED_MIN_KMH, SPEED_MAX_KMH)
+
+        // BH Fitness treadmills do not implement FTMS Set Target Speed (0x2AD9 opcode 0x02);
+        // they return "Op Code Not Supported".  The confirmed working channel is the iConcept
+        // proprietary C101 characteristic with a 2-byte UINT16 LE value in 0.1 km/h units.
+        // Sending the FTMS command in addition to C101 causes device disconnection.
+        if (fitnessDevice is BhFitnessFtmsDevice) {
+            return cm.sendIConceptSpeed(clamped)
+        }
+
         val encoded = fitnessDevice?.encodeTargetSpeedRaw(clamped) ?: (clamped * 100.0).roundToInt()
         if (!isEncodableAsSint16(encoded)) {
             Log.w(tag, "Encoded speed out of range: $encoded")
@@ -1570,16 +1579,7 @@ class MainActivity : AppCompatActivity() {
             .put(FtmsConstants.CONTROL_SET_TARGET_SPEED)
             .putShort(encoded.toShort())
             .array()
-        val ftmsSent = cm.sendControlPoint(payload)
-
-        // BH Fitness treadmills return "Op Code Not Supported" for FTMS Set Target Speed.
-        // Probe the iConcept proprietary write channels (C101/C102) in parallel so the
-        // correct encoding can be identified from the debug log.
-        if (fitnessDevice is BhFitnessFtmsDevice) {
-            cm.sendIConceptSpeedProbe(clamped)
-        }
-
-        return ftmsSent
+        return cm.sendControlPoint(payload)
     }
 
     private fun sendTargetInclinePercent(inclinePercent: Double): Boolean {

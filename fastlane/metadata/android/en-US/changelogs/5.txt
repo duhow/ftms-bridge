@@ -1,2 +1,2 @@
-- Added iConcept proprietary channel speed probes (C101/C102) for BH Fitness treadmills: sends multiple encoding candidates with detailed debug logging to identify the correct speed-control format (FTMS 0x2AD9 Set Target Speed returns "Op Code Not Supported" on these devices)
+- Fixed speed control for BH Fitness treadmills: speed is now sent via the iConcept proprietary C101 characteristic (UINT16 LE, 0.1 km/h units) instead of the FTMS control point, which is not supported by these devices and was causing disconnections
 - Fixed GATT log messages to show the correct 16-bit characteristic short UUID (was showing "34fb" for all characteristics)
