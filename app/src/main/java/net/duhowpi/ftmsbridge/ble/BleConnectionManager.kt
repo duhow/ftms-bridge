@@ -41,6 +41,11 @@ class BleConnectionManager(
 
     private var controlPointChar: BluetoothGattCharacteristic? = null
 
+    // iConcept proprietary write channels (WRITE_NO_RESPONSE, props=8).
+    // C101 and C102 are the BLE-to-UART bridge write endpoints on BH Fitness devices.
+    private var iConceptWriteChar1: BluetoothGattCharacteristic? = null
+    private var iConceptWriteChar2: BluetoothGattCharacteristic? = null
+
     var isConnected = false
         private set
 
@@ -110,6 +115,8 @@ class BleConnectionManager(
         gattQueue.clear()
         gattBusy = false
         controlPointChar = null
+        iConceptWriteChar1 = null
+        iConceptWriteChar2 = null
         debugLogger.stopSession()
         listener?.onDisconnected()
     }
@@ -141,6 +148,65 @@ class BleConnectionManager(
         return true
     }
 
+    /**
+     * Sends proprietary iConcept speed commands to the write channels C101 and C102.
+     *
+     * BH Fitness treadmills return "Op Code Not Supported" (0x80 0x02 0x02) when Set Target
+     * Speed (FTMS opcode 0x02) is written to the FTMS control point 0x2AD9.  The speed
+     * control is likely routed through the iConcept proprietary service instead.
+     *
+     * This probe sends three candidate encodings to each available write channel so we can
+     * observe which format the firmware accepts:
+     *
+     *   1. **ASCII UART** – `[SETSPD:XXX]` where XXX = speed × 10, zero-padded to 3 digits.
+     *      Matches the underlying UART protocol described in research notes.
+     *   2. **Binary ×10** – raw UINT16 LE (speed × 10, 2 bytes).
+     *   3. **Binary opcode+×10** – [0x02, speedLow, speedHigh] mirroring the FTMS opcode
+     *      layout but with ×10 units on the proprietary channel.
+     *
+     * Each attempt is labelled in the debug log so the effective encoding can be identified
+     * from the captured log.
+     *
+     * Returns true when at least one write was enqueued.
+     */
+    fun sendIConceptSpeedProbe(speedKmh: Double): Boolean {
+        if (!isConnected) return false
+        val speedX10 = (speedKmh * 10.0).roundToInt()
+        val speedLow = (speedX10 and 0xFF).toByte()
+        val speedHigh = ((speedX10 shr 8) and 0xFF).toByte()
+        var probesSent = false
+
+        listOf(
+            iConceptWriteChar1 to "C101",
+            iConceptWriteChar2 to "C102"
+        ).forEach { (char, label) ->
+            if (char == null) return@forEach
+
+            // Probe 1: ASCII UART format matching the underlying [SETSPD:XXX] protocol.
+            val asciiCmd = "[SETSPD:%03d]".format(speedX10)
+            val asciiBytes = asciiCmd.toByteArray(Charsets.US_ASCII)
+            debugLogger.logMessage("iConcept speed probe $label ASCII: $asciiCmd (${asciiBytes.joinToString(" ") { "%02X".format(it) }})")
+            enqueueOp(GattOp.WriteChar(char, asciiBytes))
+
+            // Probe 2: raw UINT16 LE, speed in 0.1 km/h units.
+            val rawUint16 = byteArrayOf(speedLow, speedHigh)
+            debugLogger.logMessage("iConcept speed probe $label UINT16-×10: ${rawUint16.joinToString(" ") { "%02X".format(it) }} ($speedX10)")
+            enqueueOp(GattOp.WriteChar(char, rawUint16))
+
+            // Probe 3: opcode-prefixed binary, mirroring FTMS layout with ×10 units.
+            val opcodePrefix = byteArrayOf(0x02, speedLow, speedHigh)
+            debugLogger.logMessage("iConcept speed probe $label opcode+UINT16-×10: ${opcodePrefix.joinToString(" ") { "%02X".format(it) }}")
+            enqueueOp(GattOp.WriteChar(char, opcodePrefix))
+
+            probesSent = true
+        }
+
+        if (!probesSent) {
+            debugLogger.logMessage("iConcept speed probe: no write chars available (C101=${iConceptWriteChar1 != null}, C102=${iConceptWriteChar2 != null})")
+        }
+        return probesSent
+    }
+
     private fun enqueueOp(op: GattOp) {
         gattQueue.add(op)
         advanceQueue()
@@ -157,7 +223,7 @@ class BleConnectionManager(
             is GattOp.WriteDescriptor -> {
                 if (ActivityCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) false
                 else {
-                    debugLogger.logMessage("CCCD write ${op.descriptor.characteristic.uuid.toString().takeLast(4)}")
+                    debugLogger.logMessage("CCCD write ${op.descriptor.characteristic.uuid.toString().substring(4, 8)}")
                     @Suppress("DEPRECATION")
                     g.writeDescriptor(op.descriptor) == true
                 }
@@ -173,13 +239,14 @@ class BleConnectionManager(
                 if (ActivityCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) false
                 else {
                     val dataHex = op.data.joinToString(" ") { String.format("%02X", it) }
+                    val charShortId = op.char.uuid.toString().substring(4, 8)
                     val extractedLevel = extractResistanceLevelFromControlWrite(op.char.uuid, op.data)
                     if (extractedLevel != null) {
                         debugLogger.logMessage(
-                            "Char write ${op.char.uuid.toString().takeLast(4)}: $dataHex (resistanceLevel=$extractedLevel)"
+                            "Char write $charShortId: $dataHex (resistanceLevel=$extractedLevel)"
                         )
                     } else {
-                        debugLogger.logMessage("Char write ${op.char.uuid.toString().takeLast(4)}: $dataHex")
+                        debugLogger.logMessage("Char write $charShortId: $dataHex")
                     }
                     @Suppress("DEPRECATION")
                     op.char.value = op.data
@@ -249,6 +316,8 @@ class BleConnectionManager(
                     gattQueue.clear()
                     gattBusy = false
                     controlPointChar = null
+                    iConceptWriteChar1 = null
+                    iConceptWriteChar2 = null
                     debugLogger.stopSession()
                     listener?.onDisconnected()
                 }
@@ -360,6 +429,10 @@ class BleConnectionManager(
             val iConceptService = gatt.getService(FtmsConstants.ICONCEPT_SERVICE_UUID)
             if (iConceptService != null) {
                 debugLogger.logMessage("iConcept proprietary service found")
+                // Store write channels (WRITE_NO_RESPONSE, props=8) for proprietary speed commands.
+                iConceptWriteChar1 = iConceptService.getCharacteristic(FtmsConstants.ICONCEPT_WRITE_1_UUID)
+                iConceptWriteChar2 = iConceptService.getCharacteristic(FtmsConstants.ICONCEPT_WRITE_2_UUID)
+                debugLogger.logMessage("iConcept write chars: C101=${iConceptWriteChar1 != null}, C102=${iConceptWriteChar2 != null}")
                 listOf(FtmsConstants.ICONCEPT_NOTIFY_1_UUID, FtmsConstants.ICONCEPT_NOTIFY_2_UUID).forEach { uuid ->
                     iConceptService.getCharacteristic(uuid)?.let { enableNotification(it) }
                 }

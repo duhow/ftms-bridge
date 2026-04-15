@@ -1,1 +1,3 @@
 - Fixed BH Fitness treadmill speed control: corrected speed command encoding to use standard FTMS units (0.01 km/h), fixing "Op Code Not Supported" rejection from the device
+- Added iConcept proprietary channel speed probes (C101/C102) for BH Fitness treadmills; sends multiple encoding candidates with detailed debug logging to identify the correct format
+- Fixed GATT log messages to show the correct 16-bit characteristic short UUID (was showing "34fb" for all characteristics)

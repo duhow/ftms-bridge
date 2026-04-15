@@ -41,6 +41,9 @@ object FtmsConstants {
 
     // iConcept 3.0 / BH Fitness proprietary service (vendor extension to FTMS)
     val ICONCEPT_SERVICE_UUID: UUID = UUID.fromString("0000c100-0000-1000-8000-00805f9b34fb")
+    // Write-only (WRITE_NO_RESPONSE, props=8) channels — candidates for proprietary speed/incline commands
+    val ICONCEPT_WRITE_1_UUID: UUID = UUID.fromString("0000c101-0000-1000-8000-00805f9b34fb")
+    val ICONCEPT_WRITE_2_UUID: UUID = UUID.fromString("0000c102-0000-1000-8000-00805f9b34fb")
     val ICONCEPT_NOTIFY_1_UUID: UUID = UUID.fromString("0000c111-0000-1000-8000-00805f9b34fb")
     val ICONCEPT_NOTIFY_2_UUID: UUID = UUID.fromString("0000c112-0000-1000-8000-00805f9b34fb")
 

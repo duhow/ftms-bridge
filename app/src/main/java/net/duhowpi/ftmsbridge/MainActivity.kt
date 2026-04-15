@@ -1570,7 +1570,16 @@ class MainActivity : AppCompatActivity() {
             .put(FtmsConstants.CONTROL_SET_TARGET_SPEED)
             .putShort(encoded.toShort())
             .array()
-        return cm.sendControlPoint(payload)
+        val ftmsSent = cm.sendControlPoint(payload)
+
+        // BH Fitness treadmills return "Op Code Not Supported" for FTMS Set Target Speed.
+        // Probe the iConcept proprietary write channels (C101/C102) in parallel so the
+        // correct encoding can be identified from the debug log.
+        if (fitnessDevice is BhFitnessFtmsDevice) {
+            cm.sendIConceptSpeedProbe(clamped)
+        }
+
+        return ftmsSent
     }
 
     private fun sendTargetInclinePercent(inclinePercent: Double): Boolean {
