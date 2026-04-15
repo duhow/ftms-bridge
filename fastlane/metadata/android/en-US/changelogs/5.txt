@@ -1,1 +1,1 @@
-- Fixed BH Fitness treadmill speed control: speed commands now use the correct 0.1 km/h units that the device firmware expects (previously sent in standard FTMS 0.01 km/h units which were silently ignored)
+- Fixed BH Fitness treadmill speed control: corrected speed command encoding to use standard FTMS units (0.01 km/h), fixing "Op Code Not Supported" rejection from the device

@@ -73,21 +73,6 @@ class BhFitnessTreadmill(deviceName: String) :
     }
 
     /**
-     * Encodes a target speed (km/h) to the raw UINT16 value expected by BH Fitness
-     * treadmills in the FTMS Control Point Set Target Speed command (opcode 0x02).
-     *
-     * BH Fitness treadmills use **0.1 km/h units** (multiply by 10) for the speed
-     * write command, not the standard FTMS 0.01 km/h units (multiply by 100).
-     * Sending the standard encoding results in the command being silently ignored.
-     *
-     * Confirmed from reverse-engineering the BH iConcept firmware: the underlying
-     * UART protocol uses [SETSPD:XXX] where XXX is the speed in 0.1 km/h steps
-     * (e.g. [SETSPD:010] = 1.0 km/h), and the BLE control point mirrors this scale.
-     */
-    override fun encodeTargetSpeedRaw(speedKmh: Double): Int =
-        (speedKmh * 10.0).roundToInt()
-
-    /**
      * Encodes a physical inclination percentage to the raw SINT16 value expected by
      * BH Fitness treadmills in the FTMS Control Point Set Target Inclination command.
      *
