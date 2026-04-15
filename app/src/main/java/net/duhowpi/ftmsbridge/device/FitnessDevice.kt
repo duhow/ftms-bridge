@@ -32,7 +32,7 @@ interface FitnessDevice {
      * Default: standard FTMS encoding — UINT16 in units of 0.01 km/h.
      * Returns a non-negative value that fits in UINT16 (0–65535) for any
      * realistic treadmill speed.
-     * Devices with non-standard scaling (e.g. BH Fitness treadmills) override this.
+     * Override in device subclasses when the device uses non-standard scaling.
      */
     fun encodeTargetSpeedRaw(speedKmh: Double): Int =
         (speedKmh * 100.0).roundToInt()
