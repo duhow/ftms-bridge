@@ -100,10 +100,22 @@ console increments) and omits the fine-adjustment buttons.
 
 ### Writing speed (Control Point, opcode 0x02)
 
-Standard FTMS encoding: UINT16 in units of 0.01 km/h.
+**BH Fitness treadmills use non-standard units for the speed write command.**
+
+The device reports speed in standard FTMS units (UINT16, 0.01 km/h) in its Treadmill
+Data notifications, but the Set Target Speed control point command (opcode 0x02) uses
+**0.1 km/h units** (multiply by 10):
+
 ```
-raw = target_kmh * 100    (6.1 km/h → 610 = 0x0262, LE: 62 02)
+raw = target_kmh * 10    (6.1 km/h → 61 = 0x003D, LE: 3D 00)
 ```
+
+Standard FTMS encoding (raw = target_kmh × 100) is silently ignored by the firmware.
+This asymmetry matches the underlying UART protocol of the BH iConcept firmware, where
+speed commands use `[SETSPD:XXX]` with XXX in 0.1 km/h steps
+(e.g. `[SETSPD:061]` = 6.1 km/h, `[SETSPD:010]` = 1.0 km/h).
+
+`BhFitnessTreadmill.encodeTargetSpeedRaw()` implements the ×10 encoding.
 
 `Request Control (0x00)` is sent once during connection setup.  After that, the device
 accepts Set Target Speed and Set Target Inclination commands directly without requiring
@@ -242,13 +254,11 @@ device to begin streaming data on the iConcept proprietary channel.
 
 ### Set Target Speed (opcode 0x02)
 
-Speed is encoded in **standard FTMS units** (UINT16, 0.01 km/h) for both reads and
-writes.  Example: 6.10 km/h → write value 610.
+Speed commands use **0.1 km/h units** (UINT16, multiply by 10) — not the standard
+FTMS 0.01 km/h units.  Example: 6.10 km/h → write value 61.
 
-After `Request Control (0x00)` succeeds on connection, the device accepts speed and
-inclination commands directly.  Sending `Start/Resume (0x07)` before each command
-interferes with the running belt state; it must **not** be queued before Set Target
-Speed or Set Target Inclination.
+Standard FTMS encoding (×100) is silently ignored by the firmware.  See the speed
+section above for full details.
 
 Set Target Inclination (opcode `0x03`) uses **standard FTMS encoding for positive grades**
 (SINT16 × 0.1 %) and **hardcoded raw values for decline** — see the write-encoding table

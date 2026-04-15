@@ -1560,7 +1560,7 @@ class MainActivity : AppCompatActivity() {
     private fun sendTargetSpeedKmh(speedKmh: Double): Boolean {
         val cm = ftmsConnectionManager ?: return false
         val clamped = speedKmh.coerceIn(SPEED_MIN_KMH, SPEED_MAX_KMH)
-        val encoded = (clamped * 100.0).roundToInt()
+        val encoded = fitnessDevice?.encodeTargetSpeedRaw(clamped) ?: (clamped * 100.0).roundToInt()
         if (!isEncodableAsSint16(encoded)) {
             Log.w(tag, "Encoded speed out of range: $encoded")
             return false

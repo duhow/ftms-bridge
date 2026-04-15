@@ -1,1 +1,1 @@
-Add user-facing changes for the next release here.
+- Fixed BH Fitness treadmill speed control: speed commands now use the correct 0.1 km/h units that the device firmware expects (previously sent in standard FTMS 0.01 km/h units which were silently ignored)
