@@ -26,10 +26,12 @@ interface FitnessDevice {
     fun onDataReceived(data: ByteArray): FitnessSample?
 
     /**
-     * Encodes a speed in km/h into the raw UINT16 value to send in a
+     * Encodes a speed in km/h into the raw integer value to send in a
      * Fitness Machine Control Point Set Target Speed command (opcode 0x02).
      *
      * Default: standard FTMS encoding — UINT16 in units of 0.01 km/h.
+     * Returns a non-negative value that fits in UINT16 (0–65535) for any
+     * realistic treadmill speed.
      * Devices with non-standard scaling (e.g. BH Fitness treadmills) override this.
      */
     fun encodeTargetSpeedRaw(speedKmh: Double): Int =
