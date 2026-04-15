@@ -183,7 +183,9 @@ class BleConnectionManager(
             if (char == null) return@forEach
 
             // Probe 1: ASCII UART format matching the underlying [SETSPD:XXX] protocol.
-            val asciiCmd = "[SETSPD:%03d]".format(speedX10)
+            // The field is 3 decimal digits (0.1 km/h steps, max 999 = 99.9 km/h).
+            val speedX10Clamped = speedX10.coerceIn(0, 999)
+            val asciiCmd = "[SETSPD:%03d]".format(speedX10Clamped)
             val asciiBytes = asciiCmd.toByteArray(Charsets.US_ASCII)
             debugLogger.logMessage("iConcept speed probe $label ASCII: $asciiCmd (${asciiBytes.joinToString(" ") { "%02X".format(it) }})")
             enqueueOp(GattOp.WriteChar(char, asciiBytes))
@@ -239,6 +241,8 @@ class BleConnectionManager(
                 if (ActivityCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) false
                 else {
                     val dataHex = op.data.joinToString(" ") { String.format("%02X", it) }
+                    // substring(4, 8) extracts the 16-bit short UUID from the standard
+                    // Bluetooth base form "0000xxxx-0000-1000-8000-00805f9b34fb".
                     val charShortId = op.char.uuid.toString().substring(4, 8)
                     val extractedLevel = extractResistanceLevelFromControlWrite(op.char.uuid, op.data)
                     if (extractedLevel != null) {
