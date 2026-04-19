@@ -137,4 +137,9 @@
     <string name="debug_virtual_bike_cadence">Cadència (RPM)</string>
     <string name="debug_virtual_bike_resistance">Nivell de resistència</string>
     <string name="debug_virtual_bike_control">Control de bici</string>
+
+    <!-- Settings -->
+    <string name="settings">Ajustos</string>
+    <string name="settings_autoconnect_min_rssi">RSSI mín. de connexió automàtica (dBm)</string>
+    <string name="settings_invalid_rssi">Valor de RSSI no vàlid. Introdueix un nombre negatiu (p. ex. -40).</string>
 </resources>

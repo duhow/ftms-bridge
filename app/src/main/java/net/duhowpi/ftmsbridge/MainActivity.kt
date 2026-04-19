@@ -17,6 +17,7 @@ import android.view.Menu
 import android.view.MenuItem
 import android.view.View
 import android.widget.Button
+import android.widget.EditText
 import android.widget.SeekBar
 import android.widget.ScrollView
 import android.widget.TextView
@@ -65,6 +66,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var hrDebugLogger: BtDebugLogger
     private lateinit var db: AppDatabase
     private lateinit var scanAdapter: ScanResultAdapter
+    private lateinit var appSettings: AppSettings
 
     private var ftmsConnectionManager: BleConnectionManager? = null
     private var hrConnectionManager: BleConnectionManager? = null
@@ -228,6 +230,7 @@ class MainActivity : AppCompatActivity() {
         hrDebugLogger = BtDebugLogger(BuildConfig.DEBUG, this)
         bleScanner = BleScanner(this)
         stateMachine = SessionStateMachine(binding, this)
+        appSettings = AppSettings(this)
 
         createDebugSampleDataIfNeeded()
 
@@ -249,6 +252,7 @@ class MainActivity : AppCompatActivity() {
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         return when (item.itemId) {
             R.id.action_history -> { startActivity(Intent(this, WorkoutHistoryActivity::class.java)); true }
+            R.id.action_settings -> { showSettingsDialog(); true }
             R.id.action_debug -> { showDebugDialog(); true }
             R.id.action_about -> { showAboutDialog(); true }
             else -> super.onOptionsItemSelected(item)
@@ -262,6 +266,31 @@ class MainActivity : AppCompatActivity() {
             .setPositiveButton(android.R.string.ok, null)
             .show()
     }
+
+    private fun showSettingsDialog() {
+        val input = android.widget.EditText(this).apply {
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER or
+                android.text.InputType.TYPE_NUMBER_FLAG_SIGNED
+            setText(appSettings.autoconnectMinRssi.toString())
+            hint = AppSettings.DEFAULT_AUTOCONNECT_MIN_RSSI.toString()
+        }
+        AlertDialog.Builder(this)
+            .setTitle(getString(R.string.settings))
+            .setMessage(getString(R.string.settings_autoconnect_min_rssi))
+            .setView(input)
+            .setPositiveButton(android.R.string.ok) { _, _ ->
+                val text = input.text.toString()
+                val value = text.toIntOrNull()
+                if (value == null || value >= 0) {
+                    Toast.makeText(this, getString(R.string.settings_invalid_rssi), Toast.LENGTH_LONG).show()
+                } else {
+                    appSettings.autoconnectMinRssi = value
+                }
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
 
     private fun setupScanList() {
         scanAdapter = ScanResultAdapter(
@@ -543,6 +572,22 @@ class MainActivity : AppCompatActivity() {
                         device = device
                     )
                     debugLogger.logMessage("Discovered: $name (${device.address}) FTMS=$isFtms HR=$isHr RSSI=${result.rssi}")
+                }
+
+                // Auto-connect: if this is an FTMS device with strong enough signal and
+                // no FTMS device is already connected or connecting.
+                if (isFtms && result.rssi >= appSettings.autoconnectMinRssi) {
+                    runOnUiThread {
+                        if (ftmsConnectionManager?.isConnected != true
+                            && stateMachine.state is SessionState.Idle
+                            && dummyTreadmill == null && dummyBike == null
+                        ) {
+                            val info = scanResultsMap[device.address] ?: return@runOnUiThread
+                            knownDevicesMap[device.address] = info
+                            debugLogger.logMessage("Auto-connecting to $name (${device.address}) RSSI=${result.rssi}")
+                            connectFtmsDevice(device)
+                        }
+                    }
                 }
             }
 
