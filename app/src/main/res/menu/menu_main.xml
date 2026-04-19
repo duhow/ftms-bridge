@@ -9,6 +9,11 @@
         app:showAsAction="always" />
 
     <item
+        android:id="@+id/action_settings"
+        android:title="@string/settings"
+        app:showAsAction="never" />
+
+    <item
         android:id="@+id/action_debug"
         android:title="@string/debug_info"
         app:showAsAction="never" />

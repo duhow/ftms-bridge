@@ -1,1 +1,3 @@
 - Fixed BLE disconnection when the app is in the background during long workouts
+- Added auto-connect to FTMS devices: the app automatically connects to the nearest FTMS machine when its signal strength meets the configured minimum RSSI threshold.
+- Added Settings option in the menu to configure the auto-connect minimum RSSI (default: -40 dBm).

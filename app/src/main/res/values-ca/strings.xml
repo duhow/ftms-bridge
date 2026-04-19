@@ -141,4 +141,9 @@
     <!-- Recording notification -->
     <string name="recording_notification_channel">Enregistrament d\'entrenament</string>
     <string name="recording_notification_text">Enregistrament d\'entrenament en curs</string>
+
+    <!-- Settings -->
+    <string name="settings">Ajustos</string>
+    <string name="settings_autoconnect_min_rssi">RSSI mín. de connexió automàtica (dBm)</string>
+    <string name="settings_invalid_rssi">Valor de RSSI no vàlid. Introdueix un nombre negatiu (p. ex. -40).</string>
 </resources>

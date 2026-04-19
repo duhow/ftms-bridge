@@ -110,6 +110,11 @@
     <string name="recent_bt_events">Recent BT Events</string>
     <string name="log_files">Log Files</string>
 
+    <!-- Settings -->
+    <string name="settings">Settings</string>
+    <string name="settings_autoconnect_min_rssi">Auto-connect min. RSSI (dBm)</string>
+    <string name="settings_invalid_rssi">Invalid RSSI value. Enter a negative number (e.g. -40).</string>
+
     <!-- About -->
     <string name="about">About</string>
     <string name="about_title">About FTMS Bridge</string>
