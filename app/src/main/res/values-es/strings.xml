@@ -137,4 +137,8 @@
     <string name="debug_virtual_bike_cadence">Cadencia (RPM)</string>
     <string name="debug_virtual_bike_resistance">Nivel de resistencia</string>
     <string name="debug_virtual_bike_control">Control de bici</string>
+
+    <!-- Recording notification -->
+    <string name="recording_notification_channel">Grabación de entrenamiento</string>
+    <string name="recording_notification_text">Grabación de entrenamiento en curso</string>
 </resources>
