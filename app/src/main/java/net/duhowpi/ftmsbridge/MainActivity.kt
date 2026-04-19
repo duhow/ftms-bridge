@@ -1718,7 +1718,6 @@ class MainActivity : AppCompatActivity() {
         dummyBike = null
         bleScanner.stopScan()
         if (stateMachine.state.hasActiveSession) stopRecording()
-        stopRecordingService()
         ftmsConnectionManager?.disconnect()
         hrConnectionManager?.disconnect()
         probeConnectionManager?.disconnect()

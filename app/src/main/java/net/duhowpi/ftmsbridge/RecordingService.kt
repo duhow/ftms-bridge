@@ -71,7 +71,7 @@ class RecordingService : Service() {
             wakeLock = pm.newWakeLock(
                 PowerManager.PARTIAL_WAKE_LOCK,
                 "FtmsBridge:RecordingWakeLock"
-            ).also { it.acquire(4 * 60 * 60 * 1000L /* 4 hours */) }
+            ).also { it.acquire(WAKE_LOCK_TIMEOUT_MS) }
             Log.d(tag, "Wake lock acquired")
         }
 
@@ -92,5 +92,6 @@ class RecordingService : Service() {
     companion object {
         private const val CHANNEL_ID = "recording_channel"
         private const val NOTIFICATION_ID = 1
+        private const val WAKE_LOCK_TIMEOUT_MS = 4 * 60 * 60 * 1000L // 4 hours
     }
 }
