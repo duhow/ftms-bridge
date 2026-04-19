@@ -452,7 +452,7 @@ class MainActivity : AppCompatActivity() {
     // ---- Permissions (continued) --------------------------------------------
 
     private fun getRequiredPermissions(): List<String> {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        val base = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             listOf(
                 Manifest.permission.BLUETOOTH_SCAN,
                 Manifest.permission.BLUETOOTH_CONNECT,
@@ -460,6 +460,11 @@ class MainActivity : AppCompatActivity() {
             )
         } else {
             listOf(Manifest.permission.ACCESS_FINE_LOCATION)
+        }
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            base + Manifest.permission.POST_NOTIFICATIONS
+        } else {
+            base
         }
     }
 
@@ -1134,6 +1139,10 @@ class MainActivity : AppCompatActivity() {
         resetSessionData()
         stateMachine.onRecordingStarted()
         sessionStartTime = System.currentTimeMillis()
+        // Start the foreground service: keeps the process alive so the OS does not kill it
+        // (and drop the BLE connection) while the app is in the background.  The service
+        // also holds the wake lock to keep the CPU running while the screen is off.
+        startRecordingService()
         // Reset and start the 1-second tick so the elapsed display counts smoothly.
         updateElapsedDisplay(0)
         elapsedTickHandler.removeCallbacks(elapsedTickRunnable)
@@ -1179,6 +1188,7 @@ class MainActivity : AppCompatActivity() {
         elapsedTickHandler.removeCallbacks(elapsedTickRunnable)
         elapsedFallbackStartTime = 0L
         lastFallbackElapsedSec = 0
+        stopRecordingService()
 
         // Keep the frozen session view so the user can review it; Back button returns to idle.
         stateMachine.applyUI(ftmsConnected, hrConnected, hasHrDevice, fitnessDevice)
@@ -1233,6 +1243,15 @@ class MainActivity : AppCompatActivity() {
         lastSavedSampleData = null
         lastHeartRateBpm = 0
         lastFtmsSample = null
+    }
+
+    private fun startRecordingService() {
+        val intent = Intent(this, RecordingService::class.java)
+        ContextCompat.startForegroundService(this, intent)
+    }
+
+    private fun stopRecordingService() {
+        stopService(Intent(this, RecordingService::class.java))
     }
 
     /**
