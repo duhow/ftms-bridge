@@ -268,7 +268,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showSettingsDialog() {
-        val input = android.widget.EditText(this).apply {
+        val input = EditText(this).apply {
             inputType = android.text.InputType.TYPE_CLASS_NUMBER or
                 android.text.InputType.TYPE_NUMBER_FLAG_SIGNED
             setText(appSettings.autoconnectMinRssi.toString())
