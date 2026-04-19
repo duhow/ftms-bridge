@@ -12,6 +12,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.os.PowerManager
 import android.util.Log
 import android.view.Menu
 import android.view.MenuItem
@@ -178,6 +179,10 @@ class MainActivity : AppCompatActivity() {
     // Recording throttle: minimum 2s between saves; identical data saved at most every 5s
     private var lastSavedSampleMs: Long = 0
     private var lastSavedSampleData: FitnessSample? = null
+
+    // Wake lock held during an active recording session to prevent Android from suspending
+    // the CPU (and dropping the BLE connection) when the app is in the background.
+    private var wakeLock: PowerManager.WakeLock? = null
 
     // Throttled scan list updates (1 second)
     private val updateHandler = Handler(Looper.getMainLooper())
@@ -1089,6 +1094,9 @@ class MainActivity : AppCompatActivity() {
         resetSessionData()
         stateMachine.onRecordingStarted()
         sessionStartTime = System.currentTimeMillis()
+        // Acquire a wake lock so the CPU stays awake and the BLE connection is not dropped
+        // by Android's power management when the app is in the background.
+        acquireWakeLock()
         // Reset and start the 1-second tick so the elapsed display counts smoothly.
         updateElapsedDisplay(0)
         elapsedTickHandler.removeCallbacks(elapsedTickRunnable)
@@ -1134,6 +1142,7 @@ class MainActivity : AppCompatActivity() {
         elapsedTickHandler.removeCallbacks(elapsedTickRunnable)
         elapsedFallbackStartTime = 0L
         lastFallbackElapsedSec = 0
+        releaseWakeLock()
 
         // Keep the frozen session view so the user can review it; Back button returns to idle.
         stateMachine.applyUI(ftmsConnected, hrConnected, hasHrDevice, fitnessDevice)
@@ -1188,6 +1197,26 @@ class MainActivity : AppCompatActivity() {
         lastSavedSampleData = null
         lastHeartRateBpm = 0
         lastFtmsSample = null
+    }
+
+    private fun acquireWakeLock() {
+        if (wakeLock?.isHeld == true) return
+        val pm = getSystemService(POWER_SERVICE) as PowerManager
+        wakeLock = pm.newWakeLock(
+            PowerManager.PARTIAL_WAKE_LOCK,
+            "FtmsBridge:RecordingWakeLock"
+        ).also { it.acquire(4 * 60 * 60 * 1000L /* 4 hours */) }
+        Log.d(tag, "Wake lock acquired")
+    }
+
+    private fun releaseWakeLock() {
+        wakeLock?.let {
+            if (it.isHeld) {
+                it.release()
+                Log.d(tag, "Wake lock released")
+            }
+        }
+        wakeLock = null
     }
 
     /**
@@ -1699,6 +1728,7 @@ class MainActivity : AppCompatActivity() {
         dummyBike = null
         bleScanner.stopScan()
         if (stateMachine.state.hasActiveSession) stopRecording()
+        releaseWakeLock()
         ftmsConnectionManager?.disconnect()
         hrConnectionManager?.disconnect()
         probeConnectionManager?.disconnect()
