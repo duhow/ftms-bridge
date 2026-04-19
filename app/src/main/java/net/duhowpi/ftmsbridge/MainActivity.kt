@@ -12,7 +12,6 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
-import android.os.PowerManager
 import android.util.Log
 import android.view.Menu
 import android.view.MenuItem
@@ -179,10 +178,6 @@ class MainActivity : AppCompatActivity() {
     // Recording throttle: minimum 2s between saves; identical data saved at most every 5s
     private var lastSavedSampleMs: Long = 0
     private var lastSavedSampleData: FitnessSample? = null
-
-    // Wake lock held during an active recording session to prevent Android from suspending
-    // the CPU (and dropping the BLE connection) when the app is in the background.
-    private var wakeLock: PowerManager.WakeLock? = null
 
     // Throttled scan list updates (1 second)
     private val updateHandler = Handler(Looper.getMainLooper())
@@ -428,7 +423,7 @@ class MainActivity : AppCompatActivity() {
     // ---- Permissions (continued) --------------------------------------------
 
     private fun getRequiredPermissions(): List<String> {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        val base = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             listOf(
                 Manifest.permission.BLUETOOTH_SCAN,
                 Manifest.permission.BLUETOOTH_CONNECT,
@@ -436,6 +431,11 @@ class MainActivity : AppCompatActivity() {
             )
         } else {
             listOf(Manifest.permission.ACCESS_FINE_LOCATION)
+        }
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            base + Manifest.permission.POST_NOTIFICATIONS
+        } else {
+            base
         }
     }
 
@@ -1094,9 +1094,10 @@ class MainActivity : AppCompatActivity() {
         resetSessionData()
         stateMachine.onRecordingStarted()
         sessionStartTime = System.currentTimeMillis()
-        // Acquire a wake lock so the CPU stays awake and the BLE connection is not dropped
-        // by Android's power management when the app is in the background.
-        acquireWakeLock()
+        // Start the foreground service: keeps the process alive so the OS does not kill it
+        // (and drop the BLE connection) while the app is in the background.  The service
+        // also holds the wake lock to keep the CPU running while the screen is off.
+        startRecordingService()
         // Reset and start the 1-second tick so the elapsed display counts smoothly.
         updateElapsedDisplay(0)
         elapsedTickHandler.removeCallbacks(elapsedTickRunnable)
@@ -1142,7 +1143,7 @@ class MainActivity : AppCompatActivity() {
         elapsedTickHandler.removeCallbacks(elapsedTickRunnable)
         elapsedFallbackStartTime = 0L
         lastFallbackElapsedSec = 0
-        releaseWakeLock()
+        stopRecordingService()
 
         // Keep the frozen session view so the user can review it; Back button returns to idle.
         stateMachine.applyUI(ftmsConnected, hrConnected, hasHrDevice, fitnessDevice)
@@ -1199,24 +1200,13 @@ class MainActivity : AppCompatActivity() {
         lastFtmsSample = null
     }
 
-    private fun acquireWakeLock() {
-        if (wakeLock?.isHeld == true) return
-        val pm = getSystemService(POWER_SERVICE) as PowerManager
-        wakeLock = pm.newWakeLock(
-            PowerManager.PARTIAL_WAKE_LOCK,
-            "FtmsBridge:RecordingWakeLock"
-        ).also { it.acquire(4 * 60 * 60 * 1000L /* 4 hours */) }
-        Log.d(tag, "Wake lock acquired")
+    private fun startRecordingService() {
+        val intent = Intent(this, RecordingService::class.java)
+        ContextCompat.startForegroundService(this, intent)
     }
 
-    private fun releaseWakeLock() {
-        wakeLock?.let {
-            if (it.isHeld) {
-                it.release()
-                Log.d(tag, "Wake lock released")
-            }
-        }
-        wakeLock = null
+    private fun stopRecordingService() {
+        stopService(Intent(this, RecordingService::class.java))
     }
 
     /**
@@ -1728,7 +1718,7 @@ class MainActivity : AppCompatActivity() {
         dummyBike = null
         bleScanner.stopScan()
         if (stateMachine.state.hasActiveSession) stopRecording()
-        releaseWakeLock()
+        stopRecordingService()
         ftmsConnectionManager?.disconnect()
         hrConnectionManager?.disconnect()
         probeConnectionManager?.disconnect()
