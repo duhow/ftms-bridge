@@ -4,5 +4,5 @@
 - Removed unused on-screen elements
 - Lap/Chart switch is now tabs above the card; swipe left/right also switches views
 - Workout card no longer jumps when switching between lap and chart views
-- Device scan list now uses all the available screen space
+- Device scan list now uses all the available screen space and is the only scrolling area (no more double scroll)
 - Live chart shows a marker line at every completed kilometre
