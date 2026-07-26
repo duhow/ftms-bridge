@@ -91,6 +91,13 @@ class MainActivity : AppCompatActivity() {
     /** Convenience: true when the state machine is in [SessionState.Recording]. */
     private val isRecording: Boolean get() = stateMachine.state is SessionState.Recording
 
+    /**
+     * Process-lifetime scope for session DB writes: keeps persisting samples and finalising
+     * the session after the activity is destroyed (task swiped from recents) while the
+     * foreground RecordingService keeps the process alive.
+     */
+    private val appScope get() = (application as FtmsBridgeApp).appScope
+
     /** Convenience: true when the state machine is in [SessionState.Paused]. */
     private val isMachinePaused: Boolean get() = stateMachine.state is SessionState.Paused
 
@@ -1197,7 +1204,7 @@ class MainActivity : AppCompatActivity() {
         binding.lapUnitEnergy.setText(R.string.unit_kcal)
         // Default to lap view
         setWorkoutView(false)
-        lifecycleScope.launch(Dispatchers.IO) {
+        appScope.launch {
             val session = WorkoutSession(
                 startTimeMs = sessionStartTime,
                 machineType = device.machineType.name,
@@ -1227,7 +1234,7 @@ class MainActivity : AppCompatActivity() {
         stateMachine.applyUI(ftmsConnected, hrConnected, hasHrDevice, fitnessDevice)
 
         val sessionId = currentSessionId ?: return
-        lifecycleScope.launch(Dispatchers.IO) {
+        appScope.launch {
             val session = db.sessionDao().getById(sessionId) ?: return@launch
             session.endTimeMs = System.currentTimeMillis()
 
@@ -1364,7 +1371,7 @@ class MainActivity : AppCompatActivity() {
         else if (elapsedFallbackStartTime > 0) {
             calculateFallbackElapsedSec(sample.timestampMs)
         } else 0
-        lifecycleScope.launch(Dispatchers.IO) {
+        appScope.launch {
             db.sampleDao().insert(
                 WorkoutSample(
                     sessionId = sessionId,
@@ -1796,10 +1803,24 @@ class MainActivity : AppCompatActivity() {
         dummyTreadmill = null
         dummyBike = null
         bleScanner.stopScan()
+        probeConnectionManager?.disconnect()
+
+        // Task swiped from recents (or otherwise finished) while a real device is recording:
+        // keep the BLE connection, loggers and foreground RecordingService alive. The BLE
+        // ConnectionListener keeps saving samples through appScope and finalises the session
+        // itself when the machine reports a stop or the device disconnects (both paths call
+        // stopRecording(), which also stops the service).
+        // ponytail: the destroyed activity instance is intentionally leaked as the session
+        // owner; reopening the app shows a fresh idle UI while recording continues in the
+        // background. Upgrade path: move session ownership into RecordingService.
+        if (isFinishing && stateMachine.state.hasActiveSession && ftmsConnectionManager?.isConnected == true) {
+            Log.i(tag, "Activity destroyed mid-session: keeping BLE and recording alive in background")
+            return
+        }
+
         if (stateMachine.state.hasActiveSession) stopRecording()
         ftmsConnectionManager?.disconnect()
         hrConnectionManager?.disconnect()
-        probeConnectionManager?.disconnect()
         debugLogger.close()
         hrDebugLogger.close()
     }
