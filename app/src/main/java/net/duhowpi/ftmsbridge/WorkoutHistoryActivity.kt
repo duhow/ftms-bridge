@@ -1,13 +1,16 @@
 package net.duhowpi.ftmsbridge
 
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.view.LayoutInflater
+import android.view.Menu
 import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.FileProvider
@@ -21,9 +24,12 @@ import kotlinx.coroutines.withContext
 import net.duhowpi.ftmsbridge.data.AppDatabase
 import net.duhowpi.ftmsbridge.data.WorkoutSession
 import net.duhowpi.ftmsbridge.databinding.ActivityWorkoutHistoryBinding
+import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
 
 class WorkoutHistoryActivity : AppCompatActivity() {
 
@@ -32,6 +38,11 @@ class WorkoutHistoryActivity : AppCompatActivity() {
     private lateinit var adapter: SessionAdapter
 
     private val displayDateFormat = SimpleDateFormat("dd MMM yyyy  HH:mm", Locale.getDefault())
+
+    private val importLauncher =
+        registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+            uri?.let { importFromUri(it) }
+        }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -59,12 +70,91 @@ class WorkoutHistoryActivity : AppCompatActivity() {
         loadSessions()
     }
 
+    override fun onCreateOptionsMenu(menu: Menu): Boolean {
+        menuInflater.inflate(R.menu.menu_workout_history, menu)
+        return true
+    }
+
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
-        if (item.itemId == android.R.id.home) {
-            finish()
-            return true
+        return when (item.itemId) {
+            android.R.id.home -> { finish(); true }
+            R.id.action_export_all -> { exportAllAsZip(); true }
+            R.id.action_import -> {
+                // .fit has no registered MIME type, so accept any file and validate content
+                importLauncher.launch(arrayOf("*/*"))
+                true
+            }
+            else -> super.onOptionsItemSelected(item)
         }
-        return super.onOptionsItemSelected(item)
+    }
+
+    private fun exportAllAsZip() {
+        lifecycleScope.launch {
+            val zipFile = withContext(Dispatchers.IO) {
+                val sessions = db.sessionDao().getAll()
+                if (sessions.isEmpty()) return@withContext null
+                val dir = getExternalFilesDir(null)?.resolve("exports") ?: filesDir.resolve("exports")
+                dir.mkdirs()
+                val stamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
+                val file = File(dir, "ftmsbridge_backup_${stamp}.zip")
+                ZipOutputStream(file.outputStream().buffered()).use { zip ->
+                    for (session in sessions) {
+                        val samples = db.sampleDao().getAllBySession(session.id)
+                        val name = WorkoutExporter.exportFileName(session, "fit")
+                            .removeSuffix(".fit") + "_${session.id}.fit"
+                        zip.putNextEntry(ZipEntry(name))
+                        zip.write(WorkoutExporter.toFit(session, samples))
+                        zip.closeEntry()
+                    }
+                }
+                file
+            }
+            if (zipFile == null) {
+                Toast.makeText(this@WorkoutHistoryActivity, R.string.no_sessions, Toast.LENGTH_SHORT).show()
+                return@launch
+            }
+            val uri = FileProvider.getUriForFile(this@WorkoutHistoryActivity, "${packageName}.fileprovider", zipFile)
+            val intent = Intent(Intent.ACTION_SEND).apply {
+                type = "application/zip"
+                putExtra(Intent.EXTRA_STREAM, uri)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            startActivity(Intent.createChooser(intent, getString(R.string.export_all)))
+        }
+    }
+
+    private fun importFromUri(uri: Uri) {
+        lifecycleScope.launch {
+            val result = withContext(Dispatchers.IO) {
+                val bytes = contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                    ?: return@withContext null
+                val fitFiles = try {
+                    if (FitDecoder.isZip(bytes)) FitDecoder.unzipFits(bytes) else listOf(bytes)
+                } catch (e: Exception) {
+                    return@withContext null
+                }
+                val existing = db.sessionDao().getAll().map { it.startTimeMs }.toHashSet()
+                var imported = 0
+                var skipped = 0
+                for (fit in fitFiles) {
+                    val decoded = runCatching { FitDecoder.decode(fit) }.getOrNull()
+                    if (decoded == null || !existing.add(decoded.session.startTimeMs)) {
+                        skipped++
+                        continue
+                    }
+                    val newId = db.sessionDao().insert(decoded.session)
+                    db.sampleDao().insertAll(decoded.samples.map { it.copy(sessionId = newId) })
+                    imported++
+                }
+                Pair(imported, skipped)
+            }
+            val message = when {
+                result == null || result.first + result.second == 0 -> getString(R.string.import_none)
+                else -> getString(R.string.import_result, result.first, result.second)
+            }
+            Toast.makeText(this@WorkoutHistoryActivity, message, Toast.LENGTH_LONG).show()
+            if (result != null && result.first > 0) loadSessions()
+        }
     }
 
     private fun loadSessions() {

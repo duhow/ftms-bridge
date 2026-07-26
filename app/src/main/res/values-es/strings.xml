@@ -30,6 +30,10 @@
     <string name="export_fit">FIT</string>
     <string name="export_csv">CSV</string>
     <string name="export_format_title">Formato de exportación</string>
+    <string name="export_all">Exportar todo (ZIP)</string>
+    <string name="import_workouts">Importar entrenamientos</string>
+    <string name="import_result">%1$d entrenamientos importados, %2$d omitidos</string>
+    <string name="import_none">No se encontraron entrenamientos en el archivo</string>
     <string name="duration">Duración</string>
     <string name="avg_speed">Vel. media</string>
     <string name="avg_hr">FC media</string>
