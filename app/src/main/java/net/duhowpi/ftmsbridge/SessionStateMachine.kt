@@ -128,7 +128,6 @@ class SessionStateMachine(
 
         // Toolbar status icons hidden
         binding.toolbarStatusIcons.visibility = View.GONE
-        binding.recordingIndicator.visibility = View.GONE
 
         // Connection indicators
         applyConnectionIndicators(ftmsConnected = false, hrConnected = false, hasHrDevice = false)
@@ -148,7 +147,6 @@ class SessionStateMachine(
         binding.metricsSection.visibility = View.GONE
         binding.workoutButtonRow.visibility = View.GONE
         binding.toolbarStatusIcons.visibility = View.GONE
-        binding.recordingIndicator.visibility = View.GONE
     }
 
     // --- Connected -----------------------------------------------------------
@@ -181,7 +179,6 @@ class SessionStateMachine(
 
         // Toolbar status
         binding.toolbarStatusIcons.visibility = View.GONE
-        binding.recordingIndicator.visibility = View.GONE
 
         applyConnectionIndicators(ftmsConnected, hrConnected, hasHrDevice)
 
@@ -208,7 +205,6 @@ class SessionStateMachine(
 
         // Hide device header; show compact toolbar indicators
         binding.deviceHeaderRow.visibility = View.GONE
-        binding.recordingIndicator.visibility = View.GONE
         binding.toolbarStatusIcons.visibility = View.VISIBLE
         applyConnectionIndicators(ftmsConnected, hrConnected, hasHrDevice)
         binding.toolbarIndicatorHr.visibility = if (hasHrDevice) View.VISIBLE else View.GONE
@@ -263,7 +259,6 @@ class SessionStateMachine(
             binding.rvScanResults.visibility = View.GONE
             binding.txtScanStatus.visibility = View.GONE
             binding.deviceHeaderRow.visibility = View.GONE
-            binding.recordingIndicator.visibility = View.GONE
             binding.toolbarStatusIcons.visibility = View.VISIBLE
             applyConnectionIndicators(ftmsConnected = false, hrConnected = false, hasHrDevice = false)
 

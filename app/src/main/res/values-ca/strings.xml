@@ -14,17 +14,11 @@
     <string name="permissions_required">Calen permisos de Bluetooth</string>
 
     <!-- Session -->
-    <string name="start_session">Iniciar</string>
-    <string name="stop_session">Aturar</string>
-    <string name="recording">● REC</string>
-    <string name="paused">⏸ EN PAUSA</string>
-    <string name="back_to_idle">◀ Tornar</string>
+    <string name="back_to_idle">Tornar</string>
 
     <!-- Workout controls -->
-    <string name="workout_start">▶ Iniciar</string>
-    <string name="workout_pause">⏸ Pausar</string>
-    <string name="workout_resume">▶ Reprendre</string>
-    <string name="workout_stop">◼ Aturar</string>
+    <string name="workout_start">Iniciar</string>
+    <string name="workout_stop">Aturar</string>
 
     <!-- History -->
     <string name="history">Historial</string>

@@ -329,24 +329,24 @@
                     android:layout_height="220dp" />
             </com.google.android.material.card.MaterialCardView>
 
-            <LinearLayout
+            <com.google.android.material.button.MaterialButtonToggleGroup
                 android:id="@+id/viewToggleRow"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center"
                 android:paddingBottom="8dp"
-                android:visibility="gone">
+                android:visibility="gone"
+                app:singleSelection="true"
+                app:selectionRequired="true"
+                app:checkedButton="@id/btnViewLap">
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnViewLap"
-                    style="@style/Widget.Material3.Button.TonalButton"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
                     android:layout_width="0dp"
                     android:layout_height="36dp"
                     android:layout_weight="1"
                     android:text="@string/view_lap"
                     android:textSize="13sp"
-                    android:layout_marginEnd="4dp"
                     app:icon="@drawable/ic_lap"
                     app:iconSize="18dp" />
 
@@ -358,10 +358,9 @@
                     android:layout_weight="1"
                     android:text="@string/view_chart"
                     android:textSize="13sp"
-                    android:layout_marginStart="4dp"
                     app:icon="@drawable/ic_chart"
                     app:iconSize="18dp" />
-            </LinearLayout>
+            </com.google.android.material.button.MaterialButtonToggleGroup>
 
             <TextView
                 android:id="@+id/txtScanStatus"
@@ -378,17 +377,6 @@
                 android:layout_height="220dp"
                 android:background="?attr/colorSurface"
                 android:paddingBottom="4dp"
-                android:visibility="gone" />
-
-            <TextView
-                android:id="@+id/recordingIndicator"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="@string/recording"
-                android:textColor="@android:color/holo_red_dark"
-                android:textStyle="bold"
-                android:gravity="center"
-                android:paddingBottom="8dp"
                 android:visibility="gone" />
 
             <LinearLayout
@@ -653,19 +641,7 @@
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:text="@string/workout_start"
-                    android:layout_marginEnd="4dp"
-                    app:icon="@drawable/ic_time" />
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnWorkoutPause"
-                    style="@style/Widget.Material3.Button.TonalButton"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="@string/workout_pause"
-                    android:layout_marginStart="4dp"
-                    android:layout_marginEnd="4dp"
-                    android:visibility="gone" />
+                    app:icon="@drawable/ic_play" />
 
             </LinearLayout>
 
