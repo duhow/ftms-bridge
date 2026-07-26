@@ -5,6 +5,7 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.IBinder
@@ -44,32 +45,12 @@ class RecordingService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        val openIntent = Intent(this, MainActivity::class.java).apply {
-            addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
-        }
-        val pendingIntent = PendingIntent.getActivity(
-            this, 0, openIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
         val startTime = intent?.getLongExtra(EXTRA_SESSION_START_MS, 0L)?.takeIf { it > 0 }
             ?: System.currentTimeMillis()
-        val notification: Notification = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle(getString(R.string.app_name))
-            .setContentText(getString(R.string.recording_notification_text))
-            .setSmallIcon(R.drawable.ic_bluetooth)
-            .setContentIntent(pendingIntent)
-            .setOngoing(true)
-            // System-rendered elapsed timer: counts up from session start without
-            // the service having to re-post the notification every second.
-            .setWhen(startTime)
-            .setShowWhen(true)
-            .setUsesChronometer(true)
-            .build()
-
         ServiceCompat.startForeground(
             this,
             NOTIFICATION_ID,
-            notification,
+            buildNotification(this, getString(R.string.recording_notification_text), startTime),
             ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
         )
 
@@ -103,5 +84,37 @@ class RecordingService : Service() {
 
         /** Unix ms when the session started; used for the notification chronometer. */
         const val EXTRA_SESSION_START_MS = "session_start_ms"
+
+        /**
+         * Re-posts the ongoing recording notification with live workout metrics.
+         * No-op when the foreground notification is not showing (service stopped).
+         */
+        fun updateMetrics(context: Context, text: String, sessionStartMs: Long) {
+            val nm = context.getSystemService(NotificationManager::class.java)
+            if (nm.activeNotifications.none { it.id == NOTIFICATION_ID }) return
+            nm.notify(NOTIFICATION_ID, buildNotification(context, text, sessionStartMs))
+        }
+
+        private fun buildNotification(context: Context, text: String, startTime: Long): Notification {
+            val openIntent = Intent(context, MainActivity::class.java).apply {
+                addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
+            }
+            val pendingIntent = PendingIntent.getActivity(
+                context, 0, openIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            return NotificationCompat.Builder(context, CHANNEL_ID)
+                .setContentTitle(context.getString(R.string.app_name))
+                .setContentText(text)
+                .setSmallIcon(R.drawable.ic_bluetooth)
+                .setContentIntent(pendingIntent)
+                .setOngoing(true)
+                // System-rendered elapsed timer: counts up from session start without
+                // the service having to re-post the notification every second.
+                .setWhen(startTime)
+                .setShowWhen(true)
+                .setUsesChronometer(true)
+                .build()
+        }
     }
 }

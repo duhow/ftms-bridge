@@ -193,6 +193,9 @@ class MainActivity : AppCompatActivity() {
     private var lastSavedSampleMs: Long = 0
     private var lastSavedSampleData: FitnessSample? = null
 
+    // Live-metrics notification refresh throttle (5 seconds)
+    private var lastNotificationUpdateMs: Long = 0
+
     // Throttled scan list updates (1 second)
     private val updateHandler = Handler(Looper.getMainLooper())
     private val scanListUpdateRunnable = object : Runnable {
@@ -1282,6 +1285,7 @@ class MainActivity : AppCompatActivity() {
         lastFallbackElapsedSec = 0
         lastSavedSampleMs = 0
         lastSavedSampleData = null
+        lastNotificationUpdateMs = 0
         lastHeartRateBpm = 0
         lastFtmsSample = null
     }
@@ -1346,6 +1350,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun saveSample(sample: FitnessSample) {
         val sessionId = currentSessionId ?: return
+        updateRecordingNotification(sample)
         val nowMs = System.currentTimeMillis()
         val msSinceLast = nowMs - lastSavedSampleMs
 
@@ -1389,6 +1394,25 @@ class MainActivity : AppCompatActivity() {
                 )
             )
         }
+    }
+
+    /**
+     * Refreshes the foreground-service notification text with live metrics, at most every 5 s.
+     * Treadmills show speed; bikes and cross-trainers show cadence instead.
+     * E.g. "Treadmill - 8.0 km/h - 394 kcal" or "Bike - 82 rpm - 210 kcal".
+     */
+    private fun updateRecordingNotification(sample: FitnessSample) {
+        val nowMs = System.currentTimeMillis()
+        if (nowMs - lastNotificationUpdateMs < 5_000) return
+        lastNotificationUpdateMs = nowMs
+        val device: FitnessDevice = fitnessDevice ?: dummyTreadmill ?: dummyBike ?: return
+        val metric = if (isActiveTreadmill) {
+            "%.1f %s".format(sample.speedKmh, getString(R.string.unit_kmh))
+        } else {
+            "${sample.cadenceRpm.toInt()} ${getString(R.string.unit_rpm)}"
+        }
+        val text = "${device.deviceName} - $metric - ${sample.totalEnergyKcal} ${getString(R.string.unit_kcal)}"
+        RecordingService.updateMetrics(this, text, sessionStartTime)
     }
 
     // ---- Debug dialog -------------------------------------------------------
