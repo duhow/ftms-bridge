@@ -6,3 +6,4 @@
 - Workout card no longer jumps when switching between lap and chart views
 - Device scan list now uses all the available screen space and is the only scrolling area (no more double scroll)
 - Live chart shows a marker line at every completed kilometre
+- New menu in Workout History to export all workouts as a ZIP of FIT files and import them back (backup/restore)

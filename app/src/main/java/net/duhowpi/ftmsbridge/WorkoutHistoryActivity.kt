@@ -40,8 +40,8 @@ class WorkoutHistoryActivity : AppCompatActivity() {
     private val displayDateFormat = SimpleDateFormat("dd MMM yyyy  HH:mm", Locale.getDefault())
 
     private val importLauncher =
-        registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-            uri?.let { importFromUri(it) }
+        registerForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
+            if (uris.isNotEmpty()) importFromUris(uris)
         }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -123,16 +123,20 @@ class WorkoutHistoryActivity : AppCompatActivity() {
         }
     }
 
-    private fun importFromUri(uri: Uri) {
+    private fun importFromUris(uris: List<Uri>) {
         lifecycleScope.launch {
             val result = withContext(Dispatchers.IO) {
-                val bytes = contentResolver.openInputStream(uri)?.use { it.readBytes() }
-                    ?: return@withContext null
-                val fitFiles = try {
-                    if (FitDecoder.isZip(bytes)) FitDecoder.unzipFits(bytes) else listOf(bytes)
-                } catch (e: Exception) {
-                    return@withContext null
+                val fitFiles = mutableListOf<ByteArray>()
+                for (uri in uris) {
+                    val bytes = contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: continue
+                    try {
+                        if (FitDecoder.isZip(bytes)) fitFiles.addAll(FitDecoder.unzipFits(bytes))
+                        else fitFiles.add(bytes)
+                    } catch (e: Exception) {
+                        // corrupt zip: skip this file, keep processing the rest
+                    }
                 }
+                if (fitFiles.isEmpty()) return@withContext null
                 val existing = db.sessionDao().getAll().map { it.startTimeMs }.toHashSet()
                 var imported = 0
                 var skipped = 0
