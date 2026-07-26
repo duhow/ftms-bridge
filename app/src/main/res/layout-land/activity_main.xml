@@ -43,15 +43,16 @@
         </LinearLayout>
     </androidx.appcompat.widget.Toolbar>
 
-    <ScrollView
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
+        android:orientation="vertical"
         android:background="?android:colorBackground">
 
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            android:layout_height="match_parent"
             android:orientation="vertical"
             android:padding="12dp">
 
@@ -139,10 +140,65 @@
                 android:textColor="?android:attr/textColorSecondary"
                 android:visibility="gone" />
 
+            <com.google.android.material.tabs.TabLayout
+                android:id="@+id/viewToggleRow"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:visibility="gone"
+                app:tabMode="fixed"
+                app:tabGravity="fill"
+                app:tabInlineLabel="true">
+
+                <com.google.android.material.tabs.TabItem
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:icon="@drawable/ic_lap"
+                    android:text="@string/view_lap" />
+
+                <com.google.android.material.tabs.TabItem
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:icon="@drawable/ic_chart"
+                    android:text="@string/view_chart" />
+            </com.google.android.material.tabs.TabLayout>
+
+            <TextView
+                android:id="@+id/txtScanStatus"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textSize="11sp"
+                android:paddingBottom="2dp"
+                android:paddingStart="2dp"
+                android:visibility="gone" />
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/rvScanResults"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:background="?attr/colorSurface"
+                android:paddingBottom="4dp"
+                android:visibility="gone" />
+
+            <ScrollView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+            <FrameLayout
+                android:id="@+id/workoutViewContainer"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp">
+
             <com.google.android.material.card.MaterialCardView
                 android:id="@+id/lapSection"
                 android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:layout_marginTop="4dp" android:visibility="gone"
+                android:visibility="gone"
                 app:cardElevation="2dp">
                 <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
                     android:orientation="vertical" android:padding="12dp" android:gravity="center">
@@ -300,63 +356,14 @@
             <com.google.android.material.card.MaterialCardView
                 android:id="@+id/chartSection"
                 android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:layout_marginTop="4dp" android:visibility="gone"
+                android:visibility="gone"
                 app:cardElevation="2dp">
                 <net.duhowpi.ftmsbridge.LineChartView
                     android:id="@+id/liveChart"
                     android:layout_width="match_parent"
                     android:layout_height="160dp" />
             </com.google.android.material.card.MaterialCardView>
-
-            <com.google.android.material.button.MaterialButtonToggleGroup
-                android:id="@+id/viewToggleRow"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:paddingBottom="4dp"
-                android:visibility="gone"
-                app:singleSelection="true"
-                app:selectionRequired="true"
-                app:checkedButton="@id/btnViewLap">
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnViewLap"
-                    style="@style/Widget.Material3.Button.OutlinedButton"
-                    android:layout_width="0dp"
-                    android:layout_height="32dp"
-                    android:layout_weight="1"
-                    android:text="@string/view_lap"
-                    android:textSize="11sp"
-                    app:icon="@drawable/ic_lap"
-                    app:iconSize="16dp" />
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnViewChart"
-                    style="@style/Widget.Material3.Button.OutlinedButton"
-                    android:layout_width="0dp"
-                    android:layout_height="32dp"
-                    android:layout_weight="1"
-                    android:text="@string/view_chart"
-                    android:textSize="11sp"
-                    app:icon="@drawable/ic_chart"
-                    app:iconSize="16dp" />
-            </com.google.android.material.button.MaterialButtonToggleGroup>
-
-            <TextView
-                android:id="@+id/txtScanStatus"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:textSize="11sp"
-                android:paddingBottom="2dp"
-                android:paddingStart="2dp"
-                android:visibility="gone" />
-
-            <androidx.recyclerview.widget.RecyclerView
-                android:id="@+id/rvScanResults"
-                android:layout_width="match_parent"
-                android:layout_height="160dp"
-                android:background="?attr/colorSurface"
-                android:paddingBottom="4dp"
-                android:visibility="gone" />
+            </FrameLayout>
 
             <LinearLayout
                 android:id="@+id/metricsSection"
@@ -615,8 +622,11 @@
                     app:iconSize="16dp" />
             </LinearLayout>
 
+            </LinearLayout>
+            </ScrollView>
+
         </LinearLayout>
-    </ScrollView>
+    </LinearLayout>
 
     <com.google.android.material.button.MaterialButton
         android:id="@+id/btnWorkoutStop"
