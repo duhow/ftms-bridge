@@ -47,6 +47,7 @@
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
+        android:fillViewport="true"
         android:background="?android:colorBackground">
 
         <LinearLayout
@@ -138,6 +139,35 @@
                 android:textSize="10sp"
                 android:textColor="?android:attr/textColorSecondary"
                 android:visibility="gone" />
+
+            <com.google.android.material.tabs.TabLayout
+                android:id="@+id/viewToggleRow"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:visibility="gone"
+                app:tabMode="fixed"
+                app:tabGravity="fill"
+                app:tabInlineLabel="true">
+
+                <com.google.android.material.tabs.TabItem
+                    android:id="@+id/btnViewLap"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:icon="@drawable/ic_lap"
+                    android:text="@string/view_lap" />
+
+                <com.google.android.material.tabs.TabItem
+                    android:id="@+id/btnViewChart"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:icon="@drawable/ic_chart"
+                    android:text="@string/view_chart" />
+            </com.google.android.material.tabs.TabLayout>
+
+            <FrameLayout
+                android:id="@+id/workoutViewContainer"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content">
 
             <com.google.android.material.card.MaterialCardView
                 android:id="@+id/lapSection"
@@ -307,39 +337,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="160dp" />
             </com.google.android.material.card.MaterialCardView>
-
-            <com.google.android.material.button.MaterialButtonToggleGroup
-                android:id="@+id/viewToggleRow"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:paddingBottom="4dp"
-                android:visibility="gone"
-                app:singleSelection="true"
-                app:selectionRequired="true"
-                app:checkedButton="@id/btnViewLap">
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnViewLap"
-                    style="@style/Widget.Material3.Button.OutlinedButton"
-                    android:layout_width="0dp"
-                    android:layout_height="32dp"
-                    android:layout_weight="1"
-                    android:text="@string/view_lap"
-                    android:textSize="11sp"
-                    app:icon="@drawable/ic_lap"
-                    app:iconSize="16dp" />
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnViewChart"
-                    style="@style/Widget.Material3.Button.OutlinedButton"
-                    android:layout_width="0dp"
-                    android:layout_height="32dp"
-                    android:layout_weight="1"
-                    android:text="@string/view_chart"
-                    android:textSize="11sp"
-                    app:icon="@drawable/ic_chart"
-                    app:iconSize="16dp" />
-            </com.google.android.material.button.MaterialButtonToggleGroup>
+            </FrameLayout>
 
             <TextView
                 android:id="@+id/txtScanStatus"
@@ -353,7 +351,9 @@
             <androidx.recyclerview.widget.RecyclerView
                 android:id="@+id/rvScanResults"
                 android:layout_width="match_parent"
-                android:layout_height="160dp"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:minHeight="160dp"
                 android:background="?attr/colorSurface"
                 android:paddingBottom="4dp"
                 android:visibility="gone" />

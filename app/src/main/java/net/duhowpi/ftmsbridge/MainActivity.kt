@@ -13,8 +13,10 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import android.view.GestureDetector
 import android.view.Menu
 import android.view.MenuItem
+import android.view.MotionEvent
 import android.view.View
 import android.widget.Button
 import android.widget.EditText
@@ -55,6 +57,7 @@ import net.duhowpi.ftmsbridge.model.ScannedDeviceInfo
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.util.UUID
+import kotlin.math.abs
 import kotlin.math.roundToInt
 
 class MainActivity : AppCompatActivity() {
@@ -108,6 +111,7 @@ class MainActivity : AppCompatActivity() {
     private val liveSpeedPoints = mutableListOf<Float>()
     private val livePaceSecondaryPoints = mutableListOf<Float>()
     private val liveHrPoints = mutableListOf<Float>()
+    private val liveKmMarkIndices = mutableListOf<Int>()
     private var liveChartElapsedSec = 0
 
     // Lap tracking
@@ -335,9 +339,13 @@ class MainActivity : AppCompatActivity() {
             if (isActiveTreadmill) showInclineControlDialog() else showResistanceControlDialog()
         }
 
-        binding.viewToggleRow.addOnButtonCheckedListener { _, checkedId, isChecked ->
-            if (isChecked) setWorkoutView(checkedId == R.id.btnViewChart)
-        }
+        binding.viewToggleRow.addOnTabSelectedListener(object : com.google.android.material.tabs.TabLayout.OnTabSelectedListener {
+            override fun onTabSelected(tab: com.google.android.material.tabs.TabLayout.Tab) {
+                setWorkoutView(tab.position == 1)
+            }
+            override fun onTabUnselected(tab: com.google.android.material.tabs.TabLayout.Tab) {}
+            override fun onTabReselected(tab: com.google.android.material.tabs.TabLayout.Tab) {}
+        })
 
         updateConnectionStatus()
         // Apply initial Idle UI (which also resets all metric displays).
@@ -348,10 +356,32 @@ class MainActivity : AppCompatActivity() {
 
     private fun setWorkoutView(showChart: Boolean) {
         isChartViewActive = showChart
-        binding.viewToggleRow.check(if (showChart) R.id.btnViewChart else R.id.btnViewLap)
-        binding.lapSection.visibility = if (!showChart) View.VISIBLE else View.GONE
-        binding.chartSection.visibility = if (showChart) View.VISIBLE else View.GONE
+        val tab = binding.viewToggleRow.getTabAt(if (showChart) 1 else 0)
+        if (tab != null && !tab.isSelected) tab.select()
+        // INVISIBLE (not GONE) keeps the container sized to the tallest view,
+        // so the card area never moves when switching views.
+        binding.lapSection.visibility = if (!showChart) View.VISIBLE else View.INVISIBLE
+        binding.chartSection.visibility = if (showChart) View.VISIBLE else View.INVISIBLE
         if (showChart) updateLiveChart()
+    }
+
+    /** Detects horizontal swipes anywhere on screen to switch lap/chart views. */
+    private val workoutSwipeDetector by lazy {
+        GestureDetector(this, object : GestureDetector.SimpleOnGestureListener() {
+            override fun onFling(e1: MotionEvent?, e2: MotionEvent, velocityX: Float, velocityY: Float): Boolean {
+                if (e1 == null || binding.viewToggleRow.visibility != View.VISIBLE) return false
+                val dx = e2.x - e1.x
+                if (abs(dx) < SWIPE_MIN_DISTANCE_PX || abs(velocityX) < SWIPE_MIN_VELOCITY ||
+                    abs(dx) < abs(e2.y - e1.y)) return false
+                setWorkoutView(dx < 0)
+                return true
+            }
+        })
+    }
+
+    override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
+        workoutSwipeDetector.onTouchEvent(ev)
+        return super.dispatchTouchEvent(ev)
     }
 
     private fun updateLiveChart() {
@@ -381,7 +411,7 @@ class MainActivity : AppCompatActivity() {
         if (hasNonZeroValues(liveHrPoints)) {
             seriesList.add(LineChartView.DataSeries(getString(R.string.metric_heart_rate), hrColor, liveHrPoints.toList(), 40f, 200f))
         }
-        binding.liveChart.setData(*seriesList.toTypedArray(), durationSec = durationSec)
+        binding.liveChart.setData(*seriesList.toTypedArray(), durationSec = durationSec, kmMarkIndices = liveKmMarkIndices.toList())
     }
 
     private fun updateLapView(sample: FitnessSample) {
@@ -1103,6 +1133,8 @@ class MainActivity : AppCompatActivity() {
             if (isTreadmill) (fitnessDevice?.getIncline(sample) ?: sample.inclinationPercent).toFloat() else resolveDisplayResistanceLevel(sample).toFloat()
         )
         liveHrPoints.add(sample.heartRateBpm.toFloat())
+        val kmCount = sample.totalDistanceM / 1000
+        while (liveKmMarkIndices.size < kmCount) liveKmMarkIndices.add(liveSpeedPoints.size - 1)
         if (isChartViewActive) updateLiveChart()
         updateLapView(sample)
     }
@@ -1232,6 +1264,7 @@ class MainActivity : AppCompatActivity() {
         liveSpeedPoints.clear()
         livePaceSecondaryPoints.clear()
         liveHrPoints.clear()
+        liveKmMarkIndices.clear()
         liveChartElapsedSec = 0
         lapStartDistanceM = 0
         lapStartTimeMs = 0
@@ -1783,6 +1816,7 @@ class MainActivity : AppCompatActivity() {
         outState.putFloatArray(KEY_LIVE_SPEED_POINTS, liveSpeedPoints.toFloatArray())
         outState.putFloatArray(KEY_LIVE_PACE_POINTS, livePaceSecondaryPoints.toFloatArray())
         outState.putFloatArray(KEY_LIVE_HR_POINTS, liveHrPoints.toFloatArray())
+        outState.putIntArray(KEY_LIVE_KM_MARKS, liveKmMarkIndices.toIntArray())
         outState.putInt(KEY_LIVE_CHART_ELAPSED, liveChartElapsedSec)
     }
 
@@ -1812,6 +1846,7 @@ class MainActivity : AppCompatActivity() {
         state.getFloatArray(KEY_LIVE_SPEED_POINTS)?.let { liveSpeedPoints.addAll(it.toList()) }
         state.getFloatArray(KEY_LIVE_PACE_POINTS)?.let { livePaceSecondaryPoints.addAll(it.toList()) }
         state.getFloatArray(KEY_LIVE_HR_POINTS)?.let { liveHrPoints.addAll(it.toList()) }
+        state.getIntArray(KEY_LIVE_KM_MARKS)?.let { liveKmMarkIndices.addAll(it.toList()) }
 
         // After process death (or screen rotation) the BLE link is gone, so restore
         // active sessions as Disconnected (user can press Stop to finalise) and
@@ -2019,6 +2054,9 @@ class MainActivity : AppCompatActivity() {
         private const val KEY_LIVE_SPEED_POINTS = "live_speed_points"
         private const val KEY_LIVE_PACE_POINTS = "live_pace_points"
         private const val KEY_LIVE_HR_POINTS = "live_hr_points"
+        private const val KEY_LIVE_KM_MARKS = "live_km_marks"
+        private const val SWIPE_MIN_DISTANCE_PX = 150f
+        private const val SWIPE_MIN_VELOCITY = 800f
         private const val KEY_LIVE_CHART_ELAPSED = "live_chart_elapsed"
 
         /** Device name prefixes that identify non-fitness BLE peripherals. */

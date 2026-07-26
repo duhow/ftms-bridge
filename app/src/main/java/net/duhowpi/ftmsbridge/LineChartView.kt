@@ -63,6 +63,11 @@ class LineChartView @JvmOverloads constructor(
         strokeWidth = 2f
         style = Paint.Style.STROKE
     }
+    private val kmMarkPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(160, 76, 175, 80)
+        strokeWidth = 3f
+        style = Paint.Style.STROKE
+    }
 
     private val paddingLeft = 72f
     private val paddingRight = 72f
@@ -72,13 +77,15 @@ class LineChartView @JvmOverloads constructor(
     private var totalDurationSec: Int = 0
     private var legendEntries: List<Pair<String, Int>> = emptyList()
     private var tooltipIndex: Int? = null
+    private var kmMarkIndices: List<Int> = emptyList()
 
-    fun setData(vararg dataSeries: DataSeries, durationSec: Int) {
+    fun setData(vararg dataSeries: DataSeries, durationSec: Int, kmMarkIndices: List<Int> = emptyList()) {
         series.clear()
         series.addAll(dataSeries)
         totalDurationSec = durationSec
         legendEntries = dataSeries.map { Pair(it.label, it.color) }
         tooltipIndex = null
+        this.kmMarkIndices = kmMarkIndices
         invalidate()
     }
 
@@ -146,6 +153,21 @@ class LineChartView @JvmOverloads constructor(
         // --- Axis lines ---
         canvas.drawLine(chartLeft, chartTop, chartLeft, chartBottom, axisPaint)
         canvas.drawLine(chartLeft, chartBottom, chartRight, chartBottom, axisPaint)
+
+        // --- Kilometre markers (vertical line + label at every completed km) ---
+        if (kmMarkIndices.isNotEmpty()) {
+            val maxPts = series.maxOf { it.points.size }
+            val lastIdx = (maxPts - 1).coerceAtLeast(1)
+            kmMarkIndices.forEachIndexed { i, pointIdx ->
+                if (pointIdx in 0..lastIdx) {
+                    val x = chartLeft + (pointIdx.toFloat() / lastIdx) * chartW
+                    canvas.drawLine(x, chartTop, x, chartBottom, kmMarkPaint)
+                    labelPaint.color = kmMarkPaint.color
+                    labelPaint.textAlign = Paint.Align.CENTER
+                    canvas.drawText("${i + 1} km", x, chartTop + labelPaint.textSize, labelPaint)
+                }
+            }
+        }
 
         // --- Series lines ---
         series.forEachIndexed { idx, s ->
