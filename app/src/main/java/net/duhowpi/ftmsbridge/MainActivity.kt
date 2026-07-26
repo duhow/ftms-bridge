@@ -91,6 +91,13 @@ class MainActivity : AppCompatActivity() {
     /** Convenience: true when the state machine is in [SessionState.Recording]. */
     private val isRecording: Boolean get() = stateMachine.state is SessionState.Recording
 
+    /**
+     * Process-lifetime scope for session DB writes: keeps persisting samples and finalising
+     * the session after the activity is destroyed (task swiped from recents) while the
+     * foreground RecordingService keeps the process alive.
+     */
+    private val appScope get() = (application as FtmsBridgeApp).appScope
+
     /** Convenience: true when the state machine is in [SessionState.Paused]. */
     private val isMachinePaused: Boolean get() = stateMachine.state is SessionState.Paused
 
@@ -185,6 +192,9 @@ class MainActivity : AppCompatActivity() {
     // Recording throttle: minimum 2s between saves; identical data saved at most every 5s
     private var lastSavedSampleMs: Long = 0
     private var lastSavedSampleData: FitnessSample? = null
+
+    // Live-metrics notification refresh throttle (5 seconds)
+    private var lastNotificationUpdateMs: Long = 0
 
     // Throttled scan list updates (1 second)
     private val updateHandler = Handler(Looper.getMainLooper())
@@ -1197,7 +1207,7 @@ class MainActivity : AppCompatActivity() {
         binding.lapUnitEnergy.setText(R.string.unit_kcal)
         // Default to lap view
         setWorkoutView(false)
-        lifecycleScope.launch(Dispatchers.IO) {
+        appScope.launch {
             val session = WorkoutSession(
                 startTimeMs = sessionStartTime,
                 machineType = device.machineType.name,
@@ -1227,7 +1237,7 @@ class MainActivity : AppCompatActivity() {
         stateMachine.applyUI(ftmsConnected, hrConnected, hasHrDevice, fitnessDevice)
 
         val sessionId = currentSessionId ?: return
-        lifecycleScope.launch(Dispatchers.IO) {
+        appScope.launch {
             val session = db.sessionDao().getById(sessionId) ?: return@launch
             session.endTimeMs = System.currentTimeMillis()
 
@@ -1275,12 +1285,14 @@ class MainActivity : AppCompatActivity() {
         lastFallbackElapsedSec = 0
         lastSavedSampleMs = 0
         lastSavedSampleData = null
+        lastNotificationUpdateMs = 0
         lastHeartRateBpm = 0
         lastFtmsSample = null
     }
 
     private fun startRecordingService() {
         val intent = Intent(this, RecordingService::class.java)
+            .putExtra(RecordingService.EXTRA_SESSION_START_MS, sessionStartTime)
         ContextCompat.startForegroundService(this, intent)
     }
 
@@ -1338,6 +1350,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun saveSample(sample: FitnessSample) {
         val sessionId = currentSessionId ?: return
+        updateRecordingNotification(sample)
         val nowMs = System.currentTimeMillis()
         val msSinceLast = nowMs - lastSavedSampleMs
 
@@ -1364,7 +1377,7 @@ class MainActivity : AppCompatActivity() {
         else if (elapsedFallbackStartTime > 0) {
             calculateFallbackElapsedSec(sample.timestampMs)
         } else 0
-        lifecycleScope.launch(Dispatchers.IO) {
+        appScope.launch {
             db.sampleDao().insert(
                 WorkoutSample(
                     sessionId = sessionId,
@@ -1381,6 +1394,25 @@ class MainActivity : AppCompatActivity() {
                 )
             )
         }
+    }
+
+    /**
+     * Refreshes the foreground-service notification text with live metrics, at most every 5 s.
+     * Treadmills show speed; bikes and cross-trainers show cadence instead.
+     * E.g. "Treadmill - 8.0 km/h - 394 kcal" or "Bike - 82 rpm - 210 kcal".
+     */
+    private fun updateRecordingNotification(sample: FitnessSample) {
+        val nowMs = System.currentTimeMillis()
+        if (nowMs - lastNotificationUpdateMs < 5_000) return
+        lastNotificationUpdateMs = nowMs
+        val device: FitnessDevice = fitnessDevice ?: dummyTreadmill ?: dummyBike ?: return
+        val metric = if (isActiveTreadmill) {
+            "%.1f %s".format(sample.speedKmh, getString(R.string.unit_kmh))
+        } else {
+            "${sample.cadenceRpm.toInt()} ${getString(R.string.unit_rpm)}"
+        }
+        val text = "${device.deviceName} - $metric - ${sample.totalEnergyKcal} ${getString(R.string.unit_kcal)}"
+        RecordingService.updateMetrics(this, text, sessionStartTime)
     }
 
     // ---- Debug dialog -------------------------------------------------------
@@ -1796,10 +1828,24 @@ class MainActivity : AppCompatActivity() {
         dummyTreadmill = null
         dummyBike = null
         bleScanner.stopScan()
+        probeConnectionManager?.disconnect()
+
+        // Task swiped from recents (or otherwise finished) while a real device is recording:
+        // keep the BLE connection, loggers and foreground RecordingService alive. The BLE
+        // ConnectionListener keeps saving samples through appScope and finalises the session
+        // itself when the machine reports a stop or the device disconnects (both paths call
+        // stopRecording(), which also stops the service).
+        // ponytail: the destroyed activity instance is intentionally leaked as the session
+        // owner; reopening the app shows a fresh idle UI while recording continues in the
+        // background. Upgrade path: move session ownership into RecordingService.
+        if (isFinishing && stateMachine.state.hasActiveSession && ftmsConnectionManager?.isConnected == true) {
+            Log.i(tag, "Activity destroyed mid-session: keeping BLE and recording alive in background")
+            return
+        }
+
         if (stateMachine.state.hasActiveSession) stopRecording()
         ftmsConnectionManager?.disconnect()
         hrConnectionManager?.disconnect()
-        probeConnectionManager?.disconnect()
         debugLogger.close()
         hrDebugLogger.close()
     }
