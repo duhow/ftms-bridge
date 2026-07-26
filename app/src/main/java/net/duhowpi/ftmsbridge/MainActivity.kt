@@ -335,8 +335,9 @@ class MainActivity : AppCompatActivity() {
             if (isActiveTreadmill) showInclineControlDialog() else showResistanceControlDialog()
         }
 
-        binding.btnViewLap.setOnClickListener { setWorkoutView(false) }
-        binding.btnViewChart.setOnClickListener { setWorkoutView(true) }
+        binding.viewToggleRow.addOnButtonCheckedListener { _, checkedId, isChecked ->
+            if (isChecked) setWorkoutView(checkedId == R.id.btnViewChart)
+        }
 
         updateConnectionStatus()
         // Apply initial Idle UI (which also resets all metric displays).
@@ -347,6 +348,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun setWorkoutView(showChart: Boolean) {
         isChartViewActive = showChart
+        binding.viewToggleRow.check(if (showChart) R.id.btnViewChart else R.id.btnViewLap)
         binding.lapSection.visibility = if (!showChart) View.VISIBLE else View.GONE
         binding.chartSection.visibility = if (showChart) View.VISIBLE else View.GONE
         if (showChart) updateLiveChart()
@@ -1161,9 +1163,7 @@ class MainActivity : AppCompatActivity() {
         binding.lapValueHr.text = "--"
         binding.lapUnitEnergy.setText(R.string.unit_kcal)
         // Default to lap view
-        isChartViewActive = false
-        binding.lapSection.visibility = View.VISIBLE
-        binding.chartSection.visibility = View.GONE
+        setWorkoutView(false)
         lifecycleScope.launch(Dispatchers.IO) {
             val session = WorkoutSession(
                 startTimeMs = sessionStartTime,
@@ -1824,11 +1824,9 @@ class MainActivity : AppCompatActivity() {
         stateMachine.applyUI()
 
         // Restore chart/lap view selection
-        binding.lapSection.visibility = if (!isChartViewActive) View.VISIBLE else View.GONE
-        binding.chartSection.visibility = if (isChartViewActive) View.VISIBLE else View.GONE
+        setWorkoutView(isChartViewActive)
 
         updateElapsedDisplay(elapsedTickSec)
-        if (isChartViewActive) updateLiveChart()
     }
 
     /**

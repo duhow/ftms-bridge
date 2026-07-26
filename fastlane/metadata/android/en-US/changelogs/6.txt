@@ -1,1 +1,4 @@
-Add user-facing changes for the next release here.
+- Cleaner workout controls: proper play/stop icons instead of text symbols
+- Lap/Chart switch now highlights the active view
+- Metric cards now adapt to dark mode
+- Removed unused on-screen elements

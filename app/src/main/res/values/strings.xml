@@ -14,17 +14,11 @@
     <string name="permissions_required">Bluetooth permissions are required</string>
 
     <!-- Session -->
-    <string name="start_session">Start</string>
-    <string name="stop_session">Stop</string>
-    <string name="recording">● REC</string>
-    <string name="paused">⏸ PAUSED</string>
-    <string name="back_to_idle">◀ Back</string>
+    <string name="back_to_idle">Back</string>
 
     <!-- Workout controls -->
-    <string name="workout_start">▶ Start</string>
-    <string name="workout_pause">⏸ Pause</string>
-    <string name="workout_resume">▶ Resume</string>
-    <string name="workout_stop">◼ Stop</string>
+    <string name="workout_start">Start</string>
+    <string name="workout_stop">Stop</string>
 
     <!-- History -->
     <string name="history">History</string>

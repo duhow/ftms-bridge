@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Dark-theme metric tile accent colors (lighter tones for contrast) -->
+    <color name="metric_speed">#90CAF9</color>
+    <color name="metric_heart">#EF9A9A</color>
+    <color name="metric_distance">#A5D6A7</color>
+    <color name="metric_energy">#FFB74D</color>
+    <color name="metric_cadence">#CE93D8</color>
+    <color name="metric_power">#FFF176</color>
+    <color name="metric_time">#80CBC4</color>
+    <color name="metric_inclination">#BCAAA4</color>
+    <color name="metric_resistance">#9FA8DA</color>
+    <!-- Dark-theme metric tile tint colors (darker backgrounds) -->
+    <color name="metric_speed_bg">#0D2A45</color>
+    <color name="metric_heart_bg">#3E1518</color>
+    <color name="metric_distance_bg">#12321A</color>
+    <color name="metric_energy_bg">#3A2410</color>
+    <color name="metric_cadence_bg">#2E1236</color>
+    <color name="metric_power_bg">#33300E</color>
+    <color name="metric_time_bg">#0C2B28</color>
+    <color name="metric_inclination_bg">#2B211E</color>
+    <color name="metric_resistance_bg">#171C3B</color>
+</resources>

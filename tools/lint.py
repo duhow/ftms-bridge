@@ -20,6 +20,7 @@ Options:
 from __future__ import annotations
 
 import argparse
+import re
 import sys
 from pathlib import Path
 from xml.etree import ElementTree as ET
@@ -108,6 +109,10 @@ def _check_language_parity() -> list[str]:
         return []
     base_names = _get_string_names(base)
     for lang_dir in sorted(RES_DIR.glob("values-*")):
+        # Only locale qualifiers (e.g. values-es, values-zh-rCN); skip
+        # mode/config qualifiers like values-night or values-v31.
+        if not re.fullmatch(r"values-[a-z]{2,3}(-r[A-Z]{2})?", lang_dir.name):
+            continue
         lang_file = lang_dir / "strings.xml"
         if not lang_file.exists():
             issues.append(f"{lang_dir.name}: missing strings.xml")
