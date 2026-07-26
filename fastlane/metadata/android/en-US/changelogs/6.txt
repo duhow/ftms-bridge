@@ -8,3 +8,4 @@
 - Live chart shows a marker line at every completed kilometre
 - New menu in Workout History to export all workouts as a ZIP of FIT files and import them back (backup/restore)
 - Recording no longer stops when the app is closed from recent apps: the session keeps running in the background until the machine stops or disconnects
+- The recording notification now shows a live timer with the elapsed session time

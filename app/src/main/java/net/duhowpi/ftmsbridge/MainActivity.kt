@@ -1288,6 +1288,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun startRecordingService() {
         val intent = Intent(this, RecordingService::class.java)
+            .putExtra(RecordingService.EXTRA_SESSION_START_MS, sessionStartTime)
         ContextCompat.startForegroundService(this, intent)
     }
 

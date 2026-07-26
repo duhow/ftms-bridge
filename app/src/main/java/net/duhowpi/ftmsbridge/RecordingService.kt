@@ -51,12 +51,19 @@ class RecordingService : Service() {
             this, 0, openIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
+        val startTime = intent?.getLongExtra(EXTRA_SESSION_START_MS, 0L)?.takeIf { it > 0 }
+            ?: System.currentTimeMillis()
         val notification: Notification = NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle(getString(R.string.app_name))
             .setContentText(getString(R.string.recording_notification_text))
             .setSmallIcon(R.drawable.ic_bluetooth)
             .setContentIntent(pendingIntent)
             .setOngoing(true)
+            // System-rendered elapsed timer: counts up from session start without
+            // the service having to re-post the notification every second.
+            .setWhen(startTime)
+            .setShowWhen(true)
+            .setUsesChronometer(true)
             .build()
 
         ServiceCompat.startForeground(
@@ -93,5 +100,8 @@ class RecordingService : Service() {
         private const val CHANNEL_ID = "recording_channel"
         private const val NOTIFICATION_ID = 1
         private const val WAKE_LOCK_TIMEOUT_MS = 4 * 60 * 60 * 1000L // 4 hours
+
+        /** Unix ms when the session started; used for the notification chronometer. */
+        const val EXTRA_SESSION_START_MS = "session_start_ms"
     }
 }
