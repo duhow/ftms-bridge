@@ -30,6 +30,10 @@
     <string name="export_fit">FIT</string>
     <string name="export_csv">CSV</string>
     <string name="export_format_title">Format d\'exportació</string>
+    <string name="export_all">Exporta-ho tot (ZIP)</string>
+    <string name="import_workouts">Importa entrenaments</string>
+    <string name="import_result">%1$d entrenaments importats, %2$d omesos</string>
+    <string name="import_none">No s\'han trobat entrenaments al fitxer</string>
     <string name="duration">Durada</string>
     <string name="avg_speed">Vel. mitjana</string>
     <string name="avg_hr">FC mitjana</string>
