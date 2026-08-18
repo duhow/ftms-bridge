@@ -24,6 +24,7 @@ import kotlinx.coroutines.withContext
 import net.duhowpi.ftmsbridge.data.AppDatabase
 import net.duhowpi.ftmsbridge.data.WorkoutSession
 import net.duhowpi.ftmsbridge.databinding.ActivityWorkoutHistoryBinding
+import net.duhowpi.ftmsbridge.ui.applySystemBarInsets
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -48,6 +49,7 @@ class WorkoutHistoryActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         binding = ActivityWorkoutHistoryBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        binding.root.applySystemBarInsets()
 
         binding.toolbar.title = getString(R.string.workout_history)
         setSupportActionBar(binding.toolbar)

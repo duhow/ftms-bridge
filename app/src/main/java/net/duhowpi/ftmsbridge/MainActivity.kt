@@ -55,6 +55,7 @@ import net.duhowpi.ftmsbridge.ftms.FtmsConstants
 import net.duhowpi.ftmsbridge.ftms.FtmsDataParser
 import net.duhowpi.ftmsbridge.model.FitnessSample
 import net.duhowpi.ftmsbridge.model.ScannedDeviceInfo
+import net.duhowpi.ftmsbridge.ui.applySystemBarInsets
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.util.UUID
@@ -226,6 +227,7 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        binding.root.applySystemBarInsets()
 
         binding.toolbar.title = getString(R.string.app_name)
         setSupportActionBar(binding.toolbar)
