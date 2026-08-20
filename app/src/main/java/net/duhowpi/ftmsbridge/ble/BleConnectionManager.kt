@@ -41,6 +41,10 @@ class BleConnectionManager(
 
     private var controlPointChar: BluetoothGattCharacteristic? = null
 
+    /** ATT MTU in force on the current link; the notification payload is this minus 3. */
+    var negotiatedMtu = DEFAULT_ATT_MTU
+        private set
+
     var isConnected = false
         private set
 
@@ -231,10 +235,17 @@ class BleConnectionManager(
             when (newState) {
                 BluetoothProfile.STATE_CONNECTED -> {
                     Log.i(tag, "Connected to ${gatt.device.name}")
-                    debugLogger.logMessage("GATT connected, discovering services...")
                     isConnected = true
                     listener?.onConnected(gatt.device.name ?: "Unknown")
-                    gatt.discoverServices()
+                    // The default ATT MTU of 23 leaves only 20 bytes for a notification,
+                    // which is not enough for a Treadmill Data packet that includes heart
+                    // rate. Ask for more before discovering services; discovery starts from
+                    // onMtuChanged either way, so a refusal is not fatal.
+                    debugLogger.logMessage("GATT connected, requesting MTU $REQUESTED_MTU...")
+                    if (!gatt.requestMtu(REQUESTED_MTU)) {
+                        debugLogger.logMessage("MTU request rejected outright, discovering services...")
+                        gatt.discoverServices()
+                    }
                 }
                 BluetoothProfile.STATE_DISCONNECTED -> {
                     Log.i(tag, "Disconnected")
@@ -253,6 +264,17 @@ class BleConnectionManager(
                     listener?.onDisconnected()
                 }
             }
+        }
+
+        override fun onMtuChanged(gatt: BluetoothGatt, mtu: Int, status: Int) {
+            if (ActivityCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) return
+            // mtu includes the 3-byte ATT header, so the usable notification payload is mtu - 3.
+            negotiatedMtu = if (status == BluetoothGatt.GATT_SUCCESS) mtu else DEFAULT_ATT_MTU
+            debugLogger.logMessage(
+                "MTU negotiated: $negotiatedMtu (status=$status, payload=${negotiatedMtu - ATT_HEADER_SIZE} bytes)"
+            )
+            Log.i(tag, "MTU negotiated: $negotiatedMtu (status=$status)")
+            gatt.discoverServices()
         }
 
         override fun onServicesDiscovered(gatt: BluetoothGatt, status: Int) {
@@ -486,5 +508,18 @@ class BleConnectionManager(
     companion object {
         private const val RESISTANCE_LOG_MIN_LEVEL = 1
         private const val RESISTANCE_LOG_MAX_LEVEL = 22
+
+        /** ATT MTU every LE link starts at, leaving a 20-byte notification payload. */
+        private const val DEFAULT_ATT_MTU = 23
+
+        /** Bytes of ATT overhead in every notification. */
+        private const val ATT_HEADER_SIZE = 3
+
+        /**
+         * MTU requested on connect. A Treadmill Data packet carrying heart rate needs 21
+         * bytes, one more than the default link allows, so the last field is dropped.
+         * 517 is the maximum an LE link can negotiate; devices are free to answer lower.
+         */
+        private const val REQUESTED_MTU = 517
     }
 }

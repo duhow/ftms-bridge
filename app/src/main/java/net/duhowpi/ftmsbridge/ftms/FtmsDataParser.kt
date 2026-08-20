@@ -9,8 +9,43 @@ object FtmsDataParser {
 
     private val tag = "FtmsDataParser"
 
+    /**
+     * Bytes of zero padding added behind every packet before parsing.
+     *
+     * A machine can describe more fields in its flags than the link can carry: with the
+     * default ATT MTU of 23 a notification holds 20 bytes, while a Treadmill Data packet
+     * that includes heart rate needs 21. Parsing such a packet straight out of a
+     * [ByteBuffer] throws [java.nio.BufferUnderflowException] part way through, and
+     * because notifications are delivered on a binder callback thread the exception is
+     * swallowed and the entire sample is lost — including the speed and distance that
+     * were present at the front of the packet.
+     *
+     * Truncation only ever removes trailing fields, so padding lets the fields that did
+     * arrive parse normally while the missing ones read back as zero. 16 bytes covers the
+     * longest tail any of these characteristics can declare.
+     */
+    private const val TRUNCATION_PADDING = 16
+
+    /** Wraps [data] for parsing so that a short packet yields partial data, not none. */
+    private fun paddedBuffer(data: ByteArray): ByteBuffer =
+        ByteBuffer.wrap(data.copyOf(data.size + TRUNCATION_PADDING)).order(ByteOrder.LITTLE_ENDIAN)
+
+    /**
+     * Logs when a packet described more data than it carried, so a machine whose
+     * notifications do not fit the current MTU is visible rather than silently degraded.
+     */
+    private fun warnIfTruncated(buf: ByteBuffer, data: ByteArray, flags: Int, what: String) {
+        if (buf.position() > data.size) {
+            Log.w(
+                tag,
+                "$what packet truncated: flags=0x%04X declared %d bytes, link delivered %d"
+                    .format(flags, buf.position(), data.size)
+            )
+        }
+    }
+
     fun parseTreadmillData(data: ByteArray): FitnessSample {
-        val buf = ByteBuffer.wrap(data).order(ByteOrder.LITTLE_ENDIAN)
+        val buf = paddedBuffer(data)
         val flags = buf.short.toInt() and 0xFFFF
 
         // Bit 0: More Data (1 = no instantaneous speed in this packet)
@@ -100,6 +135,7 @@ object FtmsDataParser {
             buf.short // skip percentage (sint16)
         }
 
+        warnIfTruncated(buf, data, flags, "Treadmill")
         Log.d(tag, "treadmill raw: speed=%.2f km/h incl=%.1f%% dist=${totalDistanceM}m kcal=${totalEnergyKcal} hr=${heartRateBpm} t=${elapsedTimeSec}s"
             .format(speedKmh, inclinationPercent))
         return FitnessSample(
@@ -122,7 +158,7 @@ object FtmsDataParser {
     }
 
     fun parseIndoorBikeData(data: ByteArray): FitnessSample {
-        val buf = ByteBuffer.wrap(data).order(ByteOrder.LITTLE_ENDIAN)
+        val buf = paddedBuffer(data)
         val flags = buf.short.toInt() and 0xFFFF
 
         // Bit 0: More Data (0 = Instantaneous Speed present)
@@ -198,6 +234,7 @@ object FtmsDataParser {
             remainingTimeSec = buf.short.toInt() and 0xFFFF
         }
 
+        warnIfTruncated(buf, data, flags, "Indoor bike")
         return FitnessSample(
             speedKmh = speedKmh,
             averageSpeedKmh = averageSpeedKmh,
@@ -238,7 +275,7 @@ object FtmsDataParser {
      *   bit 14: Remaining Time present (uint16 s)
      */
     fun parseCrossTrainerData(data: ByteArray): FitnessSample {
-        val buf = ByteBuffer.wrap(data).order(ByteOrder.LITTLE_ENDIAN)
+        val buf = paddedBuffer(data)
         val flags = buf.short.toInt() and 0xFFFF
 
         var speedKmh = 0.0
@@ -327,6 +364,7 @@ object FtmsDataParser {
             remainingTimeSec = buf.short.toInt() and 0xFFFF
         }
 
+        warnIfTruncated(buf, data, flags, "Cross trainer")
         return FitnessSample(
             speedKmh = speedKmh,
             averageSpeedKmh = averageSpeedKmh,
@@ -366,7 +404,7 @@ object FtmsDataParser {
      *   bit 9: Remaining Time present (uint16 s)
      */
     fun parseStairClimberData(data: ByteArray): FitnessSample {
-        val buf = ByteBuffer.wrap(data).order(ByteOrder.LITTLE_ENDIAN)
+        val buf = paddedBuffer(data)
         val flags = buf.short.toInt() and 0xFFFF
 
         var cadenceRpm = 0.0
@@ -424,6 +462,7 @@ object FtmsDataParser {
             remainingTimeSec = buf.short.toInt() and 0xFFFF
         }
 
+        warnIfTruncated(buf, data, flags, "Stair climber")
         return FitnessSample(
             cadenceRpm = cadenceRpm,
             averageCadenceRpm = averageCadenceRpm,
